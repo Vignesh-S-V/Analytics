@@ -4,3 +4,7 @@
 
 /* Product economics controls */
 .product-controls{display:grid;grid-template-columns:minmax(260px,2fr) minmax(180px,1fr);gap:18px;align-items:end}.product-controls label{display:flex;flex-direction:column;gap:8px;color:#aebbd1;font-size:12px}.product-controls select,.product-controls input{width:100%;padding:12px 13px;background:#111a2d;color:#edf3ff;border:1px solid #34415b;border-radius:10px;font:inherit}.tax-note{color:#9ba9c2;font-size:12px;line-height:1.6;margin:14px 0 0}.economics-kpis{margin-top:18px}.economics-detail{margin-top:18px}.economics-detail .formula-card strong{display:block;font-size:25px;margin:12px 0;color:#f3f6ff}@media(max-width:700px){.product-controls{grid-template-columns:1fr}}
+
+
+/* Live KPI states */
+.data-status.data-ready{background:#ecfdf5;border-color:#a7f3d0;color:#065f46}.live-kpi-value{display:block;font-size:26px;font-weight:750;color:#f4f8ff;margin-top:18px}.live-kpi-note{display:block;font-size:12px;color:#aab8ce;margin-top:6px}.ready-chip{display:inline-flex;margin-top:14px;padding:6px 9px;border-radius:8px;background:rgba(16,185,129,.14);color:#6ee7b7;font-size:11px}
