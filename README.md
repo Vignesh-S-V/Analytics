@@ -2,48 +2,16 @@
 
 A free-tier-first React/Vite dashboard starter for garment export operations in Tirupur.
 
-## Included
-- Management overview with illustrative revenue, profit, margin and late-order KPIs
-- Sales / buyer profitability table
-- Production, marketing and procurement decision prompts
-- Investment Lab with editable capex, monthly savings and payback assumptions
-- Responsive dark, 3D-inspired dashboard UI
-- Optional Supabase browser connection using the public anon/publishable key only
-
-## Important data integrity note
-The dashboard initially uses **illustrative demo values**. Do not use them for business decisions. The workbook rows have not yet been imported into Supabase. Once imported and appropriate least-privilege read policies are applied, the UI can read the required tables; see the current app code for the precise tables and limits.
+## Data integrity
+The dashboard uses clearly-labelled illustrative demo values until the workbook data is imported into Supabase. Do not use demo values for business decisions. The current Supabase tables are empty. Never expose a Supabase service_role key in browser code.
 
 ## Local setup
-1. Use Node.js LTS.
-2. Copy `.env.example` to `.env`.
-3. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (publishable/anon key only).
-4. Run `npm install`, then `npm run dev`.
-5. Run `npm run build` before deployment.
+1. Install Node.js LTS.
+2. Copy `.env.example` to `.env` and set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+3. Run `npm install && npm run dev`.
+4. Check `npm run build` before deployment.
 
-## Supabase
-Project URL: https://rzsgdfpwnxhseyxtrrlx.supabase.co
+## Free Render static site
+Repository `Vignesh-S-V/Analytics`, branch `main`, build command `npm install && npm run build`, publish directory `dist`. Add the URL and public anon key as build environment variables only.
 
-Tables expected:
-- `fact_orders`
-- `fact_marketing`
-- `dim_buyers`
-- `dim_styles`
-- `dim_lines`
-- `dim_suppliers`
-- `dim_market`
-
-**Never expose a `service_role` key in browser code or Vite variables.** Add least-privilege SELECT policies only after reviewing row-level security requirements.
-
-## Free Render static-site deployment
-- Repository: `Vignesh-S-V/Analytics`
-- Branch: `main`
-- Build command: `npm install && npm run build`
-- Publish directory: `dist`
-- Environment variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
-
-The repo includes no secret keys or business-data workbook. Free-tier availability and limits may change.
-
-## Documentation
-- [KPI catalogue](docs/KPI_CATALOG.md)
-- [Additional data requirements](docs/ADDITIONAL_DATA_REQUIREMENTS.md)
-- [SQL dashboard views](sql/dashboard_views.sql)
+More details: `docs/KPI_CATALOG.md`, `docs/ADDITIONAL_DATA_REQUIREMENTS.md`, `sql/dashboard_views.sql`.
