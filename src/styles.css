@@ -106,3 +106,20 @@ body{background:linear-gradient(135deg,#f8fbff 0%,#f1f6fc 55%,#ffffff 100%)!impo
 .economics-detail .formula-card strong{color:#17243b!important;text-shadow:none!important}
 .economics-detail .formula-card h2{color:#17243b!important}
 .economics-detail .formula-card .formula-source b{color:#17243b!important}
+
+
+/* Investment Lab: show source-backed historical results before optional what-if assumptions */
+.investment-workspace{display:grid;gap:16px}
+.investment-overview{padding:20px}
+.investment-kpis{margin-top:0}
+.investment-facts-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+.investment-facts-grid .result-card{min-height:145px}
+.investment-facts-grid .next-data{grid-column:1/-1}
+.scenario-toggle{width:100%;font:inherit;text-align:left;cursor:pointer;align-items:center;border:1px solid #dce8f6!important;display:flex;gap:14px;transition:transform .18s ease,box-shadow .18s ease,background .18s ease}
+.scenario-toggle:hover{background:linear-gradient(120deg,#f4f9ff,#fff)!important;box-shadow:0 14px 28px rgba(37,85,145,.10)!important;transform:translateY(-1px)}
+.scenario-toggle:focus-visible{outline:3px solid #93c5fd;outline-offset:3px}
+.scenario-toggle-copy{display:flex;flex:1;min-width:0;flex-direction:column;gap:6px}
+.scenario-toggle-copy strong{font:700 15px Manrope,sans-serif;color:#17243b}
+.scenario-toggle-copy>span:last-child{font-size:10px;color:#667891;line-height:1.6}
+.scenario-expanded{margin-top:0}
+@media(max-width:700px){.investment-facts-grid{grid-template-columns:1fr}.investment-facts-grid .next-data{grid-column:auto}}
