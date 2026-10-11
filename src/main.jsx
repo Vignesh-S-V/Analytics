@@ -63,7 +63,7 @@ function AskAI({db,range,country}){
   setError('');setSetupRequired(false);setInput('');setMessages(prev=>[...prev,{role:'user',content:question,voice:fromVoice}]);setBusy(true);
   try{
    if(!db)throw new Error('Supabase connection is not configured.');
-   const {data,error:invokeError}=await db.functions.invoke('ask-garment-data',{body:{question,filters:{year:range==='All available periods'?'':range,country:country==='All countries'?'':country}}});
+   const legacyAnon=import.meta.env.VITE_SUPABASE_LEGACY_ANON_KEY;const {data,error:invokeError}=await db.functions.invoke('ask-garment-data',{headers:legacyAnon?{Authorization:'Bearer '+legacyAnon}:{},body:{question,filters:{year:range==='All available periods'?'':range,country:country==='All countries'?'':country}}});
    if(invokeError){let detail={};try{detail=await invokeError.context?.clone?.().json()}catch{};if(detail?.code==='AI_KEY_MISSING'||detail?.help){setSetupRequired(true);throw new Error(detail.help||'Add GEMINI_API_KEY to Supabase Edge Function secrets.')}throw new Error(detail?.error||invokeError.message||'Could not connect to the AI service.');}
    if(data?.error){if(data.code==='AI_KEY_MISSING'||data.help)setSetupRequired(true);throw new Error(data.help||data.error)}
    if(!data?.answer)throw new Error('AI returned no answer. Please try again.');
