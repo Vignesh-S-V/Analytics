@@ -76,3 +76,6 @@ body{background:linear-gradient(135deg,#f8fbff 0%,#f1f6fc 55%,#ffffff 100%)!impo
 .action-item.action-clickable:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
 .action-item.action-clickable .action-copy{display:block}
 .action-item.action-clickable .action-arrow{flex-shrink:0;color:#2878d4}
+
+
+.table-empty{padding:24px 12px;text-align:center;color:#71819a!important;font-size:12px!important;background:#f8fbff}.chart-foot .foot-note{white-space:nowrap}
