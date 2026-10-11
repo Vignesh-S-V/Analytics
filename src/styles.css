@@ -290,3 +290,97 @@ img,svg,canvas{max-width:100%}
 @media (prefers-reduced-motion:reduce){
  .nav-item,.action-item.action-clickable,.interpretation-toggle,.scenario-toggle{transition:none!important}
 }
+
+
+/* Ask AI: responsive RAG chat experience */
+.ask-ai-page{display:grid;gap:15px;min-width:0}
+.ask-ai-hero{display:flex;align-items:center;gap:14px;padding:20px;background:linear-gradient(120deg,#f1f7ff,#fff)!important}
+.ask-ai-brand-icon{width:48px;height:48px;display:grid;place-items:center;flex:0 0 48px;border-radius:15px;background:linear-gradient(145deg,#e4f1ff,#cfe5ff);color:#176bce;box-shadow:inset 0 1px 0 #fff,0 6px 16px rgba(37,99,235,.12)}
+.ask-ai-hero-copy{min-width:0;flex:1}
+.ask-ai-hero-copy h2{font:750 19px Manrope,sans-serif;color:#14243d;margin:6px 0}
+.ask-ai-hero-copy p{font-size:11px;color:#62748f;line-height:1.65;margin:0;max-width:80ch}
+.ask-ai-status{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:8px 10px;border-radius:999px;border:1px solid #cfe8dd;background:#f1fbf6;color:#19744b;font-size:10px;font-weight:700}
+.ask-ai-chat{display:flex;flex-direction:column;min-height:610px;max-height:calc(100vh - 215px);background:#fff!important;border-color:#dce7f5!important;box-shadow:0 14px 34px rgba(35,68,112,.08)!important}
+.ask-ai-chat-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 19px;border-bottom:1px solid #e7eef7;background:linear-gradient(110deg,#fff,#f8fbff)}
+.ask-ai-chat-head>div{display:flex;flex-direction:column;gap:5px;min-width:0}
+.ask-ai-chat-head strong{display:flex;align-items:center;gap:7px;font-size:13px;color:#17243b}
+.ask-ai-chat-head strong svg{color:#2878d4}
+.ask-ai-chat-head>div>span{font-size:10px;color:#7a8aa3}
+.voice-language{display:flex;align-items:center;gap:7px;color:#657791;font-size:10px;white-space:nowrap}
+.voice-language select{max-width:155px;min-width:0;padding:8px 9px;border:1px solid #dce6f2;border-radius:9px;background:#fff;color:#1e2f49;font-size:10px}
+.ask-ai-messages{flex:1;min-height:245px;overflow:auto;padding:20px;display:flex;flex-direction:column;gap:19px;scroll-behavior:smooth;background:linear-gradient(180deg,#fbfdff,#fff)}
+.ask-message{display:flex;align-items:flex-start;gap:10px;width:100%;min-width:0}
+.ask-message-avatar{width:31px;height:31px;flex:0 0 31px;display:grid;place-items:center;border-radius:10px;background:#e8f2ff;color:#176bce;font-size:9px;font-weight:800}
+.ask-assistant .ask-message-avatar{background:#e4f8f1;color:#13866a}
+.ask-message-body{min-width:0;max-width:min(850px,92%);flex:1}
+.ask-message-text{font-size:12px;line-height:1.8;color:#253750;white-space:pre-wrap;overflow-wrap:anywhere}
+.ask-user .ask-message-body{max-width:min(720px,90%);background:#edf5ff;border:1px solid #d8e8fc;border-radius:13px 3px 13px 13px;padding:12px 14px;margin-left:auto}
+.ask-user{justify-content:flex-end}
+.ask-user .ask-message-avatar{order:2;background:#e6edfa;color:#425b7f}
+.ask-user .ask-message-body{order:1;flex:0 1 auto}
+.ask-sources{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:11px;padding-top:10px;border-top:1px solid #eaf0f7}
+.ask-sources>span:first-child{font-size:9px;color:#6e8099}
+.ask-source-chip{font-size:9px;color:#2269a9;background:#eff6ff;border:1px solid #dbeafe;border-radius:7px;padding:5px 7px}
+.ask-read-aloud{display:inline-flex;align-items:center;gap:6px;margin-top:9px;border:1px solid #dce7f4;border-radius:8px;background:#fff;padding:7px 9px;color:#2969ad;font-size:10px;font-weight:700}
+.ask-read-aloud:hover{background:#eff6ff}
+.ask-thinking{display:flex;align-items:center;gap:5px;color:#627791;font-size:11px;padding:8px 0}
+.ask-thinking span{width:5px;height:5px;background:#3986db;border-radius:50%;animation:askPulse 1s infinite ease-in-out}
+.ask-thinking span:nth-child(2){animation-delay:.15s}.ask-thinking span:nth-child(3){animation-delay:.3s}
+@keyframes askPulse{0%,70%,100%{opacity:.25;transform:translateY(0)}35%{opacity:1;transform:translateY(-3px)}}
+.ask-suggestions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 18px 4px;border-top:1px solid #edf2f8;background:#fff}
+.ask-suggestions>span{width:100%;font-size:9px;letter-spacing:.7px;color:#71839d;text-transform:uppercase;font-weight:700}
+.ask-suggestions button{border:1px solid #dce8f7;background:#f7faff;color:#365878;border-radius:999px;padding:8px 11px;font-size:10px;text-align:left}
+.ask-suggestions button:hover{border-color:#a9cff8;background:#eff6ff;color:#145db2}
+.ask-suggestions button:disabled{opacity:.5;cursor:wait}
+.ask-error{margin:9px 18px 0;padding:10px 12px;border-radius:9px;background:#fff5f3;border:1px solid #f5d0c9;color:#a54132;font-size:11px;line-height:1.6;overflow-wrap:anywhere}
+.ask-ai-composer{display:flex;align-items:flex-end;gap:9px;margin:13px 17px 0;padding:9px;border-radius:14px;background:#f7faff;border:1px solid #dbe6f4;box-shadow:inset 0 1px 2px rgba(34,66,105,.025)}
+.ask-ai-composer textarea{flex:1;min-width:0;max-height:130px;min-height:40px;resize:vertical;border:0!important;outline:none;background:transparent!important;color:#17243b!important;font:12px/1.6 'DM Sans',sans-serif;padding:10px 4px!important;box-shadow:none!important}
+.ask-ai-composer textarea::placeholder{color:#91a0b5}
+.ask-mic-button,.ask-send-button{height:40px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;gap:7px;flex:0 0 auto}
+.ask-mic-button{width:40px;border:1px solid #d4e3f5;background:#fff;color:#286cb2}
+.ask-mic-button:hover{background:#edf6ff}
+.ask-mic-button.is-listening{background:#fff0f0;color:#c62828;border-color:#f5c2c2;animation:micPulse 1.2s infinite}
+@keyframes micPulse{50%{box-shadow:0 0 0 5px rgba(220,38,38,.09)}}
+.ask-send-button{border:1px solid #1768cb;background:linear-gradient(145deg,#2784ec,#1763c3);color:#fff;padding:0 15px;font-size:11px;font-weight:750;box-shadow:0 5px 12px rgba(37,99,235,.17)}
+.ask-send-button:disabled{opacity:.45;box-shadow:none;cursor:not-allowed}
+.ask-ai-footnote{padding:10px 19px 14px;font-size:9px;line-height:1.6;color:#8291a7}
+.ask-busy-icon{animation:askPulse .8s infinite}
+@media(max-width:700px){
+ .ask-ai-page{gap:11px}
+ .ask-ai-hero{padding:14px;align-items:flex-start;flex-wrap:wrap;gap:10px}
+ .ask-ai-brand-icon{width:39px;height:39px;flex-basis:39px;border-radius:12px}
+ .ask-ai-hero-copy{flex-basis:calc(100% - 55px)}
+ .ask-ai-hero-copy h2{font-size:16px}
+ .ask-ai-hero-copy p{font-size:10px;line-height:1.55}
+ .ask-ai-status{margin-left:49px;padding:6px 9px;font-size:9px}
+ .ask-ai-chat{min-height:calc(100dvh - 240px);max-height:none;border-radius:13px}
+ .ask-ai-chat-head{padding:12px;align-items:flex-start;flex-direction:column}
+ .ask-ai-chat-head strong{font-size:12px}
+ .voice-language{width:100%;justify-content:space-between}
+ .voice-language select{flex:1;max-width:65%}
+ .ask-ai-messages{padding:13px 11px;gap:16px;min-height:270px;max-height:52dvh}
+ .ask-message{gap:7px}
+ .ask-message-avatar{width:27px;height:27px;flex-basis:27px;border-radius:8px}
+ .ask-message-body{max-width:calc(100% - 34px)}
+ .ask-user .ask-message-body{max-width:88%}
+ .ask-message-text{font-size:11px;line-height:1.75}
+ .ask-source-chip{font-size:8px;padding:4px 6px}
+ .ask-suggestions{padding:10px 11px 2px;gap:6px}
+ .ask-suggestions button{font-size:9px;padding:7px 9px;max-width:100%;white-space:normal}
+ .ask-ai-composer{margin:10px 10px 0;padding:6px;gap:6px;border-radius:12px;align-items:flex-end}
+ .ask-mic-button,.ask-send-button{height:39px;border-radius:10px}
+ .ask-mic-button{width:38px}
+ .ask-send-button{padding:0 11px}
+ .ask-send-button span{display:none}
+ .ask-ai-composer textarea{font-size:12px;min-height:39px;padding:9px 2px!important}
+ .ask-ai-footnote{padding:9px 12px 12px;font-size:8px}
+ .ask-error{margin:8px 10px 0;font-size:10px}
+}
+@media(max-width:390px){
+ .ask-ai-chat{min-height:calc(100dvh - 230px)}
+ .ask-ai-messages{max-height:48dvh}
+ .ask-ai-hero-copy h2{font-size:15px}
+ .ask-ai-status{margin-left:0}
+ .ask-user .ask-message-body{max-width:84%}
+}
+@media(prefers-reduced-motion:reduce){.ask-thinking span,.ask-mic-button.is-listening{animation:none!important}}
