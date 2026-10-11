@@ -123,3 +123,170 @@ body{background:linear-gradient(135deg,#f8fbff 0%,#f1f6fc 55%,#ffffff 100%)!impo
 .scenario-toggle-copy>span:last-child{font-size:10px;color:#667891;line-height:1.6}
 .scenario-expanded{margin-top:0}
 @media(max-width:700px){.investment-facts-grid{grid-template-columns:1fr}.investment-facts-grid .next-data{grid-column:auto}}
+
+
+/* Responsive layout pass: desktop, tablet, and mobile */
+html{width:100%;min-width:320px;scrollbar-gutter:stable}
+body{width:100%;min-width:320px;overflow-x:hidden}
+#root{width:100%;min-height:100vh;overflow-x:clip}
+.app-shell{width:100%;max-width:100%;min-width:0}
+.sidebar{flex:0 0 254px;min-width:0}
+.main-area{min-width:0;width:calc(100% - 254px)}
+.content{width:100%;min-width:0}
+.kpi-card,.panel,.chart-grid>*,.lower-grid>*,.investment-workspace>*,.investment-facts-grid>*{min-width:0}
+.chart-wrap,.donut-wrap,.chart-wrap .recharts-responsive-container,.donut-wrap .recharts-responsive-container{min-width:0;max-width:100%}
+.table-scroll{-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;max-width:100%}
+.table-scroll table{min-width:620px}
+select,input,button{max-width:100%}
+img,svg,canvas{max-width:100%}
+.page-heading h1{overflow-wrap:anywhere}
+.subtitle{max-width:75ch;line-height:1.65}
+.heading-actions select{min-width:0}
+.kpi-value,.result-card strong,.economics-detail .formula-card strong,.formula-card .live-kpi-value{overflow-wrap:anywhere}
+.status-pill{min-width:0;max-width:42vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status-pill .status-dot{flex:0 0 7px}
+@media (min-width:701px) and (max-width:1050px){
+ .sidebar{flex-basis:205px;padding:21px 12px}
+ .main-area{width:calc(100% - 205px)}
+ .content{padding:24px 20px}
+ .topbar{padding:0 20px}
+ .page-heading{align-items:flex-start}
+ .heading-actions{flex-wrap:wrap;justify-content:flex-end}
+ .heading-actions select{max-width:190px}
+ .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .chart-grid,.lower-grid{grid-template-columns:minmax(0,1fr)}
+ .investment-workspace{grid-template-columns:minmax(0,1fr)}
+ .investment-facts-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .investment-kpis .kpi-card{min-height:145px}
+}
+@media (max-width:700px){
+ html,body,#root{width:100%;min-width:320px;overflow-x:hidden}
+ .app-shell{display:flex;flex-direction:column;min-height:100dvh;overflow-x:clip}
+ .sidebar{order:0;width:100%;flex:0 0 auto;min-height:auto;height:auto;padding:12px 12px 9px;border-right:0;border-bottom:1px solid #e2eaf4;box-shadow:0 5px 20px rgba(31,65,109,.045);position:relative;z-index:5}
+ .brand{padding:0 3px 12px;gap:9px}
+ .brand-mark{width:34px;height:34px;border-radius:10px}
+ .brand b{font-size:18px}
+ .brand small{font-size:7px;letter-spacing:1.3px}
+ .workspace,.workspace-label,.sidebar-bottom,.nav-label{display:none!important}
+ .sidebar nav{display:flex;width:100%;max-width:100%;gap:6px;overflow-x:auto;overflow-y:hidden;padding:2px 0 5px;scroll-snap-type:x proximity;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+ .sidebar nav::-webkit-scrollbar{display:none}
+ .nav-item{flex:0 0 auto;white-space:nowrap;scroll-snap-align:start;min-height:38px;padding:9px 11px;gap:7px;border:1px solid #e4ebf5;border-radius:10px;font-size:11px;box-shadow:0 2px 5px rgba(31,68,111,.025)}
+ .nav-item.active{border-color:#c9e1ff;box-shadow:inset 0 -2px #2684ff,0 3px 8px rgba(37,99,235,.06)}
+ .main-area{width:100%;min-width:0;flex:1}
+ .topbar{height:auto;min-height:50px;padding:9px 13px;gap:10px}
+ .breadcrumb{font-size:10px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .top-actions{gap:7px;min-width:0}
+ .status-pill{font-size:9px;padding:6px 8px;max-width:min(48vw,190px)}
+ .icon-btn{width:30px;height:30px;flex:0 0 30px}
+ .small-avatar{width:28px;height:28px;flex:0 0 28px}
+ .content{width:100%;max-width:100%;margin:0;padding:17px 12px calc(18px + env(safe-area-inset-bottom))}
+ .page-heading{display:flex;flex-direction:column;align-items:stretch;gap:13px;margin-bottom:17px}
+ .eyebrow{font-size:8px;letter-spacing:1.3px;flex-wrap:wrap}
+ .page-heading h1{font-size:clamp(23px,7vw,30px);letter-spacing:-.7px;line-height:1.15;margin:8px 0 7px}
+ .subtitle{font-size:11px;line-height:1.6;max-width:none}
+ .heading-actions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);width:100%;gap:8px}
+ .heading-actions select,.heading-actions .filter-button{width:100%;min-width:0;max-width:100%;padding:10px 9px;font-size:10px}
+ .kpi-grid,.investment-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+ .kpi-card{padding:12px;min-height:132px;border-radius:13px}
+ .kpi-head{gap:7px;align-items:center}
+ .kpi-icon{width:29px;height:29px;flex:0 0 29px;border-radius:9px}
+ .kpi-label{font-size:10px;line-height:1.35}
+ .kpi-value{font-size:clamp(17px,5vw,22px);letter-spacing:-.65px;margin:12px 0 8px;white-space:normal}
+ .kpi-change{flex-wrap:wrap;align-items:flex-start;gap:4px;font-size:9px;line-height:1.4}
+ .kpi-change b{font-size:9px;overflow-wrap:anywhere}
+ .kpi-change span{line-height:1.4;overflow-wrap:anywhere}
+ .alert-strip{margin:12px 0 14px;padding:11px;gap:9px;align-items:flex-start}
+ .alert-symbol{width:29px;height:29px;flex:0 0 29px}
+ .alert-strip b{font-size:10px;line-height:1.45}
+ .alert-strip span{font-size:10px;line-height:1.55;overflow-wrap:anywhere}
+ .alert-strip>button{display:none}
+ .chart-grid,.lower-grid{grid-template-columns:minmax(0,1fr);gap:11px;margin-top:0}
+ .chart-panel,.table-panel,.action-panel{width:100%;padding:13px;border-radius:13px;min-height:0}
+ .panel-top{gap:8px}
+ .panel-kicker{font-size:8px;letter-spacing:1.15px;line-height:1.45}
+ .panel h2{font-size:14px;line-height:1.35;overflow-wrap:anywhere}
+ .panel-top p{font-size:10px;line-height:1.55}
+ .chart-wrap{width:100%;height:220px;margin:12px 0 0}
+ .chart-foot{flex-wrap:wrap;gap:10px;padding-top:9px}
+ .chart-foot .foot-note{width:100%;margin-left:0;font-size:9px}
+ .donut-wrap{width:100%;height:180px;margin:8px auto 4px}
+ .country-legend{gap:11px;padding:0 2px 3px}
+ .country-legend span{font-size:10px;min-width:0;justify-content:flex-start}
+ .country-legend span i{flex:0 0 7px}
+ .country-legend b{flex:0 0 auto;padding-left:8px}
+ .lower-grid{margin-top:12px}
+ .table-panel .panel-top{flex-direction:column}
+ .search-box{width:100%;min-height:38px}
+ .search-box input{width:100%;min-width:0;flex:1;font-size:11px}
+ .table-scroll{margin-top:12px;border-radius:8px}
+ .table-scroll table{min-width:620px}
+ th{font-size:9px;padding:10px 8px}
+ td{font-size:10px;padding:11px 8px}
+ td:first-child b{font-size:10px}
+ td:first-child small{font-size:9px}
+ .table-bottom{align-items:flex-start;gap:10px;flex-wrap:wrap;font-size:9px;line-height:1.5}
+ .table-bottom button{font-size:10px;max-width:100%;text-align:left}
+ .action-panel .panel-top{margin-bottom:4px}
+ .action-item.action-clickable{padding:13px 5px;gap:9px}
+ .action-copy>b{font-size:11px;line-height:1.5}
+ .action-copy p{font-size:10px;line-height:1.55}
+ .action-copy small{font-size:8px;letter-spacing:.7px}
+ .module-page{gap:11px}
+ .module-intro,.next-data{padding:14px}
+ .module-intro .panel-top{align-items:flex-start}
+ .panel-icon{width:35px;height:35px;flex:0 0 35px}
+ .data-status{font-size:10px;line-height:1.55;padding:10px;gap:8px}
+ .formula-grid,.economics-detail,.interpretation-kpi-list{grid-template-columns:minmax(0,1fr);gap:10px}
+ .formula-card{padding:14px}
+ .formula-card h2{font-size:15px;margin:9px 0}
+ .formula-card code{font-size:10px;line-height:1.55;overflow-wrap:anywhere;padding:10px}
+ .formula-card p{font-size:10px;line-height:1.55;min-height:0}
+ .live-kpi-value{font-size:23px}
+ .interpretation-toggle{padding:14px;gap:10px}
+ .interpretation-summary{gap:6px}
+ .interpretation-summary>strong{font-size:14px}
+ .interpretation-description{font-size:10px;line-height:1.55}
+ .interpretation-hint{font-size:10px;line-height:1.45}
+ .interpretation-details{padding:13px}
+ .interpretation-kpi{padding:12px}
+ .interpretation-kpi>div{flex-direction:column;gap:5px}
+ .investment-workspace,.investment-grid{grid-template-columns:minmax(0,1fr);gap:11px}
+ .investment-overview,.investment-inputs{padding:15px}
+ .investment-kpis .kpi-card{min-width:0}
+ .investment-facts-grid{grid-template-columns:minmax(0,1fr);gap:10px}
+ .investment-facts-grid .next-data{grid-column:auto}
+ .investment-facts-grid .result-card{min-height:0}
+ .scenario-toggle{padding:14px;gap:10px}
+ .scenario-toggle-copy strong{font-size:14px;line-height:1.4}
+ .scenario-toggle-copy>span:last-child{font-size:10px;line-height:1.55}
+ .scenario-expanded{grid-template-columns:minmax(0,1fr)}
+ .investment-results{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+ .investment-results .result-card{padding:12px;min-width:0}
+ .investment-results .result-card strong{font-size:clamp(18px,5.5vw,23px);overflow-wrap:anywhere}
+ .investment-results .result-card p{font-size:9px;line-height:1.5}
+ .investment-results .next-data{grid-column:1/-1}
+ .product-controls{grid-template-columns:minmax(0,1fr);gap:12px}
+ .product-controls label,.investment-inputs label{font-size:11px}
+ .product-controls select,.product-controls input,.investment-inputs input{width:100%;min-width:0;min-height:42px;font-size:12px}
+ .economics-kpis{margin-top:10px}
+ .economics-detail .formula-card strong{font-size:23px}
+ .tax-note{font-size:10px;line-height:1.55}
+ .footer{flex-direction:column;gap:8px;margin-top:15px;padding-top:12px;font-size:9px;line-height:1.5;overflow-wrap:anywhere}
+ .footer>span:last-child{flex-wrap:wrap}
+ .table-empty{white-space:normal;padding:18px 10px}
+}
+@media (max-width:390px){
+ .content{padding-left:10px;padding-right:10px}
+ .kpi-grid,.investment-kpis{grid-template-columns:minmax(0,1fr)}
+ .kpi-card{min-height:116px;padding:13px}
+ .kpi-value{font-size:22px}
+ .kpi-change{font-size:10px}
+ .heading-actions{grid-template-columns:minmax(0,1fr)}
+ .status-pill{max-width:42vw}
+ .investment-results{grid-template-columns:minmax(0,1fr)}
+ .investment-results .next-data{grid-column:auto}
+ .chart-wrap{height:205px}
+}
+@media (prefers-reduced-motion:reduce){
+ .nav-item,.action-item.action-clickable,.interpretation-toggle,.scenario-toggle{transition:none!important}
+}
