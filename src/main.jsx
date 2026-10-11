@@ -49,6 +49,7 @@ function AskAI({db,range,country}){
  const [listening,setListening]=useState(false);
  const [voiceLang,setVoiceLang]=useState('ta-IN');
  const [error,setError]=useState('');
+ const [setupRequired,setSetupRequired]=useState(false);
  const recognitionRef=useRef(null);
  const transcriptRef=useRef('');
  const autoSpeakRef=useRef(false);
@@ -59,18 +60,18 @@ function AskAI({db,range,country}){
  const ask=async(value,fromVoice=false)=>{
   const question=String(value??input).trim();if(!question||busy)return;
   if(recognitionRef.current){try{recognitionRef.current.stop()}catch{}}
-  setError('');setInput('');setMessages(prev=>[...prev,{role:'user',content:question,voice:fromVoice}]);setBusy(true);
+  setError('');setSetupRequired(false);setInput('');setMessages(prev=>[...prev,{role:'user',content:question,voice:fromVoice}]);setBusy(true);
   try{
    if(!db)throw new Error('Supabase connection is not configured.');
    const {data,error:invokeError}=await db.functions.invoke('ask-garment-data',{body:{question,filters:{year:range==='All available periods'?'':range,country:country==='All countries'?'':country}}});
-   if(invokeError)throw new Error(invokeError.message||'Could not connect to the AI service.');
-   if(data?.error){const err=new Error(data.error);err.help=data.help;throw err}
+   if(invokeError){let detail={};try{detail=await invokeError.context?.clone?.().json()}catch{};if(detail?.code==='AI_KEY_MISSING'||detail?.help){setSetupRequired(true);throw new Error(detail.help||'Add GEMINI_API_KEY to Supabase Edge Function secrets.')}throw new Error(detail?.error||invokeError.message||'Could not connect to the AI service.');}
+   if(data?.error){if(data.code==='AI_KEY_MISSING'||data.help)setSetupRequired(true);throw new Error(data.help||data.error)}
    if(!data?.answer)throw new Error('AI returned no answer. Please try again.');
    const assistant={role:'assistant',content:data.answer,sources:Array.isArray(data.sources)?data.sources:[]};
    setMessages(prev=>[...prev,assistant]);
    if(fromVoice) speakAnswer(data.answer);
   }catch(e){
-   const msg=e?.help?'AI is nearly ready, but one secure setup step remains: add GEMINI_API_KEY to Supabase Edge Function secrets. The key must stay server-side.':(e?.message||'Could not answer right now.');
+   const msg=setupRequired?'AI needs one secure setup step: add GEMINI_API_KEY to Supabase Edge Function secrets. Keep the key server-side; do not put it in frontend code or GitHub.':(e?.message||'Could not answer right now.');
    setError(msg);
   }finally{setBusy(false)}
  };
@@ -104,7 +105,7 @@ function AskAI({db,range,country}){
     {messages.map((m,i)=><div className={'ask-message '+(m.role==='user'?'ask-user':'ask-assistant')} key={i}><div className="ask-message-avatar">{m.role==='user'?'You':<Bot size={16}/>}</div><div className="ask-message-body"><div className="ask-message-text">{m.content}</div>{m.sources?.length>0&&<div className="ask-sources"><span>Retrieved sources:</span>{m.sources.map(s=><span className="ask-source-chip" key={s.name}>{s.name.replaceAll('_',' ')} · {s.records}</span>)}</div>}{m.role==='assistant'&&i>0&&<button className="ask-read-aloud" type="button" onClick={()=>speakAnswer(m.content)}><Volume2 size={14}/> Listen to answer</button>}</div></div>)}
     {busy&&<div className="ask-message ask-assistant"><div className="ask-message-avatar"><Bot size={16}/></div><div className="ask-message-body"><div className="ask-thinking"><span></span><span></span><span></span> Retrieving Supabase data and preparing answer…</div></div></div>}
    </div>
-   {error&&<div className="ask-error" role="alert">{error}</div>}
+   {error&&<div className="ask-error" role="alert">{error}{setupRequired&&<a className="ask-setup-link" href="https://supabase.com/dashboard/project/rzsgdfpwnxhseyxtrrlx/settings/functions" target="_blank" rel="noreferrer">Open Supabase Function settings</a>}</div>}
    {messages.length===1&&<div className="ask-suggestions"><span>Try asking</span>{suggestions.map(s=><button type="button" key={s} onClick={()=>ask(s)} disabled={busy}>{s}</button>)}</div>}
    <form className="ask-ai-composer" onSubmit={e=>{e.preventDefault();void ask(input)}}><button type="button" className={'ask-mic-button '+(listening?'is-listening':'')} onClick={listening?stopListening:startListening} disabled={busy} title={listening?'Stop voice input':'Ask by voice'} aria-label={listening?'Stop voice input':'Ask by voice'}>{listening?<Square size={17}/>:<Mic size={18}/>}</button><textarea value={input} onChange={e=>setInput(e.target.value)} rows={1} placeholder={listening?'Listening… speak your question':'Ask about total sales, GP, NP, products, buyers…'} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();void ask(input)}}} disabled={busy}/><button type="submit" className="ask-send-button" disabled={busy||!input.trim()} aria-label="Send question">{busy?<AudioLines size={17} className="ask-busy-icon"/>:<Send size={17}/>}<span>Ask</span></button></form>
    <div className="ask-ai-footnote">Microphone permission is required for voice input. Voice answers can be replayed with “Listen to answer”. AI may only report fields available in Supabase; missing financial/tax data will be identified rather than invented.</div>
