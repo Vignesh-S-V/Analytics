@@ -68,3 +68,11 @@ body{background:linear-gradient(135deg,#f8fbff 0%,#f1f6fc 55%,#ffffff 100%)!impo
 .result-card strong{color:#17243b!important}
 .live-kpi-value{color:#17243b!important}.live-kpi-note{color:#667891!important}
 @media(prefers-reduced-motion:reduce){.kpi-card,.panel{transition:none!important}.kpi-card:hover,.panel:hover{transform:none!important}}
+
+
+/* Interactive next-best-action cards */
+.action-item.action-clickable{width:100%;font:inherit;text-align:left;background:transparent;border:0;border-bottom:1px solid #edf1f7;cursor:pointer;transition:background .18s ease,transform .18s ease,box-shadow .18s ease;border-radius:10px;padding:13px 8px}
+.action-item.action-clickable:hover{background:#f0f7ff;transform:translateX(3px);box-shadow:0 5px 14px rgba(31,87,151,.08)}
+.action-item.action-clickable:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
+.action-item.action-clickable .action-copy{display:block}
+.action-item.action-clickable .action-arrow{flex-shrink:0;color:#2878d4}
