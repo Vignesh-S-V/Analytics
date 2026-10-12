@@ -73,7 +73,7 @@ function AskAI({db,range,country}){
    const publicAnon=import.meta.env.VITE_SUPABASE_ANON_KEY||legacyAnon;
    const supabaseUrl=import.meta.env.VITE_SUPABASE_URL;
    if(!supabaseUrl||!publicAnon)throw new Error('Supabase public connection configuration is missing.');
-   const response=await fetch(supabaseUrl.replace(/\\/$/,'')+'/functions/v1/ask-garment-data',{
+   const response=await fetch(supabaseUrl.replace(/\/$/,'')+'/functions/v1/ask-garment-data',{
     method:'POST',
     headers:{'Content-Type':'application/json','apikey':publicAnon,'Authorization':'Bearer '+publicAnon,'Accept':'application/x-ndjson, application/json'},
     body:JSON.stringify({question,filters:{year:range==='All available periods'?'':range,country:country==='All countries'?'':country}})
