@@ -123,7 +123,7 @@ function AskAI({db,range,country}){
  const startListening=()=>{
   if(typeof window==='undefined')return;
   const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SpeechRecognition){setError('This browser does not support voice recognition. Try Chrome or Edge, allow microphone access, and use HTTPS.');return}
+  if(!SpeechRecognition){setError('Voice recognition is not available in this browser session. This is a browser speech-recognition support issue, not proof that microphone permission is blocked. Try updating/reopening Safari, or type your question.');return}
   setError('');transcriptRef.current='';autoSpeakRef.current=true;
   const recognition=new SpeechRecognition();
   recognition.lang=voiceLang;recognition.interimResults=true;recognition.continuous=false;recognition.maxAlternatives=1;
@@ -135,7 +135,16 @@ function AskAI({db,range,country}){
    const last=event.results[event.results.length-1];
    if(last?.isFinal)transcriptRef.current=transcript;
   };
-  recognition.onerror=(event)=>{setListening(false);if(event.error==='not-allowed'||event.error==='service-not-allowed')setError('Microphone permission is blocked. Allow microphone access in browser settings and try again.');else if(event.error!=='aborted'&&event.error!=='no-speech')setError('Voice recognition failed. Please try again or type your question.');};
+  recognition.onerror=(event)=>{
+   setListening(false);
+   const code=event?.error||'unknown';
+   if(code==='not-allowed')setError('Safari denied speech recognition for this website. This can be separate from the iPhone microphone toggle. Check Safari > Website Settings for this site > Microphone > Allow, then reload. If it is already Allow, close/reopen Safari and try again.');
+   else if(code==='service-not-allowed')setError('Safari blocked or could not start its speech-recognition service. Your microphone may still be allowed; this is not proof that mic permission is blocked. Reload Safari, try English (India), or type your question.');
+   else if(code==='audio-capture')setError('The browser could not open an audio input. Check that the microphone is available and not being used by another app, then retry.');
+   else if(code==='network')setError('Speech recognition could not reach its recognition service. Check your internet connection and try again, or type your question.');
+   else if(code==='language-not-supported')setError('This speech-recognition service does not support the selected language right now. Try English (India) from Voice language.');
+   else if(code!=='aborted'&&code!=='no-speech')setError('Speech recognition failed ('+code+'). This does not necessarily mean microphone permission is blocked. Retry or type your question.');
+  };
   recognition.onend=()=>{setListening(false);const transcript=transcriptRef.current.trim();if(transcript&&autoSpeakRef.current){autoSpeakRef.current=false;void ask(transcript,true)}};
   recognitionRef.current=recognition;
   try{recognition.start()}catch{setListening(false);setError('Could not start the microphone. Try once more.')}
