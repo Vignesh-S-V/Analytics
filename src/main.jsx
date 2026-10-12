@@ -55,6 +55,8 @@ function AskAI({db,range,country}){
  const [voiceLang,setVoiceLang]=useState('ta-IN');
  const [error,setError]=useState('');
  const [setupRequired,setSetupRequired]=useState(false);
+ const [keyboardDictationFallback,setKeyboardDictationFallback]=useState(false);
+ const composerInputRef=useRef(null);
  const recognitionRef=useRef(null);
  const transcriptRef=useRef('');
  const autoSpeakRef=useRef(false);
@@ -123,8 +125,8 @@ function AskAI({db,range,country}){
  const startListening=()=>{
   if(typeof window==='undefined')return;
   const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SpeechRecognition){setError('Voice recognition is not available in this browser session. This is a browser speech-recognition support issue, not proof that microphone permission is blocked. Try updating/reopening Safari, or type your question.');return}
-  setError('');transcriptRef.current='';autoSpeakRef.current=true;
+  if(!SpeechRecognition){setKeyboardDictationFallback(true);setError('Safari does not provide a working speech-recognition service in this session. Your microphone permission may still be Allow. Use the device keyboard dictation fallback below, or type your question.');return}
+  setError('');setKeyboardDictationFallback(false);transcriptRef.current='';autoSpeakRef.current=true;
   const recognition=new SpeechRecognition();
   recognition.lang=voiceLang;recognition.interimResults=true;recognition.continuous=false;recognition.maxAlternatives=1;
   recognition.onstart=()=>setListening(true);
@@ -139,7 +141,7 @@ function AskAI({db,range,country}){
    setListening(false);
    const code=event?.error||'unknown';
    if(code==='not-allowed')setError('Safari denied speech recognition for this website. This can be separate from the iPhone microphone toggle. Check Safari > Website Settings for this site > Microphone > Allow, then reload. If it is already Allow, close/reopen Safari and try again.');
-   else if(code==='service-not-allowed')setError('Safari blocked or could not start its speech-recognition service. Your microphone may still be allowed; this is not proof that mic permission is blocked. Reload Safari, try English (India), or type your question.');
+   else if(code==='service-not-allowed'){setKeyboardDictationFallback(true);setError('Safari could not start its speech-recognition service. Your screenshot already shows Microphone = Allow; this is a separate Safari speech service issue. Use the device keyboard dictation fallback below, or try English (India).');}
    else if(code==='audio-capture')setError('The browser could not open an audio input. Check that the microphone is available and not being used by another app, then retry.');
    else if(code==='network')setError('Speech recognition could not reach its recognition service. Check your internet connection and try again, or type your question.');
    else if(code==='language-not-supported')setError('This speech-recognition service does not support the selected language right now. Try English (India) from Voice language.');
@@ -159,9 +161,9 @@ function AskAI({db,range,country}){
     {messages.map((m,i)=><div className={'ask-message '+(m.role==='user'?'ask-user':'ask-assistant')} key={i}><div className="ask-message-avatar">{m.role==='user'?'You':<Bot size={16}/>}</div><div className="ask-message-body"><div className="ask-message-text">{m.content}</div>{m.role==='assistant'&&i>0&&!m.streaming&&m.content&&<button className="ask-read-aloud" type="button" onClick={()=>speakAnswer(m.content)}><Volume2 size={14}/> Listen to answer</button>}</div></div>)}
     {busy&&<div className="ask-message ask-assistant"><div className="ask-message-avatar"><Bot size={16}/></div><div className="ask-message-body"><div className="ask-thinking"><span></span><span></span><span></span> Thinking…</div></div></div>}
    </div>
-   {error&&<div className="ask-error" role="alert">{error}{setupRequired&&<a className="ask-setup-link" href="https://supabase.com/dashboard/project/rzsgdfpwnxhseyxtrrlx/settings/functions" target="_blank" rel="noreferrer">Open Supabase Function settings</a>}</div>}
+   {error&&<div className="ask-error" role="alert">{error}{keyboardDictationFallback&&<button type="button" onClick={()=>{setError('Tap the microphone icon on the iPhone keyboard to dictate your question into this box, then tap Ask.');composerInputRef.current?.focus()}} style={{display:'inline-flex',alignItems:'center',marginTop:8,padding:'8px 10px',border:'1px solid #cbdcf0',borderRadius:8,background:'#f4f8ff',color:'#245e96',fontSize:12,fontWeight:600,cursor:'pointer'}}>Use device keyboard dictation</button>}{setupRequired&&<a className="ask-setup-link" href="https://supabase.com/dashboard/project/rzsgdfpwnxhseyxtrrlx/settings/functions" target="_blank" rel="noreferrer">Open Supabase Function settings</a>}</div>}
    {messages.length===1&&<div className="ask-suggestions"><span>Try asking</span>{suggestions.map(s=><button type="button" key={s} onClick={()=>ask(s)} disabled={busy}>{s}</button>)}</div>}
-   <form className="ask-ai-composer" onSubmit={e=>{e.preventDefault();void ask(input)}}><button type="button" className={'ask-mic-button '+(listening?'is-listening':'')} onClick={listening?stopListening:startListening} disabled={busy} title={listening?'Stop voice input':'Ask by voice'} aria-label={listening?'Stop voice input':'Ask by voice'}>{listening?<Square size={17}/>:<Mic size={18}/>}</button><textarea value={input} onChange={e=>setInput(e.target.value)} rows={1} placeholder={listening?'Listening… speak your question':'Ask about total sales, GP, NP, products, buyers…'} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();void ask(input)}}} disabled={busy}/><button type="submit" className="ask-send-button" disabled={busy||!input.trim()} aria-label="Send question">{busy?<AudioLines size={17} className="ask-busy-icon"/>:<Send size={17}/>}<span>Ask</span></button></form>
+   <form className="ask-ai-composer" onSubmit={e=>{e.preventDefault();void ask(input)}}><button type="button" className={'ask-mic-button '+(listening?'is-listening':'')} onClick={listening?stopListening:startListening} disabled={busy} title={listening?'Stop voice input':'Ask by voice'} aria-label={listening?'Stop voice input':'Ask by voice'}>{listening?<Square size={17}/>:<Mic size={18}/>}</button><textarea ref={composerInputRef} value={input} onChange={e=>setInput(e.target.value)} rows={1} placeholder={listening?'Listening… speak your question':'Ask about total sales, GP, NP, products, buyers…'} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();void ask(input)}}} disabled={busy}/><button type="submit" className="ask-send-button" disabled={busy||!input.trim()} aria-label="Send question">{busy?<AudioLines size={17} className="ask-busy-icon"/>:<Send size={17}/>}<span>Ask</span></button></form>
    <div className="ask-ai-footnote">Microphone permission is required for voice input. Voice answers can be replayed with “Listen to answer”. Missing financial or tax values will be identified rather than invented.</div>
   </div>
  </section>
