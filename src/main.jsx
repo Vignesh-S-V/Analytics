@@ -197,7 +197,7 @@ function ModulePage({page,orders=[],live=false,marketingRows=[],supplierRows=[],
    {value:revenue?((profit/revenue)*100).toFixed(2)+'%':'—',sub:inr(profit)+' profit on '+inr(revenue)+' revenue',note:'SUM(profit_inr) ÷ SUM(revenue_inr) × 100'},
    {value:orderQty?((shippedQty/orderQty)*100).toFixed(2)+'%':'—',sub:shippedQty.toLocaleString('en-IN')+' shipped / '+orderQty.toLocaleString('en-IN')+' ordered',note:'SUM(shipped_qty) ÷ SUM(order_qty) × 100'},
    {value:orderCount?inr(revenue/orderCount):'—',sub:orderCount.toLocaleString('en-IN')+' distinct orders',note:'SUM(revenue_inr) ÷ distinct order_id'},
-   {value:buyers.size?((repeatBuyers.size/buyers.size)*100).toFixed(2)+'%':'—',sub:repeatBuyers.size+' repeat buyers'',note:'Buyer has more than one dated order in selected history'}
+   {value:buyers.size?((repeatBuyers.size/buyers.size)*100).toFixed(2)+'%':'—',sub:repeatBuyers.size+' repeat buyers',note:'Buyer has more than one dated order in selected history'}
   ],
   Production:[
    {value:actualEfficiencyRows.length?(sum(actualEfficiencyRows,'actual_efficiency')/actualEfficiencyRows.length).toFixed(1)+'%':'—',sub:'Recorded efficiency values',note:'Average of recorded actual_efficiency'},
