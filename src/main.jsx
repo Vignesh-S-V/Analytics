@@ -60,19 +60,61 @@ function AskAI({db,range,country}){
  const ask=async(value,fromVoice=false)=>{
   const question=String(value??input).trim();if(!question||busy)return;
   if(recognitionRef.current){try{recognitionRef.current.stop()}catch{}}
-  setError('');setSetupRequired(false);setInput('');setMessages(prev=>[...prev,{role:'user',content:question,voice:fromVoice}]);setBusy(true);
+  const replyId=Date.now()+Math.random();
+  let finalAnswer='';
+  let finalSources=[];
+  setError('');setSetupRequired(false);setInput('');
+  setMessages(prev=>[...prev,{role:'user',content:question,voice:fromVoice},{role:'assistant',id:replyId,content:'',sources:[],streaming:true}]);
+  setBusy(true);
+  const patchReply=(patch)=>setMessages(prev=>prev.map(m=>m.id===replyId?{...m,...patch}:m));
   try{
    if(!db)throw new Error('Supabase connection is not configured.');
-   const legacyAnon=import.meta.env.VITE_SUPABASE_LEGACY_ANON_KEY;const {data,error:invokeError}=await db.functions.invoke('ask-garment-data',{headers:legacyAnon?{Authorization:'Bearer '+legacyAnon}:{},body:{question,filters:{year:range==='All available periods'?'':range,country:country==='All countries'?'':country}}});
-   if(invokeError){let detail={};try{detail=await invokeError.context?.clone?.().json()}catch{};if(detail?.code==='AI_KEY_MISSING'||detail?.help){setSetupRequired(true);throw new Error(detail.help||'Add GEMINI_API_KEY to Supabase Edge Function secrets.')}throw new Error(detail?.error||invokeError.message||'Could not connect to the AI service.');}
-   if(data?.error){if(data.code==='AI_KEY_MISSING'||data.help)setSetupRequired(true);throw new Error(data.help||data.error)}
-   if(!data?.answer)throw new Error('AI returned no answer. Please try again.');
-   const assistant={role:'assistant',content:data.answer,sources:Array.isArray(data.sources)?data.sources:[]};
-   setMessages(prev=>[...prev,assistant]);
-   if(fromVoice) speakAnswer(data.answer);
+   const legacyAnon=import.meta.env.VITE_SUPABASE_LEGACY_ANON_KEY;
+   const publicAnon=import.meta.env.VITE_SUPABASE_ANON_KEY||legacyAnon;
+   const supabaseUrl=import.meta.env.VITE_SUPABASE_URL;
+   if(!supabaseUrl||!publicAnon)throw new Error('Supabase public connection configuration is missing.');
+   const response=await fetch(supabaseUrl.replace(/\\/$/,'')+'/functions/v1/ask-garment-data',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','apikey':publicAnon,'Authorization':'Bearer '+publicAnon,'Accept':'application/x-ndjson, application/json'},
+    body:JSON.stringify({question,filters:{year:range==='All available periods'?'':range,country:country==='All countries'?'':country}})
+   });
+   const contentType=response.headers.get('content-type')||'';
+   if(!response.ok){
+    let detail={};try{detail=await response.json()}catch{}
+    if(detail?.code==='AI_KEY_MISSING'||detail?.help)setSetupRequired(true);
+    throw new Error(detail?.help||detail?.error||'AI request failed ('+response.status+'). Please try again.');
+   }
+   if(contentType.includes('application/json')){
+    const data=await response.json();
+    if(data?.error){if(data.code==='AI_KEY_MISSING'||data.help)setSetupRequired(true);throw new Error(data.help||data.error)}
+    if(!data?.answer)throw new Error('AI returned no answer. Please try again.');
+    finalAnswer=data.answer;finalSources=Array.isArray(data.sources)?data.sources:[];
+    patchReply({content:finalAnswer,sources:finalSources,streaming:false});
+   }else{
+    if(!response.body)throw new Error('Streaming response is not available in this browser.');
+    const reader=response.body.getReader();const decoder=new TextDecoder();let buffer='';
+    const processLine=(line)=>{
+     if(!line.trim())return;
+     let event;try{event=JSON.parse(line)}catch{return}
+     if(event.type==='token'&&event.text){finalAnswer+=event.text;patchReply({content:finalAnswer,streaming:true})}
+     else if(event.type==='done'){finalSources=Array.isArray(event.sources)?event.sources:[];patchReply({content:finalAnswer,sources:finalSources,streaming:false})}
+     else if(event.type==='error')throw new Error(event.error||'AI stream stopped unexpectedly.');
+    };
+    while(true){
+     const {value,done}=await reader.read();if(done)break;
+     buffer+=decoder.decode(value,{stream:true});
+     const lines=buffer.split(String.fromCharCode(10));buffer=lines.pop()||'';
+     for(const line of lines)processLine(line);
+    }
+    buffer+=decoder.decode();if(buffer.trim())processLine(buffer);
+    if(!finalAnswer.trim())throw new Error('AI returned an empty answer. Please retry or simplify your question.');
+    patchReply({content:finalAnswer,sources:finalSources,streaming:false});
+   }
+   if(fromVoice&&finalAnswer)speakAnswer(finalAnswer);
   }catch(e){
-   const msg=setupRequired?'AI needs one secure setup step: add GEMINI_API_KEY to Supabase Edge Function secrets. Keep the key server-side; do not put it in frontend code or GitHub.':(e?.message||'Could not answer right now.');
-   setError(msg);
+   if(e?.message?.includes('GEMINI_API_KEY'))setSetupRequired(true);
+   setMessages(prev=>prev.filter(m=>m.id!==replyId));
+   setError(e?.message||'Could not answer right now. Please retry.');
   }finally{setBusy(false)}
  };
  const startListening=()=>{
@@ -102,7 +144,7 @@ function AskAI({db,range,country}){
   <div className="panel ask-ai-chat">
    <div className="ask-ai-chat-head"><div><strong><Sparkles size={16}/> ThreadIQ AI</strong><span>Sales intelligence · Source-grounded answers</span></div><label className="voice-language">Voice language<select value={voiceLang} onChange={e=>setVoiceLang(e.target.value)}><option value="ta-IN">Tamil / Tanglish</option><option value="en-IN">English (India)</option><option value="hi-IN">Hindi</option></select></label></div>
    <div className="ask-ai-messages" ref={listRef} aria-live="polite">
-    {messages.map((m,i)=><div className={'ask-message '+(m.role==='user'?'ask-user':'ask-assistant')} key={i}><div className="ask-message-avatar">{m.role==='user'?'You':<Bot size={16}/>}</div><div className="ask-message-body"><div className="ask-message-text">{m.content}</div>{m.sources?.length>0&&<div className="ask-sources"><span>Retrieved sources:</span>{m.sources.map(s=><span className="ask-source-chip" key={s.name}>{s.name.replaceAll('_',' ')} · {s.records}</span>)}</div>}{m.role==='assistant'&&i>0&&<button className="ask-read-aloud" type="button" onClick={()=>speakAnswer(m.content)}><Volume2 size={14}/> Listen to answer</button>}</div></div>)}
+    {messages.map((m,i)=><div className={'ask-message '+(m.role==='user'?'ask-user':'ask-assistant')} key={i}><div className="ask-message-avatar">{m.role==='user'?'You':<Bot size={16}/>}</div><div className="ask-message-body"><div className="ask-message-text">{m.content}</div>{m.sources?.length>0&&<div className="ask-sources"><span>Retrieved sources:</span>{m.sources.map(s=><span className="ask-source-chip" key={s.name}>{s.name.replaceAll('_',' ')} · {s.records}</span>)}</div>}{m.role==='assistant'&&i>0&&!m.streaming&&m.content&&<button className="ask-read-aloud" type="button" onClick={()=>speakAnswer(m.content)}><Volume2 size={14}/> Listen to answer</button>}</div></div>)}
     {busy&&<div className="ask-message ask-assistant"><div className="ask-message-avatar"><Bot size={16}/></div><div className="ask-message-body"><div className="ask-thinking"><span></span><span></span><span></span> Retrieving Supabase data and preparing answer…</div></div></div>}
    </div>
    {error&&<div className="ask-error" role="alert">{error}{setupRequired&&<a className="ask-setup-link" href="https://supabase.com/dashboard/project/rzsgdfpwnxhseyxtrrlx/settings/functions" target="_blank" rel="noreferrer">Open Supabase Function settings</a>}</div>}
