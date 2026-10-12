@@ -21,6 +21,8 @@ jobs:
           else
             npm install
           fi
+      - name: Scan tracked text files for common secret patterns
+        run: node scripts/security-scan.mjs
       - name: Audit dependency tree
         run: npm audit
       - name: Build production app
