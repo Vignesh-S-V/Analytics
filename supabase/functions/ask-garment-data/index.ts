@@ -426,28 +426,43 @@ Deno.serve(async (req: Request) => {
       suppliers: topBy(suppliers, "linked_order_revenue_inr", 5),
       market: market.slice(-6)
     };
-    // Deterministic, useful priority answer from the actual retrieved supplier/production rows.
-    // Rank within each domain using the matching metric; don't pretend unlike metrics are a single score.
+    // Deterministic priority answer: rank each complete Supabase view server-side,
+    // rather than sorting the generic RAG sample. These two risk metrics remain separate.
     const asksBusinessAreaPriority = /which business area needs attention first|business area.{0,30}attention|area needs attention first|attention first/.test(normalizedQuestion);
     if (asksBusinessAreaPriority) {
-      const supplierRows = [...suppliers].sort((a,b)=>num(b.linked_order_late_penalty_inr)-num(a.linked_order_late_penalty_inr));
-      const productionRows = [...production].sort((a,b)=>num(b.rework_cost_inr)-num(a.rework_cost_inr));
-      const s = supplierRows[0] as Record<string,unknown> | undefined;
-      const p = productionRows[0] as Record<string,unknown> | undefined;
-      if (!s && !p) return respond({error:"Supplier and production risk data is unavailable for this request."},502,origin);
+      const [supplierResult, productionResult, supplierCountResult, productionCountResult] = await Promise.all([
+        db.from("vw_supplier_scorecard")
+          .select("supplier_id,supplier_name,supply_type,avg_delay_days,quality_rating,linked_order_late_penalty_inr")
+          .order("linked_order_late_penalty_inr", { ascending: false, nullsFirst: false })
+          .limit(1),
+        db.from("vw_production_by_line")
+          .select("line_id,unit,specialisation,rework_cost_inr,rejection_rate_pct,overtime_hours")
+          .order("rework_cost_inr", { ascending: false, nullsFirst: false })
+          .limit(1),
+        db.from("vw_supplier_scorecard").select("*", { count: "exact", head: true }),
+        db.from("vw_production_by_line").select("*", { count: "exact", head: true })
+      ]);
+      if (supplierResult.error || productionResult.error || supplierCountResult.error || productionCountResult.error) {
+        console.error("Business-area priority query failed:", supplierResult.error?.message ?? productionResult.error?.message ?? supplierCountResult.error?.message ?? productionCountResult.error?.message);
+        return respond({ error: "Could not rank supplier and production risks from the complete analytics views. Please retry." }, 502, origin);
+      }
+      const s = (supplierResult.data ?? [])[0] as Record<string,unknown> | undefined;
+      const p = (productionResult.data ?? [])[0] as Record<string,unknown> | undefined;
+      if (!s && !p) return respond({ error: "Supplier and production risk data is unavailable for this request." }, 502, origin);
       const supplierPenalty = s ? num(s.linked_order_late_penalty_inr) : 0;
       const productionRework = p ? num(p.rework_cost_inr) : 0;
       const answer = [
-        "Recommended first investigation: supplier delivery risk, because the retrieved supplier scorecard shows the largest recorded supplier late-penalty exposure for " + (s ? txt(s.supplier_name) + " (" + txt(s.supplier_id) + ")" : "no supplier row") + (s ? " at " + formatINR(supplierPenalty) + " in linked late penalties, with average delay " + num(s.avg_delay_days).toFixed(1) + " days and quality rating " + num(s.quality_rating).toFixed(1) + "/5." : "."),
-        p ? "Second investigation: production rework, led by " + txt(p.line_id) + " (" + txt(p.unit) + "), with recorded rework cost " + formatINR(productionRework) + ", rejection rate " + num(p.rejection_rate_pct).toFixed(2) + "% and " + num(p.overtime_hours).toLocaleString("en-IN") + " overtime hours." : "Production-line rework data was not returned.",
-        "Why this order: the supplier record has the largest directly recorded late-penalty figure among the retrieved supplier rows; production rework is a separate cost metric, so it is not added to late penalties and no causal link is assumed.",
-        "Scope note: this is a provisional priority based on the rows retrieved from the supplier scorecard and production-line view, not proof that every possible business area or period was exhaustively compared. Next action: review the named supplier's delayed orders and penalty drivers, while opening a separate corrective-action review for the named production line."
+        s ? "Recommended first investigation: supplier delivery risk. Highest linked late-penalty exposure in the supplier scorecard: " + txt(s.supplier_name) + " (" + txt(s.supplier_id) + "), " + formatINR(supplierPenalty) + "; average delay " + num(s.avg_delay_days).toFixed(1) + " days; quality rating " + num(s.quality_rating).toFixed(1) + "/5." : "Supplier scorecard returned no rows.",
+        p ? "Separate production concern: line " + txt(p.line_id) + " (" + txt(p.unit) + "), recorded rework cost " + formatINR(productionRework) + ", rejection rate " + num(p.rejection_rate_pct).toFixed(2) + "% and " + num(p.overtime_hours).toLocaleString("en-IN") + " overtime hours." : "Production-line view returned no rows.",
+        "Decision basis: supplier late penalties are the direct financial exposure used for the first investigation. Production rework is a different metric and is not added to late penalties; these figures alone do not establish causation.",
+        "Scope: server-side descending rankings across the complete current contents of each view, with " + num(supplierCountResult.count).toLocaleString("en-IN") + " supplier rows and " + num(productionCountResult.count).toLocaleString("en-IN") + " production-line rows. These views do not provide a selected date filter here, so treat this as the full scope represented by the current views, not a date-specific comparison.",
+        "Next action: inspect the named supplier's delayed orders and penalty drivers, and run a separate corrective-action review for the named production line."
       ].join(" ");
       return respond({
         answer,
         sources: [
-          { name: "vw_supplier_scorecard", records: suppliers.length, note: "ranked by linked_order_late_penalty_inr within retrieved supplier rows" },
-          { name: "vw_production_by_line", records: production.length, note: "ranked by rework_cost_inr within retrieved production rows" }
+          { name: "vw_supplier_scorecard", records: supplierCountResult.count ?? 0, note: "server-side ORDER BY linked_order_late_penalty_inr DESC; highest row returned" },
+          { name: "vw_production_by_line", records: productionCountResult.count ?? 0, note: "server-side ORDER BY rework_cost_inr DESC; highest row returned" }
         ],
         question
       }, 200, origin);
