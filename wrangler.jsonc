@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "analytics",
+  "compatibility_date": "2026-10-19",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  "preview_urls": true,
+  "previews": {}
+}
