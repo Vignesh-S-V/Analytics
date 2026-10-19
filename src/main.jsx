@@ -222,7 +222,8 @@ function AskAI({db,range,country}){
  const suggestions=[
   {group:'Executive overview',items:['Summarise business performance','Total sales, cost and net profit?']},
   {group:'Sales & products',items:['Which country has the highest revenue?','Which product group makes the most profit?']},
-  {group:'Financial year & growth',items:['Compare revenue across the last two financial years','Which months had the biggest revenue changes?','Compare revenue and shipped quantity growth']},
+  {group:'Trends & profitability',items:['Which months had the biggest revenue changes?','Which months had the highest recorded profit?','Explain the revenue and profit trend']},
+  {group:'Business decisions',items:['What are the biggest risks in this data?','Suggest actions to improve recorded profit','Which business area needs attention first?']},
   {group:'Operations & growth',items:['Which marketing channel has the best ROAS?','Which production line has the highest efficiency?']}
  ];
  const sourceLabel=(name)=>({
