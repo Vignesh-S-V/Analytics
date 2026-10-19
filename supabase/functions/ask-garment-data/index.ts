@@ -268,21 +268,45 @@ Deno.serve(async (req: Request) => {
       const ranked=[...grouped.values()].sort((a,b)=>(num(b.spend)?num(b.value)/num(b.spend):0)-(num(a.spend)?num(a.value)/num(a.spend):0));
       if(ranked.length){const r=ranked[0];return respond({answer:"Highest attributed ROAS channel: "+txt(r.channel)+". Attributed order value: "+formatINR(num(r.value))+"; marketing spend: "+formatINR(num(r.spend))+"; ROAS: "+(num(r.spend)?(num(r.value)/num(r.spend)).toFixed(2)+"x":"not available")+"; won orders: "+num(r.orders_won).toLocaleString("en-IN")+". ROAS uses attributed sales value, not profit",sources:[{name:"vw_marketing_channel_performance",records:(rows??[]).length}],question},200,origin);}
     }
-    const asksSupplierEarly=/supplier/.test(normalizedQ)&&/(top|best|highest|quality|delay|late|risk|revenue|profit)/.test(normalizedQ);
+    // Metric-aware supplier ranking: select the exact requested measure and direction.
+    const asksSupplierEarly=/supplier/.test(normalizedQ)&&/(top|best|highest|lowest|worst|quality|delay|late|risk|revenue|profit|penalt|attention)/.test(normalizedQ);
     if(asksSupplierEarly){
-      const metric=/quality|best rated/.test(normalizedQ)?"quality_rating":/delay|late|risk/.test(normalizedQ)?"avg_delay_days":"linked_order_revenue_inr";
-      const {data:rows,error}=await db.from("vw_supplier_scorecard").select("supplier_id,supplier_name,supply_type,avg_delay_days,quality_rating,linked_order_count,linked_order_revenue_inr,linked_order_profit_inr,linked_order_late_penalty_inr").order(metric,{ascending:metric==="avg_delay_days"?false:false}).limit(1);
+      const wantsQuality=/quality|rated/.test(normalizedQ);
+      const wantsDelay=/delay|late/.test(normalizedQ);
+      const wantsPenalty=/penalt|risk|attention/.test(normalizedQ);
+      const wantsProfit=/profit/.test(normalizedQ);
+      const metric=wantsQuality?"quality_rating":wantsDelay?"avg_delay_days":wantsPenalty?"linked_order_late_penalty_inr":wantsProfit?"linked_order_profit_inr":"linked_order_revenue_inr";
+      const descending=/highest|top|worst|most|risk|late|delay|penalt|attention/.test(normalizedQ);
+      const ascending=/lowest|least|best rated|best quality/.test(normalizedQ)&&!descending;
+      const {data:rows,error}=await db.from("vw_supplier_scorecard")
+        .select("supplier_id,supplier_name,supply_type,avg_delay_days,quality_rating,credit_days,linked_order_count,linked_order_revenue_inr,linked_order_profit_inr,linked_order_late_penalty_inr")
+        .order(metric,{ascending:ascending, nullsFirst:false}).limit(1);
       if(error)return respond({error:"Could not read supplier scorecard from Supabase."},502,origin);
       const r=(rows??[])[0] as Record<string,unknown>|undefined;
-      if(r)return respond({answer:"Supplier result: "+txt(r.supplier_name)+" ("+txt(r.supply_type)+"). Average delay: "+num(r.avg_delay_days).toFixed(1)+" days; quality rating: "+num(r.quality_rating).toFixed(2)+"; linked order revenue: "+formatINR(num(r.linked_order_revenue_inr))+"; linked order profit: "+formatINR(num(r.linked_order_profit_inr))+"",sources:[{name:"vw_supplier_scorecard",records:1}],question},200,origin);
+      if(r){
+        const metricText=metric==="quality_rating"?"quality rating "+num(r.quality_rating).toFixed(2)+"/5":metric==="avg_delay_days"?"average delay "+num(r.avg_delay_days).toFixed(1)+" days":metric==="linked_order_late_penalty_inr"?"linked late penalties "+formatINR(num(r.linked_order_late_penalty_inr)):metric==="linked_order_profit_inr"?"linked-order recorded profit "+formatINR(num(r.linked_order_profit_inr)):"linked-order revenue "+formatINR(num(r.linked_order_revenue_inr));
+        return respond({answer:(ascending?"Lowest ":"Highest ")+metric.replaceAll("_"," ")+": "+txt(r.supplier_name)+" ("+txt(r.supplier_id)+"). "+metricText+"; average delay "+num(r.avg_delay_days).toFixed(1)+" days; quality rating "+num(r.quality_rating).toFixed(2)+"/5; linked orders "+num(r.linked_order_count).toLocaleString("en-IN")+". Ranking is across the current supplier scorecard view.",sources:[{name:"vw_supplier_scorecard",records:1,note:"server-side sort by "+metric}],question},200,origin);
+      }
     }
-    const asksProductionEarly=/(production line|line efficiency|most efficient line|best line|highest efficiency|production efficiency)/.test(normalizedQ);
+    // Metric-aware production ranking; use the requested KPI rather than always ranking efficiency.
+    const asksProductionEarly=/(production line|line efficiency|most efficient line|best line|highest efficiency|production efficiency|rework|rejection|overtime|line.*(profit|cost)|production.*(profit|cost))/.test(normalizedQ);
     if(asksProductionEarly){
-      const metric=/profit/.test(normalizedQ)?"linked_order_profit_inr":"avg_actual_efficiency_pct";
-      const {data:rows,error}=await db.from("vw_production_by_line").select("line_id,unit,specialisation,order_count,order_qty,shipped_qty,rejection_qty,rejection_rate_pct,avg_actual_efficiency_pct,avg_target_efficiency_pct,avg_efficiency_gap_pp,linked_order_profit_inr").order(metric,{ascending:false}).limit(1);
+      const wantsRework=/rework/.test(normalizedQ);
+      const wantsRejection=/reject|rejection|defect|quality/.test(normalizedQ);
+      const wantsOvertime=/overtime|over time/.test(normalizedQ);
+      const wantsProfit=/profit/.test(normalizedQ);
+      const wantsPenalty=/penalt|late/.test(normalizedQ);
+      const metric=wantsRework?"rework_cost_inr":wantsRejection?"rejection_rate_pct":wantsOvertime?"overtime_hours":wantsProfit?"linked_order_profit_inr":wantsPenalty?"late_penalty_inr":"avg_actual_efficiency_pct";
+      const ascending=/lowest|least|worst efficiency|lowest rejection|least rework/.test(normalizedQ);
+      const {data:rows,error}=await db.from("vw_production_by_line")
+        .select("line_id,unit,specialisation,order_count,order_qty,shipped_qty,rejection_qty,rejection_rate_pct,avg_actual_efficiency_pct,avg_target_efficiency_pct,avg_efficiency_gap_pp,overtime_hours,rework_cost_inr,late_penalty_inr,linked_order_profit_inr")
+        .order(metric,{ascending, nullsFirst:false}).limit(1);
       if(error)return respond({error:"Could not read production line metrics from Supabase."},502,origin);
       const r=(rows??[])[0] as Record<string,unknown>|undefined;
-      if(r)return respond({answer:"Top production line: "+txt(r.line_id)+" ("+txt(r.specialisation)+"). Actual efficiency: "+num(r.avg_actual_efficiency_pct).toFixed(2)+"%; target: "+num(r.avg_target_efficiency_pct).toFixed(2)+"%; gap: "+num(r.avg_efficiency_gap_pp).toFixed(2)+" percentage points; recorded linked order profit: "+formatINR(num(r.linked_order_profit_inr))+"",sources:[{name:"vw_production_by_line",records:1}],question},200,origin);
+      if(r){
+        const metricText=metric==="rework_cost_inr"?"rework cost "+formatINR(num(r.rework_cost_inr)):metric==="rejection_rate_pct"?"rejection rate "+num(r.rejection_rate_pct).toFixed(2)+"% ("+num(r.rejection_qty).toLocaleString("en-IN")+" rejected / "+num(r.order_qty).toLocaleString("en-IN")+" ordered)":metric==="overtime_hours"?"overtime "+num(r.overtime_hours).toLocaleString("en-IN")+" hours":metric==="linked_order_profit_inr"?"linked-order recorded profit "+formatINR(num(r.linked_order_profit_inr)):metric==="late_penalty_inr"?"late penalties "+formatINR(num(r.late_penalty_inr)):"actual efficiency "+num(r.avg_actual_efficiency_pct).toFixed(2)+"%; target "+num(r.avg_target_efficiency_pct).toFixed(2)+"%; gap "+num(r.avg_efficiency_gap_pp).toFixed(2)+" percentage points";
+        return respond({answer:(ascending?"Lowest ":"Highest ")+metric.replaceAll("_"," ")+": line "+txt(r.line_id)+" ("+txt(r.unit)+", "+txt(r.specialisation)+"). "+metricText+"; orders "+num(r.order_count).toLocaleString("en-IN")+". Ranking is across the current production-line view.",sources:[{name:"vw_production_by_line",records:1,note:"server-side sort by "+metric}],question},200,origin);
+      }
     }
     const asksMarketEarly=/(cotton|yarn|exchange rate|usd inr|market price)/.test(normalizedQ);
     if(asksMarketEarly){
