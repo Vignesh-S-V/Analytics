@@ -187,7 +187,7 @@ Deno.serve(async (req: Request) => {
       const gpPct=revenue?grossProfit/revenue*100:0;
       const npPct=revenue?netProfit/revenue*100:0;
       const asksTotalCost=/total cost|total expenses|total expense|expenses evlo|cost evlo|total spend/.test(normalizedQ) || /\b(cost|expenses|expense)\b/.test(normalizedQ);
-      const asksProfitAmount=/\b(profit|net profit|np)\b/.test(normalizedQ) && !/profit margin|net margin|profitability percentage/.test(normalizedQ);
+      const asksProfitAmount=/\b(total profit|net profit|profit|np)\b/.test(normalizedQ);
       const asksRevenueAmount=/total sales|sales evlo|total revenue|revenue evlo|sales value|turnover|overall sales|\brevenue\b/.test(normalizedQ);
       const lines:string[]=[];
       if(asksRevenueAmount || asksTotalCost || asksProfitAmount) {
