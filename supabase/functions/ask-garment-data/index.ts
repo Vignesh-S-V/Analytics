@@ -413,6 +413,21 @@ Deno.serve(async (req: Request) => {
         return respond({answer,sources:[{name:"vw_sales_by_buyer",records:buyers.length}],question},200,origin);
       }
     }
+    // Deterministic safety response for cross-domain prioritization: the current prompt context
+    // contains compact/top-N supplier and production samples, not a guaranteed complete population.
+    // Do not let the LLM turn those samples into an unsupported winner or repeat unverified figures.
+    const asksBusinessAreaPriority = /which business area needs attention first|business area.{0,30}attention|area needs attention first|attention first/.test(normalizedQuestion);
+    if (asksBusinessAreaPriority) {
+      const answer = "I can’t reliably name one business area that needs attention first from the currently retrieved evidence. The supplier scorecard and production-line results are limited retrieved samples; they do not establish that all suppliers and lines were compared on a complete, common basis. Treat supplier delays/quality/late penalties and production rejection/rework/overtime as separate investigation leads, not a proven overall ranking. To rank them, retrieve the complete supplier and production populations for the same period, verify entity keys and metric definitions, and compare the documented financial impact (for example, penalty + rework cost, with any overlap removed). Until then, a definitive first-place ranking is unsupported.";
+      return respond({
+        answer,
+        sources: [
+          { name: "vw_supplier_scorecard", records: compactRelevance.suppliers.length, note: "retrieved subset; completeness not established" },
+          { name: "vw_production_by_line", records: compactRelevance.production.length, note: "retrieved subset; completeness not established" }
+        ],
+        question
+      }, 200, origin);
+    }
     const geminiKey = Deno.env.get("GEMINI_API_KEY");
     if (!geminiKey) return respond({ error: "AI_KEY_MISSING", code: "AI_KEY_MISSING", help: "Add GEMINI_API_KEY to Supabase Edge Function secrets to enable AI answers. Basic total KPI answers still work directly from Supabase." }, 503, origin);
     const compactRelevance = {
