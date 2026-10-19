@@ -413,6 +413,19 @@ Deno.serve(async (req: Request) => {
         return respond({answer,sources:[{name:"vw_sales_by_buyer",records:buyers.length}],question},200,origin);
       }
     }
+    const geminiKey = Deno.env.get("GEMINI_API_KEY");
+    if (!geminiKey) return respond({ error: "AI_KEY_MISSING", code: "AI_KEY_MISSING", help: "Add GEMINI_API_KEY to Supabase Edge Function secrets to enable AI answers. Basic total KPI answers still work directly from Supabase." }, 503, origin);
+    const compactRelevance = {
+      monthly_country: hasTimeScope ? scopedMonthly.slice(0, 12) : topBy(monthlyCountry, "revenue_inr", 5),
+      month_totals: monthRows.length ? monthRows.slice(0, 12) : [...monthTotals.values()].slice(-6),
+      countries: detectedCountry && detectedCountry !== "All countries" ? countries.filter((r)=>txt(r.country).toLowerCase().includes(detectedCountry.toLowerCase())).slice(0, 5) : topBy(countries, "revenue_inr", 5),
+      buyers: scoreRows(buyers).length ? scoreRows(buyers).slice(0, 5) : topBy(buyers, "revenue_inr", 5),
+      products: scoreRows(products).length ? scoreRows(products).slice(0, 6) : topBy(products, "profit_inr", 6),
+      marketing: scoreRows(marketing).length ? scoreRows(marketing).slice(0, 5) : topBy(marketing, "roas_ratio", 5),
+      production: scoreRows(production).length ? scoreRows(production).slice(0, 5) : topBy(production, "linked_order_profit_inr", 5),
+      suppliers: topBy(suppliers, "linked_order_revenue_inr", 5),
+      market: market.slice(-6)
+    };
     // Deterministic safety response for cross-domain prioritization: the current prompt context
     // contains compact/top-N supplier and production samples, not a guaranteed complete population.
     // Do not let the LLM turn those samples into an unsupported winner or repeat unverified figures.
@@ -428,19 +441,6 @@ Deno.serve(async (req: Request) => {
         question
       }, 200, origin);
     }
-    const geminiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!geminiKey) return respond({ error: "AI_KEY_MISSING", code: "AI_KEY_MISSING", help: "Add GEMINI_API_KEY to Supabase Edge Function secrets to enable AI answers. Basic total KPI answers still work directly from Supabase." }, 503, origin);
-    const compactRelevance = {
-      monthly_country: hasTimeScope ? scopedMonthly.slice(0, 12) : topBy(monthlyCountry, "revenue_inr", 5),
-      month_totals: monthRows.length ? monthRows.slice(0, 12) : [...monthTotals.values()].slice(-6),
-      countries: detectedCountry && detectedCountry !== "All countries" ? countries.filter((r)=>txt(r.country).toLowerCase().includes(detectedCountry.toLowerCase())).slice(0, 5) : topBy(countries, "revenue_inr", 5),
-      buyers: scoreRows(buyers).length ? scoreRows(buyers).slice(0, 5) : topBy(buyers, "revenue_inr", 5),
-      products: scoreRows(products).length ? scoreRows(products).slice(0, 6) : topBy(products, "profit_inr", 6),
-      marketing: scoreRows(marketing).length ? scoreRows(marketing).slice(0, 5) : topBy(marketing, "roas_ratio", 5),
-      production: scoreRows(production).length ? scoreRows(production).slice(0, 5) : topBy(production, "linked_order_profit_inr", 5),
-      suppliers: topBy(suppliers, "linked_order_revenue_inr", 5),
-      market: market.slice(-6)
-    };
     const sources: {name:string;records:number}[] = [
       {name:"vw_sales_monthly_by_country",records:compactRelevance.monthly_country.length},
       {name:"vw_sales_by_country",records:compactRelevance.countries.length},
