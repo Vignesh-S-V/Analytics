@@ -7,7 +7,7 @@ import './styles.css';
 
 const colors=['#65e0c4','#8e9bff','#f5bf69','#f28aa5','#7dd3fc'];
 const nav=[['Overview',LayoutDashboard],['Ask AI',Bot],['Product Economics',Shirt],['Sales & Buyers',BriefcaseBusiness],['Production',Factory],['Marketing ROI',Megaphone],['Procurement',Boxes],['Investment Lab',CircleDollarSign]];
-const compactIN=(value)=>{const n=Number(value||0),a=Math.abs(n),fmt=v=>Number(v.toFixed(1)).toLocaleString('en-IN',{maximumFractionDigits:1});if(a>=1e7)return `${fmt(n/1e7)} C`;if(a>=1e5)return `${fmt(n/1e5)} L`;if(a>=1e3)return `${fmt(n/1e3)} T`;return n.toLocaleString('en-IN',{maximumFractionDigits:1});};
+const compactIN=(value)=>{const n=Number(value||0),a=Math.abs(n),fmt=v=>Number(v.toFixed(1)).toLocaleString('en-IN',{maximumFractionDigits:1});if(a>=1e7)return `${fmt(n/1e7)} Cr`;if(a>=1e5)return `${fmt(n/1e5)} Lakh`;if(a>=1e3)return `${fmt(n/1e3)} Thousand`;return n.toLocaleString('en-IN',{maximumFractionDigits:1});};
 const inr=n=>'₹'+compactIN(n);
 
 // Read every page instead of silently truncating large Supabase tables at a fixed row limit.
