@@ -276,8 +276,9 @@ Deno.serve(async (req: Request) => {
       const wantsPenalty=/penalt|risk|attention/.test(normalizedQ);
       const wantsProfit=/profit/.test(normalizedQ);
       const metric=wantsQuality?"quality_rating":wantsDelay?"avg_delay_days":wantsPenalty?"linked_order_late_penalty_inr":wantsProfit?"linked_order_profit_inr":"linked_order_revenue_inr";
-      const descending=/highest|top|worst|most|risk|late|delay|penalt|attention/.test(normalizedQ);
-      const ascending=/lowest|least|best rated|best quality/.test(normalizedQ)&&!descending;
+      // Explicit "lowest/least/shortest/best rated" means ASC; otherwise risk/late/delay
+      // rankings default to DESC so the most exposed supplier is not accidentally hidden.
+      const ascending=/\b(lowest|least|shortest|best rated|best quality)\b/.test(normalizedQ);
       const {data:rows,error}=await db.from("vw_supplier_scorecard")
         .select("supplier_id,supplier_name,supply_type,avg_delay_days,quality_rating,credit_days,linked_order_count,linked_order_revenue_inr,linked_order_profit_inr,linked_order_late_penalty_inr")
         .order(metric,{ascending:ascending, nullsFirst:false}).limit(1);
