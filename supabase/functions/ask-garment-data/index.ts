@@ -151,37 +151,53 @@ Deno.serve(async (req: Request) => {
     const asksGrossMetric = /\bgp\b|\bgpm\b|gross profit|gross margin|gp\s*%/.test(rawQ);
     const asksNetMargin = /\bnp\b|\bnpm\b|net profit margin|net margin|profit margin|np\s*%/.test(rawQ);
     if (asksGrossMetric || asksNetMargin) {
-      const {data:profitRows,error:profitError}=await db.from("vw_sales_profitability_by_month_country")
-        .select("month,country,order_count,revenue_inr,direct_cost_inr,gross_profit_inr,gp_pct,net_profit_inr,np_pct")
-        .order("month").limit(1000);
-      if(profitError){
-        console.error("Profitability fast-path failed:",profitError.message);
-        return respond({error:"Could not read the Supabase profitability summary. Please retry."},502,origin);
+      const [profitResult, salesResult] = await Promise.all([
+        db.from("vw_sales_profitability_by_month_country")
+          .select("month,country,order_count,revenue_inr,direct_cost_inr,gross_profit_inr,gp_pct,net_profit_inr,np_pct")
+          .order("month").limit(1000),
+        db.from("vw_sales_monthly_by_country")
+          .select("month,country,order_count,revenue_inr,total_cost_inr,profit_inr")
+          .order("month").limit(1000)
+      ]);
+      if(profitResult.error || salesResult.error){
+        console.error("Profitability KPI fast-path failed:",profitResult.error?.message ?? salesResult.error?.message);
+        return respond({error:"Could not read all required finance metrics from Supabase. Please retry."},502,origin);
       }
-      const allProfitRows=(profitRows??[]) as Record<string,unknown>[];
+      const allProfitRows=(profitResult.data??[]) as Record<string,unknown>[];
+      const allSalesRows=(salesResult.data??[]) as Record<string,unknown>[];
       const namedProfitCountry=[...new Set(allProfitRows.map(r=>txt(r.country)).filter(Boolean))]
         .find(name=>rawQ.includes(name.toLowerCase())) ?? requestedCountry;
-      const relevantProfitRows=allProfitRows.filter(r=>{
+      const inScope=(r:Record<string,unknown>)=>{
         const month=monthOf(r);
         return (!qYear||month.startsWith(qYear))
           &&(!qMonth||month.endsWith("-"+qMonth))
           &&(!namedProfitCountry||namedProfitCountry==="All countries"
             ||txt(r.country).toLowerCase()===namedProfitCountry.toLowerCase());
-      });
-      if((qYear||qMonth||(namedProfitCountry&&namedProfitCountry!=="All countries"))&&!relevantProfitRows.length){
-        return respond({answer:"இந்த date/country filter-க்கு matching profitability data இல்லை. வேறு period அல்லது country-ஐ முயற்சி செய்யுங்கள்.",sources:[],question},200,origin);
+      };
+      const relevantProfitRows=allProfitRows.filter(inScope);
+      const relevantSalesRows=allSalesRows.filter(inScope);
+      if((qYear||qMonth||(namedProfitCountry&&namedProfitCountry!=="All countries"))&&(!relevantProfitRows.length||!relevantSalesRows.length)){
+        return respond({answer:"இந்த date/country filter-க்கு matching finance data முழுமையாக இல்லை. வேறு period அல்லது country-ஐ முயற்சி செய்யுங்கள்.",sources:[],question},200,origin);
       }
       const revenue=sum(relevantProfitRows,"revenue_inr");
+      const totalCost=sum(relevantSalesRows,"total_cost_inr");
       const directCost=sum(relevantProfitRows,"direct_cost_inr");
       const grossProfit=sum(relevantProfitRows,"gross_profit_inr");
       const netProfit=sum(relevantProfitRows,"net_profit_inr");
       const gpPct=revenue?grossProfit/revenue*100:0;
       const npPct=revenue?netProfit/revenue*100:0;
+      const asksTotalCost=/total cost|total expenses|total expense|expenses evlo|cost evlo|total spend/.test(normalizedQ) || /\b(cost|expenses|expense)\b/.test(normalizedQ);
+      const asksProfitAmount=/\b(profit|net profit|np)\b/.test(normalizedQ) && !/profit margin|net margin|profitability percentage/.test(normalizedQ);
+      const asksRevenueAmount=/total sales|sales evlo|total revenue|revenue evlo|sales value|turnover|overall sales|\brevenue\b/.test(normalizedQ);
       const lines:string[]=[];
+      if(asksRevenueAmount || asksTotalCost || asksProfitAmount) {
+        lines.push("Total revenue: "+formatINR(sum(relevantSalesRows,"revenue_inr"))+".");
+        if(asksTotalCost) lines.push("Total cost / expenses: "+formatINR(totalCost)+".");
+        if(asksProfitAmount) lines.push("Recorded profit (workspace profit metric): "+formatINR(sum(relevantSalesRows,"profit_inr"))+".");
+      }
       if(asksGrossMetric)lines.push("Gross profit (GP): "+formatINR(grossProfit)+"; GP%: "+gpPct.toFixed(2)+"%; direct cost (fabric + trims + CMT): "+formatINR(directCost)+".");
       if(asksNetMargin)lines.push("Net profit (NP): "+formatINR(netProfit)+"; NP%: "+npPct.toFixed(2)+"%.");
-      lines.push("Revenue: "+formatINR(revenue)+".");
-      return respond({answer:lines.join(String.fromCharCode(10)),sources:[{name:"vw_sales_profitability_by_month_country",records:relevantProfitRows.length}],summary:{revenue_inr:revenue,direct_cost_inr:directCost,gross_profit_inr:grossProfit,gp_pct:gpPct,net_profit_inr:netProfit,np_pct:npPct},question},200,origin);
+      return respond({answer:lines.join(String.fromCharCode(10)),sources:[{name:"vw_sales_profitability_by_month_country",records:relevantProfitRows.length},{name:"vw_sales_monthly_by_country",records:relevantSalesRows.length}],summary:{revenue_inr:sum(relevantSalesRows,"revenue_inr"),total_cost_inr:totalCost,recorded_profit_inr:sum(relevantSalesRows,"profit_inr"),direct_cost_inr:directCost,gross_profit_inr:grossProfit,gp_pct:gpPct,net_profit_inr:netProfit,np_pct:npPct},question},200,origin);
     }
     const quickRevenue = /total sales|sales evlo|total revenue|revenue evlo|sales value|turnover|overall sales/.test(normalizedQ) || (rawQ.includes("விற்பனை") && (rawQ.includes("மொத்த") || rawQ.includes("எவ்வளவு")));
     const quickCost = /total cost|total expenses|total expense|expenses evlo|cost evlo|total spend/.test(normalizedQ) || (rawQ.includes("செலவு") && rawQ.includes("மொத்த"));
