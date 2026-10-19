@@ -103,6 +103,7 @@ function AskAI({db,range,country}){
   const replyId=Date.now()+Math.random();
   let finalAnswer='';
   let finalSources=[];
+  let finalSummary=null;
   setError('');setSetupRequired(false);setInput('');
   setMessages(prev=>[...prev,{role:'user',content:question,voice:fromVoice},{role:'assistant',id:replyId,content:'',sources:[],streaming:true}]);
   setBusy(true);
@@ -128,8 +129,8 @@ function AskAI({db,range,country}){
     const data=await response.json();
     if(data?.error){if(data.code==='AI_KEY_MISSING'||data.help)setSetupRequired(true);throw new Error(data.help||data.error)}
     if(!data?.answer)throw new Error('AI returned no answer. Please try again.');
-    finalAnswer=data.answer;finalSources=Array.isArray(data.sources)?data.sources:[];
-    patchReply({content:finalAnswer,sources:finalSources,streaming:false});
+    finalAnswer=data.answer;finalSources=Array.isArray(data.sources)?data.sources:[];finalSummary=data.summary&&typeof data.summary==='object'?data.summary:null;
+    patchReply({content:finalAnswer,sources:finalSources,summary:finalSummary,streaming:false});
    }else{
     if(!response.body)throw new Error('Streaming response is not available in this browser.');
     const reader=response.body.getReader();const decoder=new TextDecoder();let buffer='';
@@ -137,7 +138,7 @@ function AskAI({db,range,country}){
      if(!line.trim())return;
      let event;try{event=JSON.parse(line)}catch{return}
      if(event.type==='token'&&event.text){finalAnswer+=event.text;patchReply({content:finalAnswer,streaming:true})}
-     else if(event.type==='done'){finalSources=Array.isArray(event.sources)?event.sources:[];patchReply({content:finalAnswer,sources:finalSources,streaming:false})}
+     else if(event.type==='done'){finalSources=Array.isArray(event.sources)?event.sources:[];finalSummary=event.summary&&typeof event.summary==='object'?event.summary:null;patchReply({content:finalAnswer,sources:finalSources,summary:finalSummary,streaming:false})}
      else if(event.type==='error')throw new Error(event.error||'AI stream stopped unexpectedly.');
     };
     while(true){
@@ -148,7 +149,7 @@ function AskAI({db,range,country}){
     }
     buffer+=decoder.decode();if(buffer.trim())processLine(buffer);
     if(!finalAnswer.trim())throw new Error('AI returned an empty answer. Please retry or simplify your question.');
-    patchReply({content:finalAnswer,sources:finalSources,streaming:false});
+    patchReply({content:finalAnswer,sources:finalSources,summary:finalSummary,streaming:false});
    }
    if(fromVoice&&finalAnswer)speakAnswer(finalAnswer);
   }catch(e){
@@ -187,17 +188,45 @@ function AskAI({db,range,country}){
   try{recognition.start()}catch{setListening(false);setError('Could not start the microphone. Try once more.')}
  };
  const stopListening=()=>{autoSpeakRef.current=true;try{recognitionRef.current?.stop()}catch{setListening(false)}};
- const suggestions=['Total sales evlo?','Which country has the highest revenue?','What is total net profit and margin?','Which product makes the most profit?','Marketing channel performance?'];
+ const suggestions=[
+  {group:'Executive overview',items:['Summarise business performance','Total sales, cost and net profit?']},
+  {group:'Sales & products',items:['Which country has the highest revenue?','Which product group makes the most profit?']},
+  {group:'Operations & growth',items:['Which marketing channel has the best ROAS?','Which production line has the highest efficiency?']}
+ ];
+ const sourceLabel=(name)=>({
+  vw_sales_monthly_by_country:'Monthly sales by country',
+  vw_sales_by_country:'Sales by country',
+  vw_sales_by_buyer:'Buyer performance',
+  vw_sales_by_product:'Product performance',
+  vw_marketing_channel_performance:'Marketing performance',
+  vw_production_by_line:'Production line performance',
+  vw_supplier_scorecard:'Supplier scorecard',
+  vw_market_monthly:'Market reference data',
+  vw_sales_profitability_by_month_country:'Monthly profitability'
+ }[name]||String(name||'Business data').replace(/^vw_/,'').replaceAll('_',' '));
+ const summaryCards=(summary)=>{
+  if(!summary||typeof summary!=='object')return [];
+  const cards=[];
+  const revenue=summary.revenue_inr??summary.revenue;
+  const profit=summary.profit_inr??summary.net_profit_inr;
+  const cost=summary.cost_inr??summary.total_cost_inr;
+  const orders=summary.orders??summary.order_count;
+  if(revenue!==undefined&&Number.isFinite(Number(revenue)))cards.push({label:'Revenue',value:inr(revenue)});
+  if(profit!==undefined&&Number.isFinite(Number(profit)))cards.push({label:'Recorded profit',value:inr(profit)});
+  if(cost!==undefined&&Number.isFinite(Number(cost)))cards.push({label:'Cost',value:inr(cost)});
+  if(orders!==undefined&&Number.isFinite(Number(orders)))cards.push({label:'Orders',value:Number(orders).toLocaleString('en-IN')});
+  return cards;
+ };
  return <section className="ask-ai-page">
-  <div className="panel ask-ai-hero"><div className="ask-ai-brand-icon"><Bot size={22}/></div><div className="ask-ai-hero-copy"><span className="panel-kicker">AI BUSINESS ASSISTANT</span><h2>Ask your garment data</h2><p>Ask in Tamil, Tanglish or English. Ask in Tamil, Tanglish or English and get concise answers based on your business metrics.</p></div><div className="ask-ai-status"><span className="status-dot"/> AI · Business insights</div></div>
+  <div className="panel ask-ai-hero"><div className="ask-ai-brand-icon"><Bot size={22}/></div><div className="ask-ai-hero-copy"><span className="panel-kicker">AI BUSINESS ASSISTANT</span><h2>Ask your garment data</h2><p>Ask in Tamil, Tanglish or English. Get evidence-led answers, compare performance and uncover your next best action.</p></div><div className="ask-ai-status"><span className="status-dot"/> AI · Business insights</div></div>
   <div className="panel ask-ai-chat">
    <div className="ask-ai-chat-head"><div><strong><Sparkles size={16}/> ThreadIQ AI</strong><span>Sales intelligence · Source-grounded answers</span></div><label className="voice-language">Voice language<select value={voiceLang} onChange={e=>setVoiceLang(e.target.value)}><option value="ta-IN">Tamil / Tanglish</option><option value="en-IN">English (India)</option><option value="hi-IN">Hindi</option></select></label></div>
    <div className="ask-ai-messages" ref={listRef} aria-live="polite">
-    {messages.map((m,i)=><div className={'ask-message '+(m.role==='user'?'ask-user':'ask-assistant')} key={i}><div className="ask-message-avatar">{m.role==='user'?'You':<Bot size={16}/>}</div><div className="ask-message-body"><div className="ask-message-text">{m.content}</div>{m.role==='assistant'&&i>0&&!m.streaming&&m.content&&<button className="ask-read-aloud" type="button" onClick={()=>speakAnswer(m.content)}><Volume2 size={14}/> Listen to answer</button>}</div></div>)}
+    {messages.map((m,i)=><div className={'ask-message '+(m.role==='user'?'ask-user':'ask-assistant')} key={i}><div className="ask-message-avatar">{m.role==='user'?'You':<Bot size={16}/>}</div><div className="ask-message-body"><div className="ask-message-text">{m.content}</div>{m.role==='assistant'&&m.summary&&summaryCards(m.summary).length>0&&<div className="ask-answer-metrics">{summaryCards(m.summary).map(metric=><div className="ask-answer-metric" key={metric.label}><span>{metric.label}</span><strong>{metric.value}</strong></div>)}</div>}{m.role==='assistant'&&i>0&&!m.streaming&&Array.isArray(m.sources)&&m.sources.length>0&&<div className="ask-source-wrap"><div className="ask-source-heading"><CheckCircle2 size={13}/><span>Grounded in workspace data</span></div><div className="ask-source-list">{m.sources.map((source,j)=><span className="ask-source-chip" key={(source.name||'source')+'-'+j} title={source.name||'Supabase analytics view'}>{sourceLabel(source.name)}{Number.isFinite(Number(source.records))&&source.records!==undefined?<small>{Number(source.records).toLocaleString('en-IN')} rows</small>:null}</span>)}</div></div>}{m.role==='assistant'&&i>0&&!m.streaming&&m.content&&<button className="ask-read-aloud" type="button" onClick={()=>speakAnswer(m.content)}><Volume2 size={14}/> Listen to answer</button>}</div></div>)}
     {busy&&<div className="ask-message ask-assistant"><div className="ask-message-avatar"><Bot size={16}/></div><div className="ask-message-body"><div className="ask-thinking"><span></span><span></span><span></span> Thinking…</div></div></div>}
    </div>
    {error&&<div className="ask-error" role="alert">{error}{keyboardDictationFallback&&<button type="button" onClick={()=>{setError('Tap the microphone icon on the iPhone keyboard to dictate your question into this box, then tap Ask.');composerInputRef.current?.focus()}} style={{display:'inline-flex',alignItems:'center',marginTop:8,padding:'8px 10px',border:'1px solid #cbdcf0',borderRadius:8,background:'#f4f8ff',color:'#245e96',fontSize:12,fontWeight:600,cursor:'pointer'}}>Use device keyboard dictation</button>}{setupRequired&&<a className="ask-setup-link" href="https://supabase.com/dashboard/project/rzsgdfpwnxhseyxtrrlx/settings/functions" target="_blank" rel="noreferrer">Open Supabase Function settings</a>}</div>}
-   {messages.length===1&&<div className="ask-suggestions"><span>Try asking</span>{suggestions.map(s=><button type="button" key={s} onClick={()=>ask(s)} disabled={busy}>{s}</button>)}</div>}
+   {messages.length===1&&<div className="ask-ai-quickstart"><div className="ask-ai-quickstart-heading"><span className="quickstart-icon"><Sparkles size={15}/></span><div><strong>Start with a business question</strong><small>Choose a prompt or ask your own in Tamil, Tanglish or English.</small></div></div><div className="ask-ai-prompt-grid">{suggestions.map(group=><div className="ask-ai-prompt-group" key={group.group}><span>{group.group}</span>{group.items.map(s=><button type="button" key={s} onClick={()=>ask(s)} disabled={busy}>{s}<span aria-hidden="true">↗</span></button>)}</div>)}</div></div>}
    <form className="ask-ai-composer" onSubmit={e=>{e.preventDefault();void ask(input)}}><button type="button" className={'ask-mic-button '+(listening?'is-listening':'')} onClick={listening?stopListening:startListening} disabled={busy} title={listening?'Stop voice input':'Ask by voice'} aria-label={listening?'Stop voice input':'Ask by voice'}>{listening?<Square size={17}/>:<Mic size={18}/>}</button><textarea ref={composerInputRef} value={input} onChange={e=>setInput(e.target.value)} rows={1} placeholder={listening?'Listening… speak your question':'Ask about total sales, GP, NP, products, buyers…'} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();void ask(input)}}} disabled={busy}/><button type="submit" className="ask-send-button" disabled={busy||!input.trim()} aria-label="Send question">{busy?<AudioLines size={17} className="ask-busy-icon"/>:<Send size={17}/>}<span>Ask</span></button></form>
    <div className="ask-ai-footnote">Microphone permission is required for voice input. Voice answers can be replayed with “Listen to answer”. Missing financial or tax values will be identified rather than invented.</div>
   </div>
