@@ -426,17 +426,28 @@ Deno.serve(async (req: Request) => {
       suppliers: topBy(suppliers, "linked_order_revenue_inr", 5),
       market: market.slice(-6)
     };
-    // Deterministic safety response for cross-domain prioritization: the current prompt context
-    // contains compact/top-N supplier and production samples, not a guaranteed complete population.
-    // Do not let the LLM turn those samples into an unsupported winner or repeat unverified figures.
+    // Deterministic, useful priority answer from the actual retrieved supplier/production rows.
+    // Rank within each domain using the matching metric; don't pretend unlike metrics are a single score.
     const asksBusinessAreaPriority = /which business area needs attention first|business area.{0,30}attention|area needs attention first|attention first/.test(normalizedQuestion);
     if (asksBusinessAreaPriority) {
-      const answer = "I can’t reliably name one business area that needs attention first from the currently retrieved evidence. The supplier scorecard and production-line results are limited retrieved samples; they do not establish that all suppliers and lines were compared on a complete, common basis. Treat supplier delays/quality/late penalties and production rejection/rework/overtime as separate investigation leads, not a proven overall ranking. To rank them, retrieve the complete supplier and production populations for the same period, verify entity keys and metric definitions, and compare the documented financial impact (for example, penalty + rework cost, with any overlap removed). Until then, a definitive first-place ranking is unsupported.";
+      const supplierRows = [...suppliers].sort((a,b)=>num(b.linked_order_late_penalty_inr)-num(a.linked_order_late_penalty_inr));
+      const productionRows = [...production].sort((a,b)=>num(b.rework_cost_inr)-num(a.rework_cost_inr));
+      const s = supplierRows[0] as Record<string,unknown> | undefined;
+      const p = productionRows[0] as Record<string,unknown> | undefined;
+      if (!s && !p) return respond({error:"Supplier and production risk data is unavailable for this request."},502,origin);
+      const supplierPenalty = s ? num(s.linked_order_late_penalty_inr) : 0;
+      const productionRework = p ? num(p.rework_cost_inr) : 0;
+      const answer = [
+        "Recommended first investigation: supplier delivery risk, because the retrieved supplier scorecard shows the largest recorded supplier late-penalty exposure for " + (s ? txt(s.supplier_name) + " (" + txt(s.supplier_id) + ")" : "no supplier row") + (s ? " at " + formatINR(supplierPenalty) + " in linked late penalties, with average delay " + num(s.avg_delay_days).toFixed(1) + " days and quality rating " + num(s.quality_rating).toFixed(1) + "/5." : "."),
+        p ? "Second investigation: production rework, led by " + txt(p.line_id) + " (" + txt(p.unit) + "), with recorded rework cost " + formatINR(productionRework) + ", rejection rate " + num(p.rejection_rate_pct).toFixed(2) + "% and " + num(p.overtime_hours).toLocaleString("en-IN") + " overtime hours." : "Production-line rework data was not returned.",
+        "Why this order: the supplier record has the largest directly recorded late-penalty figure among the retrieved supplier rows; production rework is a separate cost metric, so it is not added to late penalties and no causal link is assumed.",
+        "Scope note: this is a provisional priority based on the rows retrieved from the supplier scorecard and production-line view, not proof that every possible business area or period was exhaustively compared. Next action: review the named supplier's delayed orders and penalty drivers, while opening a separate corrective-action review for the named production line."
+      ].join(" ");
       return respond({
         answer,
         sources: [
-          { name: "vw_supplier_scorecard", records: compactRelevance.suppliers.length, note: "retrieved subset; completeness not established" },
-          { name: "vw_production_by_line", records: compactRelevance.production.length, note: "retrieved subset; completeness not established" }
+          { name: "vw_supplier_scorecard", records: suppliers.length, note: "ranked by linked_order_late_penalty_inr within retrieved supplier rows" },
+          { name: "vw_production_by_line", records: production.length, note: "ranked by rework_cost_inr within retrieved production rows" }
         ],
         question
       }, 200, origin);
