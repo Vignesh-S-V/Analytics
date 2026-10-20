@@ -157,6 +157,72 @@ Deno.serve(async (req: Request) => {
       return respond({ answer, rankingTable: { title: "Supplier revenue ranking", subtitle: "Highest to lowest · " + ranked.length + " suppliers", columns: [{key:"rank",label:"Rank",type:"number"},{key:"supplier_name",label:"Supplier Name"},{key:"supplier_id",label:"Supplier Code"},{key:"revenue_inr",label:"Linked-Order Revenue",type:"currency"},{key:"linked_order_count",label:"Linked Orders",type:"number"},{key:"avg_delay_days",label:"Average Delay (Days)",type:"decimal"},{key:"quality_rating",label:"Quality Rating (/5)",type:"decimal"}], rows: ranked.map((r,i)=>({rank:i+1,supplier_name:txt(r.supplier_name),supplier_id:txt(r.supplier_id),revenue_inr:num(r.linked_order_revenue_inr),linked_order_count:num(r.linked_order_count),avg_delay_days:num(r.avg_delay_days),quality_rating:num(r.quality_rating)})) }, sources: [{ name: "vw_supplier_scorecard", records: rows.length, note: "complete supplier scorecard rows sorted descending by linked_order_revenue_inr" }], question }, 200, origin);
     }
 
+    // Deterministic date coverage and annual peak-month checks. Never ask the LLM to
+    // guess whether a month exists or to substitute a different year for a missing period.
+    const coverageQuestion = /\b(date coverage|month coverage|data coverage|available period|earliest month|latest month|earliest date|latest date|date range)\b/i.test(question);
+    const peakYear = question.match(/20[0-9]{2}/)?.[0] ?? "";
+    const annualPeakQuestion = !!peakYear
+      && /\b(highest|highest-revenue|peak|top)\b/i.test(question)
+      && /\b(month|revenue|sales)\b/i.test(question);
+    if (coverageQuestion || annualPeakQuestion) {
+      const coverageRows: Record<string, unknown>[] = [];
+      const pageSize = 1000;
+      for (let offset = 0; ; offset += pageSize) {
+        const page = await db.from("vw_sales_monthly_by_country")
+          .select("month,country,order_count,revenue_inr,profit_inr")
+          .order("month", { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (page.error) {
+          console.error("Date coverage query failed:", page.error.message);
+          return respond({ error: "Could not verify monthly data coverage. Please retry." }, 502, origin);
+        }
+        const rows = (page.data ?? []) as Record<string, unknown>[];
+        coverageRows.push(...rows);
+        if (rows.length < pageSize) break;
+      }
+      const availableMonths = [...new Set(coverageRows.map(monthOf).filter(m => /^20\d{2}-\d{2}$/.test(m)))].sort();
+      if (coverageQuestion && !annualPeakQuestion) {
+        const gaps: string[] = [];
+        if (availableMonths.length) {
+          const start = availableMonths[0].split("-").map(Number);
+          const end = availableMonths[availableMonths.length - 1].split("-").map(Number);
+          let cursor = start[0] * 12 + start[1] - 1;
+          const last = end[0] * 12 + end[1] - 1;
+          const present = new Set(availableMonths);
+          while (cursor <= last) {
+            const y = Math.floor(cursor / 12), m = String(cursor % 12 + 1).padStart(2, "0");
+            const key = y + "-" + m;
+            if (!present.has(key)) gaps.push(key);
+            cursor++;
+          }
+        }
+        const answer = availableMonths.length
+          ? "Verified monthly coverage: " + availableMonths[0] + " to " + availableMonths[availableMonths.length - 1]
+            + "; " + availableMonths.length + " distinct months present."
+            + (gaps.length ? " Missing month keys inside this range: " + gaps.join(", ") + "." : " No missing month keys inside this range.")
+          : "No valid YYYY-MM month keys were returned by the monthly sales view. Date coverage is unavailable.";
+        return respond({ answer, sources: [{ name: "vw_sales_monthly_by_country", records: coverageRows.length, note: "all pages read; distinct YYYY-MM keys checked" }], question }, 200, origin);
+      }
+      const annualRows = coverageRows.filter(row => monthOf(row).startsWith(peakYear));
+      const totals = new Map<string, { month: string; revenue_inr: number; profit_inr: number; order_count: number }>();
+      for (const row of annualRows) {
+        const month = monthOf(row);
+        if (!/^20\d{2}-\d{2}$/.test(month)) continue;
+        const item = totals.get(month) ?? { month, revenue_inr: 0, profit_inr: 0, order_count: 0 };
+        item.revenue_inr += num(row.revenue_inr);
+        item.profit_inr += num(row.profit_inr);
+        item.order_count += num(row.order_count);
+        totals.set(month, item);
+      }
+      const months = [...totals.values()].sort((a, b) => b.revenue_inr - a.revenue_inr);
+      if (!months.length) {
+        const coverage = availableMonths.length ? availableMonths[0] + " to " + availableMonths[availableMonths.length - 1] : "unavailable";
+        return respond({ answer: "No monthly sales records were found for " + peakYear + ". Available coverage from this source: " + coverage + ". I cannot identify a highest-revenue month for a year with no records.", sources: [{ name: "vw_sales_monthly_by_country", records: coverageRows.length, note: "complete paginated source checked for requested year" }], question }, 200, origin);
+      }
+      const top = months[0];
+      return respond({ answer: "Highest-revenue month in " + peakYear + ": " + top.month + ". Revenue: " + formatINR(top.revenue_inr) + "; recorded profit: " + formatINR(top.profit_inr) + "; orders: " + top.order_count.toLocaleString("en-IN") + ". Months present in " + peakYear + ": " + months.length + ". Coverage across all available months: " + (availableMonths[0] ?? "unknown") + " to " + (availableMonths[availableMonths.length - 1] ?? "unknown") + ".", sources: [{ name: "vw_sales_monthly_by_country", records: annualRows.length, note: "all paginated monthly country rows for requested year, aggregated by month" }], question }, 200, origin);
+    }
+
     // Deterministic trend path: return real monthly numeric points so the UI can render a chart.
     const asksTrend = /\b(trend|over time|month by month|monthly pattern|month-wise|month wise|historical pattern)\b/i.test(question);
     if (asksTrend && /\b(revenue|sales|profit|cost|expense|expenses)\b/i.test(question)) {
@@ -330,7 +396,7 @@ Deno.serve(async (req: Request) => {
     // Explicit comparison between named countries must use country-level aggregates, not buyer snippets or a single-country fallback.
     const countryNames = ["usa","uae","germany","uk","france","spain","italy","netherlands","sweden","canada","japan","australia"];
     const requestedCountries = countryNames.filter(name => new RegExp("\\b"+name+"\\b","i").test(normalizedQ));
-    const asksCountryComparison = isCountryComparisonQuestion(normalizedQ, requestedCountries.length);
+    const asksCountryComparison = isCountryComparisonQuestion(normalizedQ + " " + question.toLowerCase(), requestedCountries.length);
     if (asksCountryComparison) {
       const rows: Record<string, unknown>[] = [];
       const pageSize = 1000;
@@ -390,7 +456,10 @@ Deno.serve(async (req: Request) => {
     const asksProductionRankingEarly = /\b(production lines?|production line performance|manufacturing lines?)\b/.test(normalizedQ)
       && /\b(rank|ranking|ranked|top|highest|lowest|sort|list|rework|rejection|reject|overtime|efficiency|performance)\b/.test(normalizedQ);
     if (asksProductionRankingEarly) {
-      const metric = /\brework\b/.test(normalizedQ) ? "rework_cost_inr"
+      const explicitlyAsksEfficiency = /\b(highest|highest recorded|most|best)\b.{0,24}\befficiency\b/.test(normalizedQ)
+        || /\befficiency\b.{0,24}\b(highest|most|best)\b/.test(normalizedQ);
+      const metric = explicitlyAsksEfficiency ? "avg_actual_efficiency_pct"
+        : /\brework\b/.test(normalizedQ) ? "rework_cost_inr"
         : /\brejection|reject\b/.test(normalizedQ) ? "rejection_rate_pct"
         : /\bovertime\b/.test(normalizedQ) ? "overtime_hours" : "avg_actual_efficiency_pct";
       const {data,error}=await db.from("vw_production_by_line").select("line_id,unit,specialisation,order_count,order_qty,shipped_qty,rejection_qty,rejection_rate_pct,avg_actual_efficiency_pct,avg_target_efficiency_pct,overtime_hours,rework_cost_inr").limit(100);
@@ -399,7 +468,7 @@ Deno.serve(async (req: Request) => {
       const ascending = /\b(lowest|least|minimum)\b/.test(normalizedQ) && !/\b(highest\s+to\s+lowest|descending|high\s+to\s+low)\b/.test(normalizedQ);
       const ranked=[...rows].sort((a,b)=>(ascending?1:-1)*(num(a[metric])-num(b[metric])));
       if(!ranked.length)return respond({answer:"No production-line rows are available.",sources:[{name:"vw_production_by_line",records:0}],question},200,origin);
-      return respond({answer:"Production lines ranked by "+metric.replaceAll("_"," ")+" ("+(ascending?"lowest to highest":"highest to lowest")+"); "+ranked.length+" lines.",rankingTable:{title:"Production line performance",subtitle:"Sorted by "+metric.replaceAll("_"," ")+" · "+ranked.length+" lines",columns:[{key:"rank",label:"Rank",type:"number"},{key:"line_id",label:"Line"},{key:"unit",label:"Unit"},{key:"specialisation",label:"Specialisation"},{key:"order_count",label:"Orders",type:"number"},{key:"rework_cost_inr",label:"Rework Cost",type:"currency"},{key:"rejection_rate_pct",label:"Rejection Rate",type:"percent"},{key:"avg_actual_efficiency_pct",label:"Actual Efficiency",type:"percent"},{key:"avg_target_efficiency_pct",label:"Target Efficiency",type:"percent"},{key:"overtime_hours",label:"Overtime Hours",type:"decimal"}],rows:ranked.map((r,i)=>({rank:i+1,line_id:txt(r.line_id),unit:txt(r.unit),specialisation:txt(r.specialisation),order_count:num(r.order_count),rework_cost_inr:num(r.rework_cost_inr),rejection_rate_pct:num(r.rejection_rate_pct),avg_actual_efficiency_pct:num(r.avg_actual_efficiency_pct)*100,avg_target_efficiency_pct:num(r.avg_target_efficiency_pct)*100,overtime_hours:num(r.overtime_hours)}))},sources:[{name:"vw_production_by_line",records:rows.length,note:"all production-line groups sorted by requested metric"}],question},200,origin);
+      return respond({answer:"Production lines ranked by "+metric.replaceAll("_"," ")+" ("+(ascending?"lowest to highest":"highest to lowest")+"); "+ranked.length+" lines.",rankingTable:{title:"Production line performance",subtitle:"Sorted by "+metric.replaceAll("_"," ")+" · "+rows.length+" lines",columns:[{key:"rank",label:"Rank",type:"number"},{key:"line_id",label:"Line"},{key:"unit",label:"Unit"},{key:"specialisation",label:"Specialisation"},{key:"order_count",label:"Orders",type:"number"},{key:"rework_cost_inr",label:"Rework Cost",type:"currency"},{key:"rejection_rate_pct",label:"Rejection Rate",type:"percent"},{key:"avg_actual_efficiency_pct",label:"Actual Efficiency",type:"percent"},{key:"avg_target_efficiency_pct",label:"Target Efficiency",type:"percent"},{key:"overtime_hours",label:"Overtime Hours",type:"decimal"}],rows:ranked.map((r,i)=>({rank:i+1,line_id:txt(r.line_id),unit:txt(r.unit),specialisation:txt(r.specialisation),order_count:num(r.order_count),rework_cost_inr:num(r.rework_cost_inr),rejection_rate_pct:num(r.rejection_rate_pct),avg_actual_efficiency_pct:num(r.avg_actual_efficiency_pct)*100,avg_target_efficiency_pct:num(r.avg_target_efficiency_pct)*100,overtime_hours:num(r.overtime_hours)}))},sources:[{name:"vw_production_by_line",records:rows.length,note:"all production-line groups sorted by requested metric"}],question},200,origin);
     }
 
     const asksGrossMetric = /\bgp\b|\bgpm\b|gross profit|gross margin|gp\s*%/.test(rawQ);
@@ -473,7 +542,7 @@ Deno.serve(async (req: Request) => {
         const answer=metric==="rework_cost_inr"
           ?"Highest total rework cost: line "+txt(r.line_id)+" ("+txt(r.unit)+", "+txt(r.specialisation)+"). Rework cost: "+rework+"; rejection rate: "+rejection+"; orders: "+num(r.order_count).toLocaleString("en-IN")+". Ranked across all "+rows.length+" production-line groups."
           :"Highest "+metric.replaceAll("_"," ")+": line "+txt(r.line_id)+" ("+txt(r.unit)+"). "+(metric==="rejection_rate_pct"?"Rejection rate: "+rejection:metric==="overtime_hours"?"Overtime: "+num(r.overtime_hours).toLocaleString("en-IN")+" hours":"Actual efficiency: "+num(r.avg_actual_efficiency_pct).toFixed(2)+"%; target: "+num(r.avg_target_efficiency_pct).toFixed(2)+"%")+".";
-        return respond({answer,rankingTable:{title:"Production line performance",subtitle:"Sorted by "+metric.replaceAll("_"," ")+" · "+ranked.length+" lines",columns:[{key:"rank",label:"Rank",type:"number"},{key:"line_id",label:"Line"},{key:"unit",label:"Unit"},{key:"specialisation",label:"Specialisation"},{key:"order_count",label:"Orders",type:"number"},{key:"rework_cost_inr",label:"Rework Cost",type:"currency"},{key:"rejection_rate_pct",label:"Rejection Rate",type:"percent"},{key:"avg_actual_efficiency_pct",label:"Actual Efficiency",type:"percent"},{key:"avg_target_efficiency_pct",label:"Target Efficiency",type:"percent"},{key:"overtime_hours",label:"Overtime Hours",type:"decimal"}],rows:ranked.map((r,i)=>({rank:i+1,line_id:txt(r.line_id),unit:txt(r.unit),specialisation:txt(r.specialisation),order_count:num(r.order_count),rework_cost_inr:num(r.rework_cost_inr),rejection_rate_pct:num(r.rejection_rate_pct),avg_actual_efficiency_pct:num(r.avg_actual_efficiency_pct),avg_target_efficiency_pct:num(r.avg_target_efficiency_pct),overtime_hours:num(r.overtime_hours)}))},sources:[{name:"vw_production_by_line",records:rows.length,note:"all line groups ranked server-side by requested metric"}],question},200,origin);
+        return respond({answer,rankingTable:{title:"Production line performance",subtitle:"Sorted by "+metric.replaceAll("_"," ")+" · "+ranked.length+" lines",columns:[{key:"rank",label:"Rank",type:"number"},{key:"line_id",label:"Line"},{key:"unit",label:"Unit"},{key:"specialisation",label:"Specialisation"},{key:"order_count",label:"Orders",type:"number"},{key:"rework_cost_inr",label:"Rework Cost",type:"currency"},{key:"rejection_rate_pct",label:"Rejection Rate",type:"percent"},{key:"avg_actual_efficiency_pct",label:"Actual Efficiency",type:"percent"},{key:"avg_target_efficiency_pct",label:"Target Efficiency",type:"percent"},{key:"overtime_hours",label:"Overtime Hours",type:"decimal"}],rows:rows.map((r,i)=>({rank:i+1,line_id:txt(r.line_id),unit:txt(r.unit),specialisation:txt(r.specialisation),order_count:num(r.order_count),rework_cost_inr:num(r.rework_cost_inr),rejection_rate_pct:num(r.rejection_rate_pct),avg_actual_efficiency_pct:num(r.avg_actual_efficiency_pct)*100,avg_target_efficiency_pct:num(r.avg_target_efficiency_pct)*100,overtime_hours:num(r.overtime_hours)}))},sources:[{name:"vw_production_by_line",records:rows.length,note:"all line groups ranked server-side by requested metric"}],question},200,origin);
       }
     }
 
@@ -729,8 +798,15 @@ Deno.serve(async (req: Request) => {
       if(error)return respond({error:"Could not read marketing aggregates from Supabase."},502,origin);
       const grouped=new Map<string,Record<string,unknown>>();
       for(const row of (rows??[]) as Record<string,unknown>[]){const channel=txt(row.channel)||"Unknown";const v=grouped.get(channel)??{channel,spend:0,value:0,orders_won:0};v.spend=num(v.spend)+num(row.marketing_spend_inr);v.value=num(v.value)+num(row.attributed_order_value_inr);v.orders_won=num(v.orders_won)+num(row.orders_won);grouped.set(channel,v);}
-      const ranked=[...grouped.values()].sort((a,b)=>(num(b.spend)?num(b.value)/num(b.spend):0)-(num(a.spend)?num(a.value)/num(a.spend):0));
-      if(ranked.length){const r=ranked[0];return respond({answer:"Highest attributed ROAS channel: "+txt(r.channel)+". Attributed order value: "+formatINR(num(r.value))+"; marketing spend: "+formatINR(num(r.spend))+"; ROAS: "+(num(r.spend)?(num(r.value)/num(r.spend)).toFixed(2)+"x":"not available")+"; won orders: "+num(r.orders_won).toLocaleString("en-IN")+". ROAS uses attributed sales value, not profit",sources:[{name:"vw_marketing_channel_performance",records:(rows??[]).length}],question},200,origin);}
+      const ranked=[...grouped.values()].map(r=>({...r,roas:num(r.spend)>0?num(r.value)/num(r.spend):null})).sort((a,b)=>(b.roas??-1)-(a.roas??-1));
+      if(ranked.length){
+        const asksProfitRoi=/\b(profit roi|roi|return on investment|attributable profit)\b/.test(normalizedQ);
+        const wantsFullRanking=/\b(rank|ranking|ranked|all|every|each|compare)\b/.test(normalizedQ);
+        const top=ranked[0];
+        const answer=(wantsFullRanking?"Marketing channels ranked by attributed ROAS (highest to lowest):\n"+ranked.map((r,i)=>(i+1)+". "+txt(r.channel)+" — ROAS: "+(r.roas===null?"N/A":r.roas.toFixed(2)+"x")+"; attributed revenue: "+formatINR(num(r.value))+"; spend: "+formatINR(num(r.spend))+"; won orders: "+num(r.orders_won).toLocaleString("en-IN")).join("\n"):"Highest attributed ROAS channel: "+txt(top.channel)+". Attributed order value: "+formatINR(num(top.value))+"; marketing spend: "+formatINR(num(top.spend))+"; ROAS: "+(top.roas===null?"not available":top.roas.toFixed(2)+"x")+"; won orders: "+num(top.orders_won).toLocaleString("en-IN"))
+          + (asksProfitRoi?". Profit ROI is unavailable from this view because attributable profit is not included; ROAS is revenue divided by spend, not profit ROI.":". ROAS = attributed revenue / marketing spend; this is not profit ROI.");
+        return respond({answer,rankingTable:{title:"Marketing channel ROAS ranking",subtitle:"Sorted by attributed revenue / marketing spend · "+ranked.length+" channels",columns:[{key:"rank",label:"Rank",type:"number"},{key:"channel",label:"Channel"},{key:"value",label:"Attributed Revenue",type:"currency"},{key:"spend",label:"Marketing Spend",type:"currency"},{key:"roas",label:"ROAS",type:"decimal"},{key:"orders_won",label:"Won Orders",type:"number"}],rows:ranked.map((r,i)=>({rank:i+1,channel:txt(r.channel),value:num(r.value),spend:num(r.spend),roas:r.roas,orders_won:num(r.orders_won)}))},sources:[{name:"vw_marketing_channel_performance",records:(rows??[]).length,note:"grouped by channel; ROAS computed from summed attributed order value / summed spend; profit ROI unavailable from selected fields"}],question},200,origin);
+      }
     }
     // Metric-aware supplier ranking: select the exact requested measure and direction.
     const asksSupplierEarly=/supplier/.test(normalizedQ)&&/(top|best|highest|lowest|worst|quality|delay|late|risk|revenue|profit|penalt|attention)/.test(normalizedQ);
