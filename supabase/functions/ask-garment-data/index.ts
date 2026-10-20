@@ -379,6 +379,55 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    const asksMonthExtremes = /\b(which month|what month|highest revenue month|lowest revenue month|highest revenue|lowest revenue)\b/.test(normalizedQ)
+      && /\b(month|revenue|sales)\b/.test(normalizedQ)
+      && !/\b(trend|over time|month by month|monthly pattern)\b/.test(normalizedQ);
+    if(asksMonthExtremes){
+      const {data,error}=await db.from("vw_sales_monthly_by_country")
+        .select("month,revenue_inr,profit_inr,total_cost_inr,order_count")
+        .order("month",{ascending:true}).limit(1000);
+      if(error)return respond({error:"Could not calculate monthly high/low values. Please retry."},502,origin);
+      const grouped=new Map<string,Record<string,unknown>>();
+      for(const row of (data??[]) as Record<string,unknown>[]){
+        const month=monthOf(row);if(!month)continue;
+        const r=grouped.get(month)??{month,revenue_inr:0,profit_inr:0,total_cost_inr:0,order_count:0};
+        for(const k of ["revenue_inr","profit_inr","total_cost_inr","order_count"])r[k]=num(r[k])+num(row[k]);
+        grouped.set(month,r);
+      }
+      let rows=[...grouped.values()];
+      if(qYear)rows=rows.filter(r=>txt(r.month).startsWith(qYear));
+      if(qMonth)rows=rows.filter(r=>txt(r.month).endsWith("-"+qMonth));
+      if(rows.length){
+        const high=[...rows].sort((a,b)=>num(b.revenue_inr)-num(a.revenue_inr))[0];
+        const low=[...rows].sort((a,b)=>num(a.revenue_inr)-num(b.revenue_inr))[0];
+        const answer="Highest-revenue month: "+txt(high.month)+" — "+formatINR(num(high.revenue_inr))+" ("+num(high.order_count).toLocaleString("en-IN")+" orders). Lowest-revenue month: "+txt(low.month)+" — "+formatINR(num(low.revenue_inr))+" ("+num(low.order_count).toLocaleString("en-IN")+" orders). Scope: "+rows.length+" monthly totals aggregated across all countries"+(qYear?" in "+qYear:" across all available months")+".";
+        return respond({answer,sources:[{name:"vw_sales_monthly_by_country",records:(data??[]).length,note:"all returned country-month rows grouped by month before high/low comparison"}],question},200,origin);
+      }
+    }
+
+    const asksSourceCoverage = /\b(source rows|source row count|rows used|records covered|total records|how many records|record count|source tables)\b/.test(normalizedQ);
+    if(asksSourceCoverage){
+      const countQueries=[
+        ["fact_orders",db.from("fact_orders").select("order_id",{count:"exact",head:true})],
+        ["vw_sales_monthly_by_country",db.from("vw_sales_monthly_by_country").select("month",{count:"exact",head:true})],
+        ["vw_sales_by_country",db.from("vw_sales_by_country").select("country",{count:"exact",head:true})],
+        ["vw_sales_by_buyer",db.from("vw_sales_by_buyer").select("buyer_id",{count:"exact",head:true})],
+        ["vw_sales_by_product",db.from("vw_sales_by_product").select("style_id",{count:"exact",head:true})],
+        ["vw_marketing_channel_performance",db.from("vw_marketing_channel_performance").select("channel",{count:"exact",head:true})],
+        ["vw_production_by_line",db.from("vw_production_by_line").select("line_id",{count:"exact",head:true})],
+        ["vw_supplier_scorecard",db.from("vw_supplier_scorecard").select("supplier_id",{count:"exact",head:true})],
+        ["vw_market_monthly",db.from("vw_market_monthly").select("month",{count:"exact",head:true})]
+      ] as const;
+      const results=await Promise.all(countQueries.map(async ([name,query])=>({name,...await query})));
+      const failed=results.find(r=>r.error);
+      if(failed){console.error("Source coverage count failed:",failed.name,failed.error?.message);return respond({error:"Could not verify all source row counts. Please retry."},502,origin);}
+      const counts=results.map(r=>({name:r.name,records:r.count??0}));
+      const fact=counts.find(r=>r.name==="fact_orders")?.records??0;
+      const views=counts.filter(r=>r.name!=="fact_orders");
+      const answer="Source coverage verified from live database counts. Underlying fact orders: "+fact.toLocaleString("en-IN")+" rows. Aggregate/source views: "+views.map(r=>r.name.replace(/^vw_/,"")+": "+r.records.toLocaleString("en-IN")+" rows").join("; ")+". These are separate view row counts and must not be added together as unique orders because views aggregate or regroup the same underlying orders.";
+      return respond({answer,sources:counts,question},200,origin);
+    }
+
     const asksCurrentMonthSales = /(this month|current month|இந்த மாதம்|இம்மாதம்)/i.test(question) && /(sales|revenue|விற்பனை|மொத்த)/i.test(question);
     if(asksCurrentMonthSales){
       const {data,error}=await db.from("vw_sales_monthly_by_country").select("month,revenue_inr,total_cost_inr,profit_inr,order_count").order("month",{ascending:false}).limit(1000);
