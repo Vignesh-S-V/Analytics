@@ -152,7 +152,7 @@ Deno.serve(async (req: Request) => {
       const rows = (data ?? []) as Record<string, unknown>[];
       if (!rows.length) return respond({ answer: "No supplier scorecard rows are available for this ranking.", sources: [{ name: "vw_supplier_scorecard", records: 0 }], question }, 200, origin);
       const ranked = [...rows].sort((a, b) => num(b.linked_order_revenue_inr) - num(a.linked_order_revenue_inr));
-      const answer = "All " + ranked.length + " suppliers ranked by total linked-order revenue (highest to lowest):\\n" + ranked.map((r, i) => (i + 1) + ". " + txt(r.supplier_name) + " (" + txt(r.supplier_id) + ") — " + formatINR(num(r.linked_order_revenue_inr)) + "; linked orders " + num(r.linked_order_count).toLocaleString("en-IN")).join("\\n");
+      const answer = "All " + ranked.length + " suppliers ranked by total linked-order revenue (highest to lowest):" + String.fromCharCode(10) + ranked.map((r, i) => (i + 1) + ". " + txt(r.supplier_name) + " (" + txt(r.supplier_id) + ") — " + formatINR(num(r.linked_order_revenue_inr)) + "; linked orders " + num(r.linked_order_count).toLocaleString("en-IN")).join(String.fromCharCode(10));
       return respond({ answer, sources: [{ name: "vw_supplier_scorecard", records: rows.length, note: "complete supplier scorecard rows sorted descending by linked_order_revenue_inr" }], question }, 200, origin);
     }
 
