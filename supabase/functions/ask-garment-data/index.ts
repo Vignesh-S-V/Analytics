@@ -332,9 +332,22 @@ Deno.serve(async (req: Request) => {
     const requestedCountries = countryNames.filter(name => new RegExp("\\b"+name+"\\b","i").test(normalizedQ));
     const asksCountryComparison = isCountryComparisonQuestion(normalizedQ, requestedCountries.length);
     if (asksCountryComparison) {
-      const {data,error}=await db.from("vw_sales_monthly_by_country").select("month,country,order_count,revenue_inr,profit_inr").order("month",{ascending:true}).limit(1000);
-      if(error){console.error("Country comparison failed:",error.message);return respond({error:"Could not calculate the country comparison. Please retry."},502,origin);}
-      const rows=(data??[]) as Record<string,unknown>[];
+      const rows: Record<string, unknown>[] = [];
+      const pageSize = 1000;
+      for (let offset = 0; ; offset += pageSize) {
+        const { data, error } = await db.from("vw_sales_monthly_by_country")
+          .select("month,country,order_count,revenue_inr,profit_inr")
+          .order("month", { ascending: true })
+          .order("country", { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (error) {
+          console.error("Country comparison failed:", error.message);
+          return respond({ error: "Could not calculate the country comparison. Please retry." }, 502, origin);
+        }
+        const page = (data ?? []) as Record<string, unknown>[];
+        rows.push(...page);
+        if (page.length < pageSize) break;
+      }
       const grouped=new Map<string,Record<string,unknown>>();
       for(const row of rows){const m=monthOf(row);if(qYear&&!m.startsWith(qYear))continue;if(qMonth&&!m.endsWith("-"+qMonth))continue;const country=txt(row.country);if(!requestedCountries.includes(country.toLowerCase()))continue;const cur=grouped.get(country)??{country,revenue_inr:0,profit_inr:0,order_count:0};cur.revenue_inr=num(cur.revenue_inr)+num(row.revenue_inr);cur.profit_inr=num(cur.profit_inr)+num(row.profit_inr);cur.order_count=num(cur.order_count)+num(row.order_count);grouped.set(country,cur);}
       const compareRows=[...grouped.values()].sort((a,b)=>requestedCountries.indexOf(txt(a.country).toLowerCase())-requestedCountries.indexOf(txt(b.country).toLowerCase()));
@@ -350,10 +363,23 @@ Deno.serve(async (req: Request) => {
       && /\b(rank|ranking|ranked|top|highest|lowest|sort|list|all|compare)\b/.test(normalizedQ)
       && /\b(revenue|sales|profit)\b/.test(normalizedQ);
     if (asksCountryRankingEarly) {
-      const {data,error}=await db.from("vw_sales_monthly_by_country").select("month,country,order_count,revenue_inr,profit_inr").order("month",{ascending:true}).limit(1000);
-      if(error){console.error("Country ranking failed:",error.message);return respond({error:"Could not calculate country rankings. Please retry."},502,origin);}
-      const rows=(data??[]) as Record<string,unknown>[];
-      const grouped=new Map<string,Record<string,unknown>>();
+      const rows: Record<string, unknown>[] = [];
+       const pageSize = 1000;
+       for (let offset = 0; ; offset += pageSize) {
+         const { data, error } = await db.from("vw_sales_monthly_by_country")
+           .select("month,country,order_count,revenue_inr,profit_inr")
+           .order("month", { ascending: true })
+           .order("country", { ascending: true })
+           .range(offset, offset + pageSize - 1);
+         if (error) {
+           console.error("Country ranking failed:", error.message);
+           return respond({ error: "Could not calculate country rankings. Please retry." }, 502, origin);
+         }
+         const page = (data ?? []) as Record<string, unknown>[];
+         rows.push(...page);
+         if (page.length < pageSize) break;
+       }
+       const grouped=new Map<string,Record<string,unknown>>();
       for(const row of rows){const m=monthOf(row);if(qYear&&!m.startsWith(qYear))continue;if(qMonth&&!m.endsWith("-"+qMonth))continue;const country=txt(row.country)||"Unknown";const cur=grouped.get(country)??{country,revenue_inr:0,profit_inr:0,order_count:0};cur.revenue_inr=num(cur.revenue_inr)+num(row.revenue_inr);cur.profit_inr=num(cur.profit_inr)+num(row.profit_inr);cur.order_count=num(cur.order_count)+num(row.order_count);grouped.set(country,cur);}
       const metric=/\bby\s+(?:recorded\s+)?(?:profit|net profit|np)\b/.test(normalizedQ)&&!/\bby\s+(?:total\s+)?(?:revenue|sales)\b/.test(normalizedQ)?"profit_inr":"revenue_inr";
       const ranked=[...grouped.values()].sort((a,b)=>num(b[metric])-num(a[metric]));
