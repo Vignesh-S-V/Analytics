@@ -133,7 +133,7 @@ Deno.serve(async (req: Request) => {
       console.error("AI quota check failed:", quotaError.message);
       return respond({ error: "Could not verify AI request quota. Please retry." }, 503, origin);
     }
-    if (quotaAllowed !== true) return respond({ error: "AI question limit reached (12 per minute per approved account). Please wait one minute and retry." }, 429, origin);
+    if (quotaAllowed !== true) return respond({ error: "Request burst limit reached (60 per minute per approved account). Please retry shortly." }, 429, origin);
     // Deterministic trend path: return real monthly numeric points so the UI can render a chart.
     const asksTrend = /\b(trend|over time|month by month|monthly pattern|month-wise|month wise|historical pattern)\b/i.test(question);
     if (asksTrend && /\b(revenue|sales|profit|cost|expense|expenses)\b/i.test(question)) {
