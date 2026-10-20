@@ -128,8 +128,23 @@ function AskAI({db,range,country}){
  useEffect(()=>{if(listRef.current)listRef.current.scrollTop=listRef.current.scrollHeight},[messages,busy]);
  useEffect(()=>()=>{try{recognitionRef.current?.stop()}catch{};if(typeof window!=='undefined'&&window.speechSynthesis)window.speechSynthesis.cancel()},[]);
  const speakAnswer=(text)=>{if(typeof window==='undefined'||!window.speechSynthesis){setError('Voice playback is not supported in this browser.');return}window.speechSynthesis.cancel();const utterance=new SpeechSynthesisUtterance(text);utterance.lang=voiceLang;utterance.rate=0.96;window.speechSynthesis.speak(utterance)};
- const ask=async(value,fromVoice=false)=>{
-  const question=String(value??input).trim();if(!question||busy)return;
+ const ask=async(value,fromVoice=false,batchItem=false)=>{
+  const question=String(value??input).trim();if(!question||(busy&&!batchItem))return;
+  // Allow a pasted numbered test list to run as separate, valid requests.
+  if(!batchItem){
+   const numbered=question.split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
+   const batch=numbered.length>1&&numbered.every(line=>/^\d{1,2}[.)]\s+/.test(line))
+    ?numbered.map(line=>line.replace(/^\d{1,2}[.)]\s+/,'').trim()).filter(Boolean):[];
+   if(batch.length>1){
+    setError('');setInput('');
+    for(const item of batch){
+     if(item.length>1200){setError('A batch question exceeds the 1,200-character limit: '+item.slice(0,90));continue}
+     await ask(item, false, true);
+    }
+    return;
+   }
+  }
+  if(question.length>1200){setError('Question is too long (maximum 1,200 characters). For multiple tests, paste a numbered list with one question per line.');return;}
   if(recognitionRef.current){try{recognitionRef.current.stop()}catch{}}
   const replyId=Date.now()+Math.random();
   let finalAnswer='';
