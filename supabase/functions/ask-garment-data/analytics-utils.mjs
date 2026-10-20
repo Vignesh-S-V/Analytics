@@ -6,7 +6,9 @@ export function detectProductRankingIntent(normalizedQ) {
 
   const explicitProfitRank = /\b(by\s+(?:total\s+)?(?:recorded\s+)?(?:profit|net profit|np)|most profitable|highest (?:recorded )?profit|maximum profit|top profit|profit highest|generated the highest recorded profit|generated highest profit)\b/.test(normalizedQ);
   const explicitRevenueRank = /\b(by\s+(?:total\s+)?(?:revenue|sales)|highest (?:total )?(?:revenue|sales)|top (?:revenue|sales))\b/.test(normalizedQ);
-  const asksGroupTotal = /\b(product group|product groups|by group|group level|across (?:all )?styles)\b/.test(normalizedQ)
+  // Category/group questions must aggregate styles before ranking. A category-level
+  // request must never silently receive a style-level table.
+  const asksGroupTotal = /\b(product group|product groups|by group|group level|across (?:all )?styles|category|categories)\b/.test(normalizedQ)
     || /\bwhich product group\b/.test(normalizedQ);
 
   return {
@@ -48,9 +50,11 @@ export function aggregateProductGroups(rows, metric) {
 }
 
 export function isCountryComparisonQuestion(normalizedQ, requestedCountryCount) {
-  return requestedCountryCount >= 2
-    && /\b(compare|comparison|versus|vs|difference|between|and)\b/.test(normalizedQ)
-    && /\b(revenue|sales|profit|margin|orders)\b/.test(normalizedQ);
+  const comparisonIntent = /\b(compare|comparison|versus|vs|difference|between|and)\b/.test(normalizedQ)
+    || /ஒப்பிட|ஒப்பீடு|வித்தியாசம்|மற்றும்/.test(normalizedQ);
+  const metricIntent = /\b(revenue|sales|profit|margin|orders)\b/.test(normalizedQ)
+    || /வருவாய்|விற்பனை|லாபம்|ஆர்டர்|ஆர்டர்கள்|மார்ஜின்/.test(normalizedQ);
+  return requestedCountryCount >= 2 && comparisonIntent && metricIntent;
 }
 
 function finiteNumber(value) {
@@ -58,7 +62,6 @@ function finiteNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
 }
-
 
 /**
  * Normalize and rank buyer aggregates from vw_sales_by_buyer.
