@@ -297,7 +297,7 @@ Deno.serve(async (req: Request) => {
     const asksFillRate=/fill rate|order fill|fulfill|fulfil|shipment rate/.test(normalizedQ);
     const asksDelayed=/delayed order|late order|orders delayed|delivery delay/.test(normalizedQ);
     const asksQuantity=/total quantity|total qty|shipped quantity|shipped qty|order quantity|order qty|units sold|quantity sold/.test(normalizedQ);
-    if(asksFillRate||asksDelayed||asksQuantity){
+    if((asksFillRate||asksDelayed||asksQuantity)&&!/\bsupplier\b/.test(normalizedQ)){
       const {data:rows,error}=await db.from("vw_sales_monthly_by_country").select("month,order_count,order_qty,shipped_qty,delayed_order_count").order("month").limit(1000);
       if(error)return respond({error:"Could not read the Supabase order summary."},502,origin);
       const all=(rows??[]) as Record<string,unknown>[];
@@ -310,7 +310,7 @@ Deno.serve(async (req: Request) => {
       else answer="Order quantity: "+orderQty.toLocaleString("en-IN")+"; shipped quantity: "+shippedQty.toLocaleString("en-IN")+".";
       return respond({answer,sources:[{name:"vw_sales_monthly_by_country",records:relevant.length}],question},200,origin);
     }
-    const asksTopProductEarly=/(which|top|highest|most profitable|best selling).*(product|style|fabric|category)|((product|style|fabric|category).*(highest|top|most profitable|best selling))/.test(normalizedQ);
+    const asksTopProductEarly=/(which|top|highest|most profitable|best selling).*\b(product(?: group| category)?|style|fabric|category)\b|\b(product(?: group| category)?|style|fabric|category)\b.*(highest|top|most profitable|best selling)/.test(normalizedQ);
     if(asksTopProductEarly&&!qYear&&!qMonth){
       const profitMetric=/profit|profitable|np|return/.test(normalizedQ);
       const {data:rows,error}=await db.from("vw_sales_by_product").select("product_category,fabric,style_id,order_count,order_qty,shipped_qty,revenue_inr,total_cost_inr,profit_inr,profit_margin_pct").order(profitMetric?"profit_inr":"revenue_inr",{ascending:false}).limit(1);
