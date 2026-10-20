@@ -250,6 +250,151 @@ Deno.serve(async (req: Request) => {
       if(asksNetMargin)lines.push("Net profit (NP): "+formatINR(netProfit)+"; NP%: "+npPct.toFixed(2)+"%.");
       return respond({answer:lines.join(String.fromCharCode(10)),sources:[{name:"vw_sales_profitability_by_month_country",records:relevantProfitRows.length},{name:"vw_sales_monthly_by_country",records:relevantSalesRows.length}],summary:{revenue_inr:sum(relevantSalesRows,"revenue_inr"),total_cost_inr:totalCost,recorded_profit_inr:sum(relevantSalesRows,"profit_inr"),direct_cost_inr:directCost,gross_profit_inr:grossProfit,gp_pct:gpPct,net_profit_inr:netProfit,np_pct:npPct},question},200,origin);
     }
+    // Exact entity-specific answers must run BEFORE generic KPI intents.
+    // This prevents "buyer revenue" from being intercepted by the all-company revenue handler.
+    const asksProductionLine = /\b(production line|line)\b/.test(normalizedQ) && /\b(rework|rejection|reject|overtime|efficiency|production cost|line cost)\b/.test(normalizedQ);
+    if (asksProductionLine) {
+      const metric = /\brework\b/.test(normalizedQ) ? "rework_cost_inr"
+        : /\b(rejection|reject)\b/.test(normalizedQ) ? "rejection_rate_pct"
+        : /\bovertime\b/.test(normalizedQ) ? "overtime_hours"
+        : "avg_actual_efficiency_pct";
+      const {data,error}=await db.from("vw_production_by_line")
+        .select("line_id,unit,specialisation,order_count,order_qty,shipped_qty,rejection_qty,rejection_rate_pct,avg_actual_efficiency_pct,avg_target_efficiency_pct,overtime_hours,rework_cost_inr")
+        .order(metric,{ascending:/\b(lowest|least|minimum)\b/.test(normalizedQ),nullsFirst:false}).limit(100);
+      if(error){console.error("Production ranking failed:",error.message);return respond({error:"Could not calculate production-line metrics. Please retry."},502,origin);}
+      const rows=(data??[]) as Record<string,unknown>[];
+      const r=rows[0];
+      if(r){
+        const rework=formatINR(num(r.rework_cost_inr));
+        const rejection=num(r.rejection_rate_pct).toFixed(2)+"% ("+num(r.rejection_qty).toLocaleString("en-IN")+" rejected / "+num(r.order_qty).toLocaleString("en-IN")+" ordered)";
+        const answer=metric==="rework_cost_inr"
+          ?"Highest total rework cost: line "+txt(r.line_id)+" ("+txt(r.unit)+", "+txt(r.specialisation)+"). Rework cost: "+rework+"; rejection rate: "+rejection+"; orders: "+num(r.order_count).toLocaleString("en-IN")+". Ranked across all "+rows.length+" production-line groups."
+          :"Highest "+metric.replaceAll("_"," ")+": line "+txt(r.line_id)+" ("+txt(r.unit)+"). "+(metric==="rejection_rate_pct"?"Rejection rate: "+rejection:metric==="overtime_hours"?"Overtime: "+num(r.overtime_hours).toLocaleString("en-IN")+" hours":"Actual efficiency: "+num(r.avg_actual_efficiency_pct).toFixed(2)+"%; target: "+num(r.avg_target_efficiency_pct).toFixed(2)+"%")+".";
+        return respond({answer,sources:[{name:"vw_production_by_line",records:rows.length,note:"all line groups ranked server-side by requested metric"}],question},200,origin);
+      }
+    }
+
+    const asksSupplier = /\bsupplier\b/.test(normalizedQ);
+    const asksSupplierPenalty = asksSupplier && /\b(penalt|penalties|penalty)\b/.test(normalizedQ);
+    const asksSupplierRevenueRanking = asksSupplier && /\b(rank|ranking|revenue|sales)\b/.test(normalizedQ);
+    const asksSupplierDelayAverage = asksSupplier && /\b(average|avg|slowest|slow|delay|delayed|delivery)\b/.test(normalizedQ)
+      && !asksSupplierPenalty && !asksSupplierRevenueRanking;
+    if (asksSupplierPenalty || asksSupplierRevenueRanking || asksSupplierDelayAverage) {
+      const {data,error}=await db.from("vw_supplier_scorecard")
+        .select("supplier_id,supplier_name,supply_type,avg_delay_days,quality_rating,linked_order_count,linked_order_revenue_inr,linked_order_profit_inr,linked_order_late_penalty_inr")
+        .limit(100);
+      if(error){console.error("Supplier analytics query failed:",error.message);return respond({error:"Could not calculate supplier metrics. Please retry."},502,origin);}
+      const rows=(data??[]) as Record<string,unknown>[];
+      if(rows.length){
+        if(asksSupplierPenalty){
+          const ranked=[...rows].sort((a,b)=>num(b.linked_order_late_penalty_inr)-num(a.linked_order_late_penalty_inr));
+          const r=ranked[0];
+          return respond({answer:"Highest total linked-order late penalty: "+txt(r.supplier_name)+" ("+txt(r.supplier_id)+"). Total penalty: "+formatINR(num(r.linked_order_late_penalty_inr))+"; linked orders: "+num(r.linked_order_count).toLocaleString("en-IN")+"; average delay: "+num(r.avg_delay_days).toFixed(1)+" days. Ranked across all "+rows.length+" supplier groups by the exact late-penalty amount, not average delay.",sources:[{name:"vw_supplier_scorecard",records:rows.length,note:"all supplier groups sorted by total linked-order late penalty"}],question},200,origin);
+        }
+        if(asksSupplierRevenueRanking){
+          const ranked=[...rows].sort((a,b)=>num(b.linked_order_revenue_inr)-num(a.linked_order_revenue_inr));
+          const answer="All "+ranked.length+" suppliers ranked by total linked-order revenue (highest to lowest):\n"+ranked.map((r,i)=>(i+1)+". "+txt(r.supplier_name)+" ("+txt(r.supplier_id)+") — "+formatINR(num(r.linked_order_revenue_inr))+"; orders "+num(r.linked_order_count).toLocaleString("en-IN")).join("\n");
+          return respond({answer,sources:[{name:"vw_supplier_scorecard",records:rows.length,note:"all supplier groups sorted by total linked-order revenue"}],question},200,origin);
+        }
+        const ranked=[...rows].sort((a,b)=>num(b.avg_delay_days)-num(a.avg_delay_days));
+        const avg=rows.reduce((acc,r)=>acc+num(r.avg_delay_days),0)/rows.length;
+        const slowest=ranked[0];
+        return respond({answer:"Average supplier delay: "+avg.toFixed(2)+" days across "+rows.length+" suppliers (unweighted mean of supplier average-delay values). Slowest supplier: "+txt(slowest.supplier_name)+" ("+txt(slowest.supplier_id)+"), averaging "+num(slowest.avg_delay_days).toFixed(1)+" days; linked orders: "+num(slowest.linked_order_count).toLocaleString("en-IN")+".",sources:[{name:"vw_supplier_scorecard",records:rows.length,note:"all supplier groups; average is unweighted across supplier averages"}],question},200,origin);
+      }
+    }
+
+    const asksTopBuyer = /\b(buyer|customer)\b/.test(normalizedQ) && /\b(highest|top|most|best|contributes|contribution|rank|ranking|revenue|sales|profit)\b/.test(normalizedQ);
+    if(asksTopBuyer){
+      const metric=/\b(profit|profitable|net profit|np)\b/.test(normalizedQ)?"profit_inr":"revenue_inr";
+      const {data,error}=await db.from("vw_sales_by_buyer")
+        .select("buyer_id,buyer_name,country,order_count,revenue_inr,total_cost_inr,profit_inr,profit_margin_pct")
+        .order(metric,{ascending:false,nullsFirst:false}).limit(100);
+      if(error){console.error("Buyer ranking failed:",error.message);return respond({error:"Could not calculate buyer rankings. Please retry."},502,origin);}
+      const rows=(data??[]) as Record<string,unknown>[];
+      if(rows.length){
+        const r=rows[0];
+        const answer="Highest "+(metric==="profit_inr"?"recorded-profit":"revenue")+" buyer: "+txt(r.buyer_name)+" ("+txt(r.country)+"). Revenue: "+formatINR(num(r.revenue_inr))+"; recorded profit: "+formatINR(num(r.profit_inr))+"; orders: "+num(r.order_count).toLocaleString("en-IN")+"; profit margin: "+num(r.profit_margin_pct).toFixed(2)+"%. Ranked across "+rows.length+" buyer groups.";
+        return respond({answer,sources:[{name:"vw_sales_by_buyer",records:rows.length,note:"all buyer groups sorted by requested metric"}],question},200,origin);
+      }
+    }
+
+    const asksCountryRanking = /\bcountr(?:y|ies)\b/.test(normalizedQ) && /\b(top|highest|most|best|compare|rank|ranking|revenue|sales|profit)\b/.test(normalizedQ);
+    if(asksCountryRanking){
+      const {data,error}=await db.from("vw_sales_monthly_by_country")
+        .select("month,country,order_count,revenue_inr,profit_inr")
+        .order("month",{ascending:true}).limit(1000);
+      if(error){console.error("Country ranking failed:",error.message);return respond({error:"Could not calculate country rankings. Please retry."},502,origin);}
+      const rows=(data??[]) as Record<string,unknown>[];
+      const grouped=new Map<string,Record<string,unknown>>();
+      for(const row of rows){
+        const month=monthOf(row);
+        if(qYear&&!month.startsWith(qYear))continue;
+        if(qMonth&&!month.endsWith("-"+qMonth))continue;
+        const country=txt(row.country)||"Unknown";
+        const r=grouped.get(country)??{country,revenue_inr:0,profit_inr:0,order_count:0};
+        r.revenue_inr=num(r.revenue_inr)+num(row.revenue_inr);
+        r.profit_inr=num(r.profit_inr)+num(row.profit_inr);
+        r.order_count=num(r.order_count)+num(row.order_count);
+        grouped.set(country,r);
+      }
+      const metric=/\b(profit|profitable|net profit|np)\b/.test(normalizedQ)?"profit_inr":"revenue_inr";
+      const requestedTopN=Math.max(1,Math.min(20,Number(normalizedQ.match(/\btop\s+(\d{1,2})\b/)?.[1]||(/compare|rank all|all countries/.test(normalizedQ)?20:1))));
+      const ranked=[...grouped.values()].sort((a,b)=>num(b[metric])-num(a[metric])).slice(0,requestedTopN);
+      if(ranked.length){
+        const label=metric==="profit_inr"?"recorded profit":"revenue";
+        const answer=ranked.length===1
+          ?"Highest "+label+" country: "+txt(ranked[0].country)+". "+(metric==="profit_inr"?"Recorded profit: ":"Revenue: ")+formatINR(num(ranked[0][metric]))+"; orders: "+num(ranked[0].order_count).toLocaleString("en-IN")+"."
+          :"Countries ranked by "+label+" (top "+ranked.length+"):\n"+ranked.map((r,i)=>(i+1)+". "+txt(r.country)+" — "+formatINR(num(r[metric]))+"; orders "+num(r.order_count).toLocaleString("en-IN")).join("\n");
+        return respond({answer,sources:[{name:"vw_sales_monthly_by_country",records:rows.length,note:"all retrieved country-month rows aggregated by country before ranking"}],question},200,origin);
+      }
+    }
+
+    const asksYearComparison = /\b(compare|comparison|versus|vs)\b/.test(normalizedQ) && /20\d{2}/.test(normalizedQ) && /\b(revenue|sales|profit|cost)\b/.test(normalizedQ);
+    if(asksYearComparison){
+      const years=[...new Set(question.match(/20\d{2}/g)??[])];
+      if(years.length>=2){
+        const {data,error}=await db.from("vw_sales_monthly_by_country")
+          .select("month,revenue_inr,profit_inr,total_cost_inr,order_count")
+          .order("month",{ascending:true}).limit(1000);
+        if(error){console.error("Year comparison failed:",error.message);return respond({error:"Could not retrieve year-comparison data. Please retry."},502,origin);}
+        const rows=(data??[]) as Record<string,unknown>[];
+        const totals=new Map<string,{year:string;month:string;revenue_inr:number;profit_inr:number;total_cost_inr:number;orders:number}>();
+        for(const row of rows){
+          const m=monthOf(row), y=m.slice(0,4);
+          if(!years.includes(y))continue;
+          const key=y+"-"+m.slice(5,7);
+          const t=totals.get(key)??{year:y,month:m.slice(5,7),revenue_inr:0,profit_inr:0,total_cost_inr:0,orders:0};
+          t.revenue_inr+=num(row.revenue_inr);t.profit_inr+=num(row.profit_inr);t.total_cost_inr+=num(row.total_cost_inr);t.orders+=num(row.order_count);totals.set(key,t);
+        }
+        const points=[...totals.values()].sort((a,b)=>(a.month+a.year).localeCompare(b.month+b.year));
+        const summaries=years.map(year=>{
+          const list=points.filter(p=>p.year===year);
+          return {year,months:list.length,revenue_inr:list.reduce((s,p)=>s+p.revenue_inr,0),profit_inr:list.reduce((s,p)=>s+p.profit_inr,0),cost_inr:list.reduce((s,p)=>s+p.total_cost_inr,0),orders:list.reduce((s,p)=>s+p.orders,0)};
+        });
+        const missing=summaries.filter(s=>s.months===0);
+        if(missing.length)return respond({answer:"No monthly records were retrieved for "+missing.map(x=>x.year).join(", ")+". Available database period: "+(rows.length?monthOf(rows[0])+" to "+monthOf(rows[rows.length-1]):"none")+". I cannot make a full-year comparison without those months.",sources:[{name:"vw_sales_monthly_by_country",records:rows.length}],question},200,origin);
+        const answer="Year comparison from the monthly sales view:\n"+summaries.map(s=>s.year+": "+s.months+" months; revenue "+formatINR(s.revenue_inr)+"; recorded profit "+formatINR(s.profit_inr)+"; cost "+formatINR(s.cost_inr)+"; orders "+s.orders.toLocaleString("en-IN")).join("\n")+"\nMonthly rows are aggregated across countries. Compare like-for-like only if both years cover the same number of months.";
+        const chartData={type:"line",xKey:"month",series:years.flatMap(y=>[{key:"revenue_"+y,label:"Revenue "+y},{key:"profit_"+y,label:"Profit "+y}]),data:Array.from({length:12},(_,i)=>{const month=String(i+1).padStart(2,"0");const obj:Record<string,unknown>={month};for(const y of years){const p=points.find(x=>x.year===y&&x.month===month);obj["revenue_"+y]=p?.revenue_inr??null;obj["profit_"+y]=p?.profit_inr??null;}return obj;})};
+        return respond({answer,chartData,sources:[{name:"vw_sales_monthly_by_country",records:rows.length,note:"year totals computed from complete monthly-country rows"}],question},200,origin);
+      }
+    }
+
+    const asksCurrentMonthSales = /(this month|current month|இந்த மாதம்|இம்மாதம்)/i.test(question) && /(sales|revenue|விற்பனை|மொத்த)/i.test(question);
+    if(asksCurrentMonthSales){
+      const {data,error}=await db.from("vw_sales_monthly_by_country").select("month,revenue_inr,total_cost_inr,profit_inr,order_count").order("month",{ascending:false}).limit(1000);
+      if(error)return respond({error:"Could not verify the latest available sales month. Please retry."},502,origin);
+      const rows=(data??[]) as Record<string,unknown>[];
+      const latest=rows.map(monthOf).filter(Boolean).sort().at(-1);
+      if(!latest)return respond({answer:"No monthly sales records are available in the database.",sources:[],question},200,origin);
+      const r=rows.filter(x=>monthOf(x)===latest);
+      const revenue=sum(r,"revenue_inr"),cost=sum(r,"total_cost_inr"),profit=sum(r,"profit_inr"),orders=sum(r,"order_count");
+      const current=new Date().toISOString().slice(0,7);
+      const answer=latest===current
+        ?"Current month "+latest+" sales revenue: "+formatINR(revenue)+"; cost "+formatINR(cost)+"; recorded profit "+formatINR(profit)+"; orders "+orders.toLocaleString("en-IN")+"."
+        :"No current-month ("+current+") rows are present. Latest available month is "+latest+": revenue "+formatINR(revenue)+"; cost "+formatINR(cost)+"; recorded profit "+formatINR(profit)+"; orders "+orders.toLocaleString("en-IN")+". I will not label an old month as current-month sales.";
+      return respond({answer,sources:[{name:"vw_sales_monthly_by_country",records:rows.length,note:"latest available month verified against current calendar month"}],question},200,origin);
+    }
+
     const quickRevenue = /total sales|sales evlo|total revenue|revenue evlo|sales value|turnover|overall sales/.test(normalizedQ) || (rawQ.includes("விற்பனை") && (rawQ.includes("மொத்த") || rawQ.includes("எவ்வளவு")));
     const quickCost = /total cost|total expenses|total expense|expenses evlo|cost evlo|total spend/.test(normalizedQ) || (rawQ.includes("செலவு") && rawQ.includes("மொத்த"));
     const quickProfit = /total profit|net profit|profit evlo|total np|np evlo/.test(normalizedQ) || (rawQ.includes("லாபம்") && rawQ.includes("மொத்த"));
