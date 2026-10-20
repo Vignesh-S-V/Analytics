@@ -137,8 +137,10 @@ function AskAI({db,range,country}){
     ?numbered.map(line=>line.replace(/^\d{1,2}[.)]\s+/,'').trim()).filter(Boolean):[];
    if(batch.length>1){
     setError('');setInput('');
-    for(const item of batch){
-     await ask(item, false, true);
+    for(let index=0;index<batch.length;index++){
+     // Respect the server-side 12-requests/minute quota; avoid a burst of 19 requests.
+     if(index>0) await new Promise(resolve=>setTimeout(resolve,5200));
+     await ask(batch[index], false, true);
     }
     return;
    }
