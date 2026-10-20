@@ -338,8 +338,8 @@ Deno.serve(async (req: Request) => {
     const countryNames = ["usa","uae","germany","uk","france","spain","italy","netherlands","sweden","canada","japan","australia"];
     const requestedCountries = countryNames.filter(name => new RegExp("\\b"+name+"\\b","i").test(normalizedQ));
     const asksCountryComparison = requestedCountries.length >= 2
-      && /\\b(compare|comparison|versus|vs|difference|between|and)\\b/.test(normalizedQ)
-      && /\\b(revenue|sales|profit|margin|orders)\\b/.test(normalizedQ);
+      && /\b(compare|comparison|versus|vs|difference|between|and)\b/.test(normalizedQ)
+      && /\b(revenue|sales|profit|margin|orders)\b/.test(normalizedQ);
     if (asksCountryComparison) {
       const {data,error}=await db.from("vw_sales_monthly_by_country").select("month,country,order_count,revenue_inr,profit_inr").order("month",{ascending:true}).limit(1000);
       if(error){console.error("Country comparison failed:",error.message);return respond({error:"Could not calculate the country comparison. Please retry."},502,origin);}
