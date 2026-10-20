@@ -146,7 +146,8 @@ function AskAI({db,range,country}){
    const supabaseUrl=SUPABASE_URL;
    const {data:{session}}=await db.auth.getSession();
    if(!session?.access_token)throw new Error('Please sign in again to ask business questions.');
-   const response=await fetch(supabaseUrl.replace(/\/$/,'')+'/functions/v1/ask-garment-data',{
+   const apiUrl=import.meta.env.DEV?'/functions/v1/ask-garment-data':supabaseUrl.replace(/\/$/,'')+'/functions/v1/ask-garment-data';
+   const response=await fetch(apiUrl,{
     method:'POST',
     headers:{'Content-Type':'application/json','apikey':publicAnon,'Authorization':'Bearer '+session.access_token,'Accept':'application/x-ndjson, application/json'},
     body:JSON.stringify({question,filters:{year:range==='All available periods'?'':range,country:country==='All countries'?'':country}})
