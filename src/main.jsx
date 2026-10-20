@@ -145,19 +145,32 @@ function AskAI({db,range,country}){
  const speakAnswer=(text)=>{if(typeof window==='undefined'||!window.speechSynthesis){setError('Voice playback is not supported in this browser.');return}window.speechSynthesis.cancel();const utterance=new SpeechSynthesisUtterance(text);utterance.lang=voiceLang;utterance.rate=0.96;window.speechSynthesis.speak(utterance)};
  const ask=async(value,fromVoice=false,batchItem=false)=>{
   const question=String(value??input).trim();if(!question||(busy&&!batchItem))return;
-  // Batch pasted question lists into independent requests. Supports Q01...Q100 and
-  // plain "1. ..." lists; ignores surrounding instructions and section headings.
+  // Batch pasted question lists into independent requests. Supports Q01...Q100
+  // whether questions are on separate lines or pasted as one long paragraph.
+  // Stop Q30 at the shared instructions/footer so they are never sent as part of a question.
   if(!batchItem){
    const lines=question.split(/\r?\n/);
-   const qBatch=lines.map(line=>{
-    const match=line.trim().match(/^Q\s*(\d{1,3})[.):]\s*(.+)$/i);
-    return match?{number:Number(match[1]),text:match[2].trim()}:null;
-   }).filter(Boolean).sort((a,b)=>a.number-b.number);
+   const markerPattern=/(?:^|\s)Q\s*(\d{1,3})[.):]\s*/gi;
+   const markers=[];
+   let marker;
+   while((marker=markerPattern.exec(question))!==null){
+    const number=Number(marker[1]);
+    if(number>=1&&number<=100)markers.push({number,start:marker.index,end:markerPattern.lastIndex});
+   }
+   const stopFooter=/\s*(?:\*\*Instructions for all \d+ questions:\*\*|Instructions for all \d+ questions:|\*\*svg\*\*|svgGrounded in workspace data|Supplier revenue ranking)/i;
+   const qBatch=markers.map((item,index)=>{
+    const next=markers[index+1];
+    let end=next?next.start:question.length;
+    const section=question.slice(item.end,end);
+    const footer=stopFooter.exec(section);
+    if(footer)end=item.end+footer.index;
+    return {number:item.number,text:question.slice(item.end,end).trim()};
+   }).filter(item=>item.text);
    const nonEmpty=lines.map(line=>line.trim()).filter(Boolean);
    const plainBatch=qBatch.length>1?[]:
     (nonEmpty.length>1&&nonEmpty.every(line=>/^\d{1,3}[.)]\s+/.test(line))
       ?nonEmpty.map(line=>line.replace(/^\d{1,3}[.)]\s+/,'').trim()).filter(Boolean):[]);
-   const batch=qBatch.length>1?qBatch.map(item=>item.text):plainBatch;
+   const batch=qBatch.length>1?qBatch.sort((a,b)=>a.number-b.number).map(item=>item.text):plainBatch;
    if(batch.length>1){
     setError('');setInput('');
     // Send each question separately so the backend's intent routing handles it correctly.
