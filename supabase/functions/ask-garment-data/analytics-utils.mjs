@@ -58,3 +58,31 @@ function finiteNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
 }
+
+
+/**
+ * Normalize and rank buyer aggregates from vw_sales_by_buyer.
+ * Margin is always recomputed from aggregate profit / aggregate revenue.
+ */
+export function rankBuyerRows(rows, metric = "revenue_inr", limit = Infinity) {
+  if (metric !== "revenue_inr" && metric !== "profit_inr") {
+    throw new TypeError("metric must be revenue_inr or profit_inr");
+  }
+  const normalized = (Array.isArray(rows) ? rows : []).map((row) => {
+    const revenue = finiteNumber(row?.revenue_inr);
+    const profit = finiteNumber(row?.profit_inr);
+    const orders = finiteNumber(row?.order_count ?? row?.orders);
+    return {
+      buyer_id: String(row?.buyer_id ?? ""),
+      buyer_name: String(row?.buyer_name ?? "Unknown").trim() || "Unknown",
+      country: String(row?.country ?? "Unknown").trim() || "Unknown",
+      revenue_inr: revenue,
+      profit_inr: profit,
+      order_count: orders,
+      profit_margin_pct: revenue !== 0 ? profit / revenue * 100 : 0,
+    };
+  });
+  normalized.sort((a, b) => b[metric] - a[metric] || a.buyer_name.localeCompare(b.buyer_name));
+  const safeLimit = Number.isFinite(limit) ? Math.max(0, Math.floor(limit)) : normalized.length;
+  return normalized.slice(0, safeLimit).map((row, index) => ({ rank: index + 1, ...row }));
+}
