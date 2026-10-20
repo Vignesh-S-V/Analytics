@@ -136,8 +136,8 @@ Deno.serve(async (req: Request) => {
     }
     if (quotaAllowed !== true) return respond({ error: "AI question limit reached (12 per minute per approved account). Please wait one minute and retry." }, 429, origin);
     // Deterministic trend path: return real monthly numeric points so the UI can render a chart.
-    const asksTrend = /\\b(trend|over time|month by month|monthly pattern|month-wise|month wise|historical pattern)\\b/i.test(question);
-    if (asksTrend && /\\b(revenue|sales|profit|cost|expense|expenses)\\b/i.test(question)) {
+    const asksTrend = /\b(trend|over time|month by month|monthly pattern|month-wise|month wise|historical pattern)\b/i.test(question);
+    if (asksTrend && /\b(revenue|sales|profit|cost|expense|expenses)\b/i.test(question)) {
       const trendQuery = await db.from("vw_sales_monthly_by_country")
         .select("month,country,revenue_inr,total_cost_inr,profit_inr")
         .order("month", { ascending: true }).limit(1000);
@@ -160,11 +160,11 @@ Deno.serve(async (req: Request) => {
       }
       const points = [...monthTotalsForChart.values()].sort((a,b)=>a.month.localeCompare(b.month));
       if (points.length >= 2) {
-        const series = /\\b(cost|expense|expenses)\\b/.test(q)
+        const series = /\b(cost|expense|expenses)\b/.test(q)
           ? [{key:"total_cost_inr",label:"Cost"}]
-          : /\\b(profit)\\b/.test(q) && !/\\b(revenue|sales)\\b/.test(q)
+          : /\b(profit)\b/.test(q) && !/\b(revenue|sales)\b/.test(q)
             ? [{key:"profit_inr",label:"Recorded profit"}]
-            : /\\b(revenue|sales)\\b/.test(q) && !/\\b(profit)\\b/.test(q)
+            : /\b(revenue|sales)\b/.test(q) && !/\b(profit)\b/.test(q)
               ? [{key:"revenue_inr",label:"Revenue"}]
               : [{key:"revenue_inr",label:"Revenue"},{key:"profit_inr",label:"Recorded profit"}];
         const sumMetric=(key:string)=>points.reduce((acc,p)=>acc+num((p as unknown as Record<string,unknown>)[key]),0);
