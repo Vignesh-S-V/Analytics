@@ -23,6 +23,8 @@ jobs:
           else
             npm install
           fi
+      - name: Run Ask AI analytics regression tests
+        run: npm test
       - name: Scan tracked text files for common secret patterns
         run: node scripts/security-scan.mjs
       - name: Audit dependency tree
