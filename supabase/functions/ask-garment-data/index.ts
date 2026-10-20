@@ -157,6 +157,72 @@ Deno.serve(async (req: Request) => {
       return respond({ answer, rankingTable: { title: "Supplier revenue ranking", subtitle: "Highest to lowest · " + ranked.length + " suppliers", columns: [{key:"rank",label:"Rank",type:"number"},{key:"supplier_name",label:"Supplier Name"},{key:"supplier_id",label:"Supplier Code"},{key:"revenue_inr",label:"Linked-Order Revenue",type:"currency"},{key:"linked_order_count",label:"Linked Orders",type:"number"},{key:"avg_delay_days",label:"Average Delay (Days)",type:"decimal"},{key:"quality_rating",label:"Quality Rating (/5)",type:"decimal"}], rows: ranked.map((r,i)=>({rank:i+1,supplier_name:txt(r.supplier_name),supplier_id:txt(r.supplier_id),revenue_inr:num(r.linked_order_revenue_inr),linked_order_count:num(r.linked_order_count),avg_delay_days:num(r.avg_delay_days),quality_rating:num(r.quality_rating)})) }, sources: [{ name: "vw_supplier_scorecard", records: rows.length, note: "complete supplier scorecard rows sorted descending by linked_order_revenue_inr" }], question }, 200, origin);
     }
 
+    // Deterministic date coverage and annual peak-month checks. Never ask the LLM to
+    // guess whether a month exists or to substitute a different year for a missing period.
+    const coverageQuestion = /\\b(date coverage|month coverage|data coverage|available period|earliest month|latest month|earliest date|latest date|date range)\\b/i.test(question);
+    const peakYear = question.match(/20[0-9]{2}/)?.[0] ?? "";
+    const annualPeakQuestion = !!peakYear
+      && /\\b(highest|highest-revenue|peak|top)\\b/i.test(question)
+      && /\\b(month|revenue|sales)\\b/i.test(question);
+    if (coverageQuestion || annualPeakQuestion) {
+      const coverageRows: Record<string, unknown>[] = [];
+      const pageSize = 1000;
+      for (let offset = 0; ; offset += pageSize) {
+        const page = await db.from("vw_sales_monthly_by_country")
+          .select("month,country,order_count,revenue_inr,profit_inr")
+          .order("month", { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (page.error) {
+          console.error("Date coverage query failed:", page.error.message);
+          return respond({ error: "Could not verify monthly data coverage. Please retry." }, 502, origin);
+        }
+        const rows = (page.data ?? []) as Record<string, unknown>[];
+        coverageRows.push(...rows);
+        if (rows.length < pageSize) break;
+      }
+      const availableMonths = [...new Set(coverageRows.map(monthOf).filter(m => /^20\\d{2}-\\d{2}$/.test(m)))].sort();
+      if (coverageQuestion && !annualPeakQuestion) {
+        const gaps: string[] = [];
+        if (availableMonths.length) {
+          const start = availableMonths[0].split("-").map(Number);
+          const end = availableMonths[availableMonths.length - 1].split("-").map(Number);
+          let cursor = start[0] * 12 + start[1] - 1;
+          const last = end[0] * 12 + end[1] - 1;
+          const present = new Set(availableMonths);
+          while (cursor <= last) {
+            const y = Math.floor(cursor / 12), m = String(cursor % 12 + 1).padStart(2, "0");
+            const key = y + "-" + m;
+            if (!present.has(key)) gaps.push(key);
+            cursor++;
+          }
+        }
+        const answer = availableMonths.length
+          ? "Verified monthly coverage: " + availableMonths[0] + " to " + availableMonths[availableMonths.length - 1]
+            + "; " + availableMonths.length + " distinct months present."
+            + (gaps.length ? " Missing month keys inside this range: " + gaps.join(", ") + "." : " No missing month keys inside this range.")
+          : "No valid YYYY-MM month keys were returned by the monthly sales view. Date coverage is unavailable.";
+        return respond({ answer, sources: [{ name: "vw_sales_monthly_by_country", records: coverageRows.length, note: "all pages read; distinct YYYY-MM keys checked" }], question }, 200, origin);
+      }
+      const annualRows = coverageRows.filter(row => monthOf(row).startsWith(peakYear));
+      const totals = new Map<string, { month: string; revenue_inr: number; profit_inr: number; order_count: number }>();
+      for (const row of annualRows) {
+        const month = monthOf(row);
+        if (!/^20\\d{2}-\\d{2}$/.test(month)) continue;
+        const item = totals.get(month) ?? { month, revenue_inr: 0, profit_inr: 0, order_count: 0 };
+        item.revenue_inr += num(row.revenue_inr);
+        item.profit_inr += num(row.profit_inr);
+        item.order_count += num(row.order_count);
+        totals.set(month, item);
+      }
+      const months = [...totals.values()].sort((a, b) => b.revenue_inr - a.revenue_inr);
+      if (!months.length) {
+        const coverage = availableMonths.length ? availableMonths[0] + " to " + availableMonths[availableMonths.length - 1] : "unavailable";
+        return respond({ answer: "No monthly sales records were found for " + peakYear + ". Available coverage from this source: " + coverage + ". I cannot identify a highest-revenue month for a year with no records.", sources: [{ name: "vw_sales_monthly_by_country", records: coverageRows.length, note: "complete paginated source checked for requested year" }], question }, 200, origin);
+      }
+      const top = months[0];
+      return respond({ answer: "Highest-revenue month in " + peakYear + ": " + top.month + ". Revenue: " + formatINR(top.revenue_inr) + "; recorded profit: " + formatINR(top.profit_inr) + "; orders: " + top.order_count.toLocaleString("en-IN") + ". Months present in " + peakYear + ": " + months.length + ". Coverage across all available months: " + (availableMonths[0] ?? "unknown") + " to " + (availableMonths[availableMonths.length - 1] ?? "unknown") + ".", sources: [{ name: "vw_sales_monthly_by_country", records: annualRows.length, note: "all paginated monthly country rows for requested year, aggregated by month" }], question }, 200, origin);
+    }
+
     // Deterministic trend path: return real monthly numeric points so the UI can render a chart.
     const asksTrend = /\b(trend|over time|month by month|monthly pattern|month-wise|month wise|historical pattern)\b/i.test(question);
     if (asksTrend && /\b(revenue|sales|profit|cost|expense|expenses)\b/i.test(question)) {
