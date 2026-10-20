@@ -864,3 +864,21 @@ html,body,#root{background:#f5f7fb!important;color:#172b4d!important}body{backgr
   .yoy-kpis .result-card{padding:10px 8px}
   .yoy-kpis .result-card strong{font-size:14px}
 }
+
+
+/* Structured Ask AI supplier ranking */
+.ask-supplier-ranking{width:100%;max-width:100%;color:#203654}
+.ask-supplier-ranking-heading{display:flex;flex-direction:column;gap:5px;margin:2px 0 16px}
+.ask-supplier-ranking-heading strong{font-size:16px;line-height:1.4;font-weight:750;color:#172b49}
+.ask-supplier-ranking-heading span{font-size:12px;color:#647895;line-height:1.5}
+.ask-supplier-table-wrap{width:100%;max-width:100%;overflow:auto;border:1px solid #d9e5f3;border-radius:10px;background:#fff}
+.ask-supplier-table{width:100%;min-width:920px;border-collapse:separate;border-spacing:0;text-align:left;white-space:nowrap}
+.ask-supplier-table thead th{background:#f0f6fd;color:#294261;font-size:11px;letter-spacing:0;font-weight:750;padding:11px 12px;border-bottom:1px solid #d8e4f2;border-right:1px solid #e2eaf4}
+.ask-supplier-table thead th:last-child,.ask-supplier-table tbody td:last-child{border-right:0}
+.ask-supplier-table tbody td{font-size:12px;color:#263b58;padding:9px 12px;border-bottom:1px solid #e7edf5;border-right:1px solid #edf1f7;line-height:1.35}
+.ask-supplier-table tbody tr:last-child td{border-bottom:0}
+.ask-supplier-table tbody tr:hover td{background:#f7fbff}
+.ask-supplier-table tbody td:first-child{font-weight:750;color:#142b49}
+.ask-supplier-table .ask-supplier-revenue{font-weight:800;color:#0966dc}
+.ask-supplier-ranking+.ask-source-wrap{margin-top:16px}
+@media(max-width:700px){.ask-supplier-ranking-heading strong{font-size:14px}.ask-supplier-table thead th{padding:10px;font-size:10px}.ask-supplier-table tbody td{padding:9px 10px;font-size:11px}}
