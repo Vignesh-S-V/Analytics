@@ -11,10 +11,10 @@ const compactIN=(value)=>{const n=Number(value||0),a=Math.abs(n),fmt=v=>Number(v
 const inr=n=>'₹'+compactIN(n);
 function rankingTableFromAnswer(answer){
  const text=String(answer||'');
- const supplierHeading=/all\\s+\\d+\\s+suppliers?\\s+ranked\\s+by\\s+(?:total\\s+)?linked.order\\s+revenue/i.test(text);
+ const supplierHeading=/all\s+\d+\s+suppliers?\s+ranked\s+by\s+(?:total\s+)?linked.order\s+revenue/i.test(text);
  if(!supplierHeading)return null;
  const rows=[];
- const linePattern=/(?:^|\\n)\\s*(\\d+)\\.\\s*(.*?)\\s*\\((SP\\d+)\\)\\s*[—-]\\s*₹?([\\d,.]+)\\s*(Cr|crore|Lakh|L)?\\s*;\\s*(?:linked\\s+)?orders\\s+([\\d,]+)/gi;
+ const linePattern=/(?:^|\n)\s*(\d+)\.\s*(.*?)\s*\((SP\d+)\)\s*[—-]\s*₹?([\d,.]+)\s*(Cr|crore|Lakh|L)?\s*;\s*(?:linked\s+)?orders\s+([\d,]+)/gi;
  let match;
  while((match=linePattern.exec(text))!==null){
   const amount=Number(match[4].replace(/,/g,''))*(/^(l|lakh)$/i.test(match[5]||'')?100000:/^(cr|crore)$/i.test(match[5]||'')?10000000:1);
