@@ -9,6 +9,21 @@ const colors=['#65e0c4','#8e9bff','#f5bf69','#f28aa5','#7dd3fc'];
 const nav=[['Overview',LayoutDashboard],['Ask AI',Bot],['Product Economics',Shirt],['Sales & Buyers',BriefcaseBusiness],['Production',Factory],['Marketing ROI',Megaphone],['Procurement',Boxes],['Investment Lab',CircleDollarSign]];
 const compactIN=(value)=>{const n=Number(value||0),a=Math.abs(n),fmt=v=>Number(v.toFixed(1)).toLocaleString('en-IN',{maximumFractionDigits:1});if(a>=1e7)return `${fmt(n/1e7)} Cr`;if(a>=1e5)return `${fmt(n/1e5)} Lakh`;if(a>=1e3)return `${fmt(n/1e3)} Thousand`;return n.toLocaleString('en-IN',{maximumFractionDigits:1});};
 const inr=n=>'₹'+compactIN(n);
+function rankingTableFromAnswer(answer){
+ const text=String(answer||'');
+ const supplierHeading=/all\\s+\\d+\\s+suppliers?\\s+ranked\\s+by\\s+(?:total\\s+)?linked.order\\s+revenue/i.test(text);
+ if(!supplierHeading)return null;
+ const rows=[];
+ const linePattern=/(?:^|\\n)\\s*(\\d+)\\.\\s*(.*?)\\s*\\((SP\\d+)\\)\\s*[—-]\\s*₹?([\\d,.]+)\\s*(Cr|crore|Lakh|L)?\\s*;\\s*(?:linked\\s+)?orders\\s+([\\d,]+)/gi;
+ let match;
+ while((match=linePattern.exec(text))!==null){
+  const amount=Number(match[4].replace(/,/g,''))*(/^(l|lakh)$/i.test(match[5]||'')?100000:/^(cr|crore)$/i.test(match[5]||'')?10000000:1);
+  rows.push({rank:Number(match[1]),supplier_name:match[2].trim(),supplier_id:match[3],revenue_inr:amount,linked_order_count:Number(match[6].replace(/,/g,''))});
+ }
+ if(!rows.length)return null;
+ return {title:'Supplier revenue ranking',subtitle:'Highest to lowest · '+rows.length+' suppliers',columns:[{key:'rank',label:'Rank',type:'number'},{key:'supplier_name',label:'Supplier Name'},{key:'supplier_id',label:'Supplier Code'},{key:'revenue_inr',label:'Linked-Order Revenue',type:'currency'},{key:'linked_order_count',label:'Linked Orders',type:'number'}],rows};
+}
+
 
 // Read every page instead of silently truncating large Supabase tables at a fixed row limit.
 async function fetchAllRowsInPages(buildQuery,pageSize=1000,parallelPages=5){
@@ -178,7 +193,7 @@ function AskAI({db,range,country}){
     const data=await response.json();
     if(data?.error){if(data.code==='AI_KEY_MISSING'||data.help)setSetupRequired(true);throw new Error(data.help||data.error)}
     if(!data?.answer)throw new Error('AI returned no answer. Please try again.');
-    finalAnswer=data.answer;finalSources=Array.isArray(data.sources)?data.sources:[];finalSummary=data.summary&&typeof data.summary==='object'?data.summary:null;finalChartData=data.chartData&&typeof data.chartData==='object'?data.chartData:null;finalSupplierRanking=Array.isArray(data.supplierRanking)?data.supplierRanking:null;finalRankingTable=data.rankingTable&&Array.isArray(data.rankingTable.rows)?data.rankingTable:null;
+    finalAnswer=data.answer;finalSources=Array.isArray(data.sources)?data.sources:[];finalSummary=data.summary&&typeof data.summary==='object'?data.summary:null;finalChartData=data.chartData&&typeof data.chartData==='object'?data.chartData:null;finalSupplierRanking=Array.isArray(data.supplierRanking)?data.supplierRanking:null;finalRankingTable=data.rankingTable&&Array.isArray(data.rankingTable.rows)?data.rankingTable:rankingTableFromAnswer(data.answer);
     patchReply({content:finalAnswer,sources:finalSources,summary:finalSummary,chartData:finalChartData,supplierRanking:finalSupplierRanking,rankingTable:finalRankingTable,streaming:false});
    }else{
     if(!response.body)throw new Error('Streaming response is not available in this browser.');
@@ -187,7 +202,7 @@ function AskAI({db,range,country}){
      if(!line.trim())return;
      let event;try{event=JSON.parse(line)}catch{return}
      if(event.type==='token'&&event.text){finalAnswer+=event.text;patchReply({content:finalAnswer,streaming:true})}
-     else if(event.type==='done'){finalSources=Array.isArray(event.sources)?event.sources:[];finalSummary=event.summary&&typeof event.summary==='object'?event.summary:null;finalChartData=event.chartData&&typeof event.chartData==='object'?event.chartData:null;finalSupplierRanking=Array.isArray(event.supplierRanking)?event.supplierRanking:null;finalRankingTable=event.rankingTable&&Array.isArray(event.rankingTable.rows)?event.rankingTable:null;patchReply({content:finalAnswer,sources:finalSources,summary:finalSummary,chartData:finalChartData,supplierRanking:finalSupplierRanking,rankingTable:finalRankingTable,streaming:false})}
+     else if(event.type==='done'){finalSources=Array.isArray(event.sources)?event.sources:[];finalSummary=event.summary&&typeof event.summary==='object'?event.summary:null;finalChartData=event.chartData&&typeof event.chartData==='object'?event.chartData:null;finalSupplierRanking=Array.isArray(event.supplierRanking)?event.supplierRanking:null;finalRankingTable=event.rankingTable&&Array.isArray(event.rankingTable.rows)?event.rankingTable:rankingTableFromAnswer(finalAnswer);patchReply({content:finalAnswer,sources:finalSources,summary:finalSummary,chartData:finalChartData,supplierRanking:finalSupplierRanking,rankingTable:finalRankingTable,streaming:false})}
      else if(event.type==='error')throw new Error(event.error||'AI stream stopped unexpectedly.');
     };
     while(true){
@@ -198,7 +213,7 @@ function AskAI({db,range,country}){
     }
     buffer+=decoder.decode();if(buffer.trim())processLine(buffer);
     if(!finalAnswer.trim())throw new Error('AI returned an empty answer. Please retry or simplify your question.');
-    patchReply({content:finalAnswer,sources:finalSources,summary:finalSummary,supplierRanking:finalSupplierRanking,rankingTable:finalRankingTable,streaming:false});
+    finalRankingTable=finalRankingTable||rankingTableFromAnswer(finalAnswer);patchReply({content:finalAnswer,sources:finalSources,summary:finalSummary,supplierRanking:finalSupplierRanking,rankingTable:finalRankingTable,streaming:false});
    }
    if(fromVoice&&finalAnswer)speakAnswer(finalAnswer);
   }catch(e){
