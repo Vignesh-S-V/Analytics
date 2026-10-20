@@ -159,11 +159,11 @@ Deno.serve(async (req: Request) => {
 
     // Deterministic date coverage and annual peak-month checks. Never ask the LLM to
     // guess whether a month exists or to substitute a different year for a missing period.
-    const coverageQuestion = /\\b(date coverage|month coverage|data coverage|available period|earliest month|latest month|earliest date|latest date|date range)\\b/i.test(question);
+    const coverageQuestion = /\b(date coverage|month coverage|data coverage|available period|earliest month|latest month|earliest date|latest date|date range)\b/i.test(question);
     const peakYear = question.match(/20[0-9]{2}/)?.[0] ?? "";
     const annualPeakQuestion = !!peakYear
-      && /\\b(highest|highest-revenue|peak|top)\\b/i.test(question)
-      && /\\b(month|revenue|sales)\\b/i.test(question);
+      && /\b(highest|highest-revenue|peak|top)\b/i.test(question)
+      && /\b(month|revenue|sales)\b/i.test(question);
     if (coverageQuestion || annualPeakQuestion) {
       const coverageRows: Record<string, unknown>[] = [];
       const pageSize = 1000;
@@ -180,7 +180,7 @@ Deno.serve(async (req: Request) => {
         coverageRows.push(...rows);
         if (rows.length < pageSize) break;
       }
-      const availableMonths = [...new Set(coverageRows.map(monthOf).filter(m => /^20\\d{2}-\\d{2}$/.test(m)))].sort();
+      const availableMonths = [...new Set(coverageRows.map(monthOf).filter(m => /^20\d{2}-\d{2}$/.test(m)))].sort();
       if (coverageQuestion && !annualPeakQuestion) {
         const gaps: string[] = [];
         if (availableMonths.length) {
@@ -207,7 +207,7 @@ Deno.serve(async (req: Request) => {
       const totals = new Map<string, { month: string; revenue_inr: number; profit_inr: number; order_count: number }>();
       for (const row of annualRows) {
         const month = monthOf(row);
-        if (!/^20\\d{2}-\\d{2}$/.test(month)) continue;
+        if (!/^20\d{2}-\d{2}$/.test(month)) continue;
         const item = totals.get(month) ?? { month, revenue_inr: 0, profit_inr: 0, order_count: 0 };
         item.revenue_inr += num(row.revenue_inr);
         item.profit_inr += num(row.profit_inr);
