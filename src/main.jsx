@@ -138,13 +138,12 @@ function AskAI({db,range,country}){
    if(batch.length>1){
     setError('');setInput('');
     for(const item of batch){
-     if(item.length>1200){setError('A batch question exceeds the 1,200-character limit: '+item.slice(0,90));continue}
      await ask(item, false, true);
     }
     return;
    }
   }
-  if(question.length>1200){setError('Question is too long (maximum 1,200 characters). For multiple tests, paste a numbered list with one question per line.');return;}
+  // No arbitrary UI character cap; provider context limits are handled as readable errors.
   if(recognitionRef.current){try{recognitionRef.current.stop()}catch{}}
   const replyId=Date.now()+Math.random();
   let finalAnswer='';
