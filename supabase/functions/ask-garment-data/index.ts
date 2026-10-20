@@ -143,7 +143,7 @@ Deno.serve(async (req: Request) => {
       && /\b(all|every|highest to lowest|descending|descending order)\b/.test(earlyNormalizedQ);
     if (asksAllSupplierRevenue) {
       const { data, error } = await db.from("vw_supplier_scorecard")
-        .select("supplier_id,supplier_name,linked_order_count,linked_order_revenue_inr")
+        .select("supplier_id,supplier_name,linked_order_count,linked_order_revenue_inr,avg_delay_days,quality_rating")
         .limit(100);
       if (error) {
         console.error("Complete supplier revenue ranking failed:", error.message);
@@ -153,7 +153,7 @@ Deno.serve(async (req: Request) => {
       if (!rows.length) return respond({ answer: "No supplier scorecard rows are available for this ranking.", sources: [{ name: "vw_supplier_scorecard", records: 0 }], question }, 200, origin);
       const ranked = [...rows].sort((a, b) => num(b.linked_order_revenue_inr) - num(a.linked_order_revenue_inr));
       const answer = "All " + ranked.length + " suppliers ranked by total linked-order revenue (highest to lowest):" + String.fromCharCode(10) + ranked.map((r, i) => (i + 1) + ". " + txt(r.supplier_name) + " (" + txt(r.supplier_id) + ") — " + formatINR(num(r.linked_order_revenue_inr)) + "; linked orders " + num(r.linked_order_count).toLocaleString("en-IN")).join(String.fromCharCode(10));
-      return respond({ answer, sources: [{ name: "vw_supplier_scorecard", records: rows.length, note: "complete supplier scorecard rows sorted descending by linked_order_revenue_inr" }], question }, 200, origin);
+      return respond({ answer, supplierRanking: ranked.map((r, i) => ({ rank: i + 1, supplierName: txt(r.supplier_name), supplierId: txt(r.supplier_id), revenueInr: num(r.linked_order_revenue_inr), linkedOrders: num(r.linked_order_count), averageDelayDays: num(r.avg_delay_days), qualityRating: num(r.quality_rating) })), sources: [{ name: "vw_supplier_scorecard", records: rows.length, note: "complete supplier scorecard rows sorted descending by linked_order_revenue_inr" }], question }, 200, origin);
     }
 
     // Deterministic trend path: return real monthly numeric points so the UI can render a chart.
