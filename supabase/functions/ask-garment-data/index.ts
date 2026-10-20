@@ -227,7 +227,7 @@ Deno.serve(async (req: Request) => {
       && /\b(rank|ranking|ranked|top|highest|lowest|sort|list|all)\b/.test(normalizedQ)
       && /\b(revenue|sales|profit|margin)\b/.test(normalizedQ);
     if (asksBuyerRankingEarly) {
-      const metric = /\bby\\s+(?:total\\s+)?(?:recorded\\s+)?(?:profit|net profit|np)\b/.test(normalizedQ) ? "profit_inr" : "revenue_inr";
+      const metric = /\bby\s+(?:total\s+)?(?:recorded\s+)?(?:profit|net profit|np)\b/.test(normalizedQ) ? "profit_inr" : "revenue_inr";
       const { data, error } = await db.from("vw_sales_by_buyer")
         .select("buyer_id,buyer_name,country,order_count,revenue_inr,profit_inr,profit_margin_pct")
         .order(metric, { ascending: false, nullsFirst: false }).limit(100);
@@ -242,7 +242,7 @@ Deno.serve(async (req: Request) => {
       && /\b(rank|ranking|ranked|top|highest|lowest|sort|list|most profitable)\b/.test(normalizedQ)
       && /\b(profit|revenue|sales|margin)\b/.test(normalizedQ);
     if (asksProductRankingEarly) {
-      const metric = /\bby\\s+(?:recorded\\s+)?(?:profit|net profit|np)\b|most profitable/.test(normalizedQ) ? "profit_inr" : "revenue_inr";
+      const metric = /\bby\s+(?:recorded\s+)?(?:profit|net profit|np)\b|most profitable/.test(normalizedQ) ? "profit_inr" : "revenue_inr";
       const { data, error } = await db.from("vw_sales_by_product")
         .select("product_category,fabric,style_id,order_count,revenue_inr,profit_inr,profit_margin_pct")
         .order(metric,{ascending:false,nullsFirst:false}).limit(500);
@@ -262,7 +262,7 @@ Deno.serve(async (req: Request) => {
       const rows=(data??[]) as Record<string,unknown>[];
       const grouped=new Map<string,Record<string,unknown>>();
       for(const row of rows){const m=monthOf(row);if(qYear&&!m.startsWith(qYear))continue;if(qMonth&&!m.endsWith("-"+qMonth))continue;const country=txt(row.country)||"Unknown";const cur=grouped.get(country)??{country,revenue_inr:0,profit_inr:0,order_count:0};cur.revenue_inr=num(cur.revenue_inr)+num(row.revenue_inr);cur.profit_inr=num(cur.profit_inr)+num(row.profit_inr);cur.order_count=num(cur.order_count)+num(row.order_count);grouped.set(country,cur);}
-      const metric=/\bby\\s+(?:recorded\\s+)?(?:profit|net profit|np)\b/.test(normalizedQ)&&!/\bby\\s+(?:total\\s+)?(?:revenue|sales)\b/.test(normalizedQ)?"profit_inr":"revenue_inr";
+      const metric=/\bby\s+(?:recorded\s+)?(?:profit|net profit|np)\b/.test(normalizedQ)&&!/\bby\s+(?:total\s+)?(?:revenue|sales)\b/.test(normalizedQ)?"profit_inr":"revenue_inr";
       const ranked=[...grouped.values()].sort((a,b)=>num(b[metric])-num(a[metric]));
       if(!ranked.length)return respond({answer:"No country ranking rows are available for the selected scope.",sources:[{name:"vw_sales_monthly_by_country",records:rows.length}],question},200,origin);
       return respond({answer:"Countries ranked by "+(metric==="profit_inr"?"recorded profit":"revenue")+" (highest to lowest); "+ranked.length+" countries.",rankingTable:{title:"Country sales ranking",subtitle:"Sorted by "+(metric==="profit_inr"?"recorded profit":"revenue")+" · "+ranked.length+" countries",columns:[{key:"rank",label:"Rank",type:"number"},{key:"country",label:"Country"},{key:metric,label:metric==="profit_inr"?"Recorded Profit":"Revenue",type:"currency"},{key:"order_count",label:"Orders",type:"number"}],rows:ranked.map((r,i)=>({rank:i+1,country:txt(r.country),[metric]:num(r[metric]),order_count:num(r.order_count)}))},sources:[{name:"vw_sales_monthly_by_country",records:rows.length,note:"monthly country rows aggregated by country before ranking"}],question},200,origin);
