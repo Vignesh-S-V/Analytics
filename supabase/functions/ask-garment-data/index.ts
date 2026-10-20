@@ -242,7 +242,7 @@ Deno.serve(async (req: Request) => {
       && /\b(rank|ranking|ranked|top|highest|lowest|sort|list|most profitable)\b/.test(normalizedQ)
       && /\b(profit|revenue|sales|margin)\b/.test(normalizedQ);
     if (asksProductRankingEarly) {
-      const metric = /\bby\s+(?:recorded\s+)?(?:profit|net profit|np)\b|most profitable/.test(normalizedQ) ? "profit_inr" : "revenue_inr";
+      const explicitProfitRank = /\b(by\s+(?:total\s+)?(?:recorded\s+)?(?:profit|net profit|np)|most profitable|highest (?:recorded )?profit|maximum profit|top profit|profit highest)\b/.test(normalizedQ);\n      const explicitRevenueRank = /\b(by\s+(?:total\s+)?(?:revenue|sales)|highest (?:total )?(?:revenue|sales)|top (?:revenue|sales))\b/.test(normalizedQ);\n      const metric = explicitProfitRank && !explicitRevenueRank ? "profit_inr" : "revenue_inr";
       const { data, error } = await db.from("vw_sales_by_product")
         .select("product_category,fabric,style_id,order_count,revenue_inr,profit_inr,profit_margin_pct")
         .order(metric,{ascending:false,nullsFirst:false}).limit(500);
@@ -251,6 +251,27 @@ Deno.serve(async (req: Request) => {
       const ranked=[...rows].sort((a,b)=>num(b[metric])-num(a[metric])).slice(0,50);
       if(!ranked.length)return respond({answer:"No product ranking rows are available.",sources:[{name:"vw_sales_by_product",records:0}],question},200,origin);
       return respond({answer:"Products ranked by "+(metric==="profit_inr"?"recorded profit":"revenue")+" (highest to lowest); showing "+ranked.length+" product groups.",rankingTable:{title:"Product ranking",subtitle:"Sorted by "+(metric==="profit_inr"?"recorded profit":"revenue")+" · "+ranked.length+" products",columns:[{key:"rank",label:"Rank",type:"number"},{key:"product_category",label:"Product Group"},{key:"fabric",label:"Fabric"},{key:"style_id",label:"Style"},{key:"revenue_inr",label:"Revenue",type:"currency"},{key:"profit_inr",label:"Recorded Profit",type:"currency"},{key:"profit_margin_pct",label:"Profit Margin",type:"percent"},{key:"order_count",label:"Orders",type:"number"}],rows:ranked.map((r,i)=>({rank:i+1,product_category:txt(r.product_category),fabric:txt(r.fabric),style_id:txt(r.style_id),revenue_inr:num(r.revenue_inr),profit_inr:num(r.profit_inr),profit_margin_pct:num(r.profit_margin_pct),order_count:num(r.order_count)}))},sources:[{name:"vw_sales_by_product",records:rows.length,note:"complete retrieved product groups sorted by requested metric"}],question},200,origin);
+    }
+
+    // Explicit comparison between named countries must use country-level aggregates, not buyer snippets or a single-country fallback.
+    const countryNames = ["usa","uae","germany","uk","france","spain","italy","netherlands","sweden","canada","japan","australia"];
+    const requestedCountries = countryNames.filter(name => new RegExp("\\\\b"+name+"\\\\b","i").test(normalizedQ));
+    const asksCountryComparison = requestedCountries.length >= 2
+      && /\\b(compare|comparison|versus|vs|difference|between|and)\\b/.test(normalizedQ)
+      && /\\b(revenue|sales|profit|margin|orders)\\b/.test(normalizedQ);
+    if (asksCountryComparison) {
+      const {data,error}=await db.from("vw_sales_monthly_by_country").select("month,country,order_count,revenue_inr,profit_inr").order("month",{ascending:true}).limit(1000);
+      if(error){console.error("Country comparison failed:",error.message);return respond({error:"Could not calculate the country comparison. Please retry."},502,origin);}
+      const rows=(data??[]) as Record<string,unknown>[];
+      const grouped=new Map<string,Record<string,unknown>>();
+      for(const row of rows){const m=monthOf(row);if(qYear&&!m.startsWith(qYear))continue;if(qMonth&&!m.endsWith("-"+qMonth))continue;const country=txt(row.country);if(!requestedCountries.includes(country.toLowerCase()))continue;const cur=grouped.get(country)??{country,revenue_inr:0,profit_inr:0,order_count:0};cur.revenue_inr=num(cur.revenue_inr)+num(row.revenue_inr);cur.profit_inr=num(cur.profit_inr)+num(row.profit_inr);cur.order_count=num(cur.order_count)+num(row.order_count);grouped.set(country,cur);}
+      const compareRows=[...grouped.values()].sort((a,b)=>requestedCountries.indexOf(txt(a.country).toLowerCase())-requestedCountries.indexOf(txt(b.country).toLowerCase()));
+      if(compareRows.length!==requestedCountries.length)return respond({answer:"The selected period does not contain complete country-level data for every requested country. Please try another period.",sources:[{name:"vw_sales_monthly_by_country",records:rows.length}],question},200,origin);
+      const margin=(r:Record<string,unknown>)=>num(r.revenue_inr)?num(r.profit_inr)/num(r.revenue_inr)*100:0;
+      const first=compareRows[0], second=compareRows[1];
+      const answer=compareRows.map(r=>txt(r.country)+": revenue "+formatINR(num(r.revenue_inr))+", recorded profit "+formatINR(num(r.profit_inr))+", margin "+margin(r).toFixed(2)+"%, "+num(r.order_count).toLocaleString("en-IN")+" orders").join(". ")
+        + ". Revenue difference: "+formatINR(Math.abs(num(first.revenue_inr)-num(second.revenue_inr)))+"; recorded-profit difference: "+formatINR(Math.abs(num(first.profit_inr)-num(second.profit_inr)))+".";
+      return respond({answer,rankingTable:{title:"Country comparison",subtitle:"Country-level aggregates"+(qYear?" · "+qYear:"")+(qMonth?" · selected month":""),columns:[{key:"country",label:"Country"},{key:"revenue_inr",label:"Revenue",type:"currency"},{key:"profit_inr",label:"Recorded Profit",type:"currency"},{key:"margin_pct",label:"Profit Margin",type:"percent"},{key:"order_count",label:"Orders",type:"number"}],rows:compareRows.map(r=>({country:txt(r.country),revenue_inr:num(r.revenue_inr),profit_inr:num(r.profit_inr),margin_pct:margin(r),order_count:num(r.order_count)}))},sources:[{name:"vw_sales_monthly_by_country",records:rows.length,note:"all monthly rows aggregated to country level for the requested comparison"}],question},200,origin);
     }
 
     const asksCountryRankingEarly = /\b(countr(?:y|ies))\b/.test(normalizedQ)
@@ -277,7 +298,7 @@ Deno.serve(async (req: Request) => {
       const {data,error}=await db.from("vw_production_by_line").select("line_id,unit,specialisation,order_count,order_qty,shipped_qty,rejection_qty,rejection_rate_pct,avg_actual_efficiency_pct,avg_target_efficiency_pct,overtime_hours,rework_cost_inr").limit(100);
       if(error){console.error("Production ranking failed:",error.message);return respond({error:"Could not retrieve production-line data from Supabase. Please retry."},502,origin);}
       const rows=(data??[]) as Record<string,unknown>[];
-      const ascending=/\b(lowest|least|minimum)\b/.test(normalizedQ);
+      const ascending = /\b(lowest|least|minimum)\b/.test(normalizedQ) && !/\b(highest\s+to\s+lowest|descending|high\s+to\s+low)\b/.test(normalizedQ);
       const ranked=[...rows].sort((a,b)=>(ascending?1:-1)*(num(a[metric])-num(b[metric])));
       if(!ranked.length)return respond({answer:"No production-line rows are available.",sources:[{name:"vw_production_by_line",records:0}],question},200,origin);
       return respond({answer:"Production lines ranked by "+metric.replaceAll("_"," ")+" ("+(ascending?"lowest to highest":"highest to lowest")+"); "+ranked.length+" lines.",rankingTable:{title:"Production line performance",subtitle:"Sorted by "+metric.replaceAll("_"," ")+" · "+ranked.length+" lines",columns:[{key:"rank",label:"Rank",type:"number"},{key:"line_id",label:"Line"},{key:"unit",label:"Unit"},{key:"specialisation",label:"Specialisation"},{key:"order_count",label:"Orders",type:"number"},{key:"rework_cost_inr",label:"Rework Cost",type:"currency"},{key:"rejection_rate_pct",label:"Rejection Rate",type:"percent"},{key:"avg_actual_efficiency_pct",label:"Actual Efficiency",type:"percent"},{key:"avg_target_efficiency_pct",label:"Target Efficiency",type:"percent"},{key:"overtime_hours",label:"Overtime Hours",type:"decimal"}],rows:ranked.map((r,i)=>({rank:i+1,line_id:txt(r.line_id),unit:txt(r.unit),specialisation:txt(r.specialisation),order_count:num(r.order_count),rework_cost_inr:num(r.rework_cost_inr),rejection_rate_pct:num(r.rejection_rate_pct),avg_actual_efficiency_pct:num(r.avg_actual_efficiency_pct)*100,avg_target_efficiency_pct:num(r.avg_target_efficiency_pct)*100,overtime_hours:num(r.overtime_hours)}))},sources:[{name:"vw_production_by_line",records:rows.length,note:"all production-line groups sorted by requested metric"}],question},200,origin);
