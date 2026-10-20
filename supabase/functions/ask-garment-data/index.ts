@@ -135,6 +135,49 @@ Deno.serve(async (req: Request) => {
       return respond({ error: "Could not verify AI request quota. Please retry." }, 503, origin);
     }
     if (quotaAllowed !== true) return respond({ error: "AI question limit reached (12 per minute per approved account). Please wait one minute and retry." }, 429, origin);
+    // Deterministic trend path: return real monthly numeric points so the UI can render a chart.
+    const asksTrend = /\b(trend|over time|month by month|monthly pattern|month-wise|month wise|historical pattern)\b/i.test(question);
+    if (asksTrend && /\b(revenue|sales|profit|cost|expense|expenses)\b/i.test(question)) {
+      const trendQuery = await db.from("vw_sales_monthly_by_country")
+        .select("month,country,revenue_inr,total_cost_inr,profit_inr")
+        .order("month", { ascending: true }).limit(1000);
+      if (trendQuery.error) {
+        console.error("Trend chart query failed:", trendQuery.error.message);
+        return respond({ error: "Could not retrieve monthly trend data. Please retry." }, 502, origin);
+      }
+      const q = question.toLowerCase();
+      const yearMatch = question.match(/20[0-9]{2}/)?.[0] ?? requestedYear;
+      const monthTotalsForChart = new Map<string, {month:string; revenue_inr:number; total_cost_inr:number; profit_inr:number}>();
+      for (const row of (trendQuery.data ?? []) as Record<string,unknown>[]) {
+        const month = monthOf(row);
+        if (!month || (yearMatch && !month.startsWith(yearMatch))) continue;
+        if (requestedCountry && requestedCountry !== "All countries" && txt(row.country).toLowerCase() !== requestedCountry.toLowerCase()) continue;
+        const item = monthTotalsForChart.get(month) ?? {month,revenue_inr:0,total_cost_inr:0,profit_inr:0};
+        item.revenue_inr += num(row.revenue_inr);
+        item.total_cost_inr += num(row.total_cost_inr);
+        item.profit_inr += num(row.profit_inr);
+        monthTotalsForChart.set(month,item);
+      }
+      const points = [...monthTotalsForChart.values()].sort((a,b)=>a.month.localeCompare(b.month));
+      if (points.length >= 2) {
+        const series = /\b(cost|expense|expenses)\b/.test(q)
+          ? [{key:"total_cost_inr",label:"Cost"}]
+          : /\b(profit)\b/.test(q) && !/\b(revenue|sales)\b/.test(q)
+            ? [{key:"profit_inr",label:"Recorded profit"}]
+            : /\b(revenue|sales)\b/.test(q) && !/\b(profit)\b/.test(q)
+              ? [{key:"revenue_inr",label:"Revenue"}]
+              : [{key:"revenue_inr",label:"Revenue"},{key:"profit_inr",label:"Recorded profit"}];
+        const sumMetric=(key:string)=>points.reduce((acc,p)=>acc+num((p as unknown as Record<string,unknown>)[key]),0);
+        const highestRevenue=[...points].sort((a,b)=>b.revenue_inr-a.revenue_inr)[0];
+        const lowestRevenue=[...points].sort((a,b)=>a.revenue_inr-b.revenue_inr)[0];
+        const highestProfit=[...points].sort((a,b)=>b.profit_inr-a.profit_inr)[0];
+        const answer = "Monthly trend based on " + points.length + " available months" + (yearMatch ? " in " + yearMatch : "") + ". " +
+          (series.some(s=>s.key==="revenue_inr") ? "Revenue total: "+formatINR(sumMetric("revenue_inr"))+". Highest revenue month: "+highestRevenue.month+" ("+formatINR(highestRevenue.revenue_inr)+"); lowest: "+lowestRevenue.month+" ("+formatINR(lowestRevenue.revenue_inr)+"). " : "") +
+          (series.some(s=>s.key==="profit_inr") ? "Recorded profit total: "+formatINR(sumMetric("profit_inr"))+". Highest profit month: "+highestProfit.month+" ("+formatINR(highestProfit.profit_inr)+"). " : "") +
+          "The chart shows recorded monthly totals; it does not infer missing months.";
+        return respond({answer, chartData:{type:"line",xKey:"month",series,data:points.map(p=>({month:p.month,...Object.fromEntries(series.map(s=>[s.key,(p as unknown as Record<string,unknown>)[s.key]]))}))},sources:[{name:"vw_sales_monthly_by_country",records:points.length,note:"monthly totals aggregated from returned rows"}],question},200,origin);
+      }
+    }
     let datasets: Record<string, unknown>[][];
     // Keep exact KPI/ranking questions on their one-query fast paths even when generic RAG data is cached.
     const bypassRetrievalCache = /\b(total sales|sales evlo|total revenue|revenue evlo|sales value|turnover|overall sales|total cost|total expenses|total expense|expenses evlo|cost evlo|total spend|total profit|net profit|profit evlo|total np|np evlo|order count|number of orders|total orders|orders evlo|how many orders|which country|what country|top country|highest|best selling|most profitable|gp|gpm|gross profit|gross margin|np|npm|net margin|profit margin|fill rate|order fill|fulfill|fulfil|shipment rate|delayed order|late order|orders delayed|delivery delay|total quantity|total qty|shipped quantity|shipped qty|order quantity|order qty|units sold|quantity sold|product|style|fabric|category|buyer|customer|marketing channel|which channel|best channel|top channel|highest roas|campaign performance|marketing roi|roas|supplier|production line|line efficiency|most efficient line|best line|highest efficiency|production efficiency|cotton|yarn|exchange rate|usd inr|market price)\b/i.test(question)
