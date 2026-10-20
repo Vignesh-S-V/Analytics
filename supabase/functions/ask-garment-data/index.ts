@@ -274,7 +274,7 @@ Deno.serve(async (req: Request) => {
           ...group,
           profit_margin_pct: group.revenue_inr !== 0 ? group.profit_inr / group.revenue_inr * 100 : 0,
           style_count: group.styles.size
-        })).sort((a, b) => num(b[metric]) - num(a[metric]));
+        })).sort((a, b) => metric === "profit_inr" ? b.profit_inr - a.profit_inr : b.revenue_inr - a.revenue_inr);
         const top = rankedGroups[0];
         const metricLabel = metric === "profit_inr" ? "recorded profit" : "revenue";
         const answer = "Highest " + metricLabel + " product group: " + top.product_category + ". Combined revenue: " + formatINR(top.revenue_inr)
