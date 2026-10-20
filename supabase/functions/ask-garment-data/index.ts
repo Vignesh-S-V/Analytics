@@ -523,7 +523,7 @@ Deno.serve(async (req: Request) => {
     // rather than sorting the generic RAG sample. These two risk metrics remain separate.
     const asksBusinessAreaPriority = /which business area needs attention first|business area.{0,30}attention|area needs attention first|attention first/.test(normalizedQuestion);
     if (asksBusinessAreaPriority) {
-      const [supplierResult, productionResult, supplierCountResult, productionCountResult] = await Promise.all([
+      const [supplierResult, productionResult, supplierCountResult, productionCountResult, factOrderCountResult] = await Promise.all([
         db.from("vw_supplier_scorecard")
           .select("supplier_id,supplier_name,supply_type,avg_delay_days,quality_rating,linked_order_late_penalty_inr")
           .order("linked_order_late_penalty_inr", { ascending: false, nullsFirst: false })
@@ -533,10 +533,11 @@ Deno.serve(async (req: Request) => {
           .order("rework_cost_inr", { ascending: false, nullsFirst: false })
           .limit(1),
         db.from("vw_supplier_scorecard").select("*", { count: "exact", head: true }),
-        db.from("vw_production_by_line").select("*", { count: "exact", head: true })
+        db.from("vw_production_by_line").select("*", { count: "exact", head: true }),
+        db.from("fact_orders").select("*", { count: "exact", head: true })
       ]);
-      if (supplierResult.error || productionResult.error || supplierCountResult.error || productionCountResult.error) {
-        console.error("Business-area priority query failed:", supplierResult.error?.message ?? productionResult.error?.message ?? supplierCountResult.error?.message ?? productionCountResult.error?.message);
+      if (supplierResult.error || productionResult.error || supplierCountResult.error || productionCountResult.error || factOrderCountResult.error) {
+        console.error("Business-area priority query failed:", supplierResult.error?.message ?? productionResult.error?.message ?? supplierCountResult.error?.message ?? productionCountResult.error?.message ?? factOrderCountResult.error?.message);
         return respond({ error: "Could not rank supplier and production risks from the complete analytics views. Please retry." }, 502, origin);
       }
       const s = (supplierResult.data ?? [])[0] as Record<string,unknown> | undefined;
@@ -548,14 +549,14 @@ Deno.serve(async (req: Request) => {
         s ? "Recommended first investigation: supplier delivery risk. Highest linked late-penalty exposure in the supplier scorecard: " + txt(s.supplier_name) + " (" + txt(s.supplier_id) + "), " + formatINR(supplierPenalty) + "; average delay " + num(s.avg_delay_days).toFixed(1) + " days; quality rating " + num(s.quality_rating).toFixed(1) + "/5." : "Supplier scorecard returned no rows.",
         p ? "Separate production concern: line " + txt(p.line_id) + " (" + txt(p.unit) + "), recorded rework cost " + formatINR(productionRework) + ", rejection rate " + num(p.rejection_rate_pct).toFixed(2) + "% and " + num(p.overtime_hours).toLocaleString("en-IN") + " overtime hours." : "Production-line view returned no rows.",
         "Decision basis: supplier late penalties are the direct financial exposure used for the first investigation. Production rework is a different metric and is not added to late penalties; these figures alone do not establish causation.",
-        "Scope: server-side descending rankings across the complete current contents of each view, with " + num(supplierCountResult.count).toLocaleString("en-IN") + " supplier rows and " + num(productionCountResult.count).toLocaleString("en-IN") + " production-line rows. These views do not provide a selected date filter here, so treat this as the full scope represented by the current views, not a date-specific comparison.",
+        "Scope: ranked all supplier and production-line groups after aggregating their linked orders. The views contain " + num(supplierCountResult.count).toLocaleString("en-IN") + " supplier groups and " + num(productionCountResult.count).toLocaleString("en-IN") + " production-line groups, summarizing " + num(factOrderCountResult.count).toLocaleString("en-IN") + " fact-order rows in the current database. The 20-row counts are grouped entities, not a 20-order sample. No date filter was selected, so this covers the full current database scope, not a date-specific comparison.",
         "Next action: inspect the named supplier's delayed orders and penalty drivers, and run a separate corrective-action review for the named production line."
       ].join(" ");
       return respond({
         answer,
         sources: [
-          { name: "vw_supplier_scorecard", records: supplierCountResult.count ?? 0, note: "server-side ORDER BY linked_order_late_penalty_inr DESC; highest row returned" },
-          { name: "vw_production_by_line", records: productionCountResult.count ?? 0, note: "server-side ORDER BY rework_cost_inr DESC; highest row returned" }
+          { name: "vw_supplier_scorecard", records: supplierCountResult.count ?? 0, note: "all supplier groups ranked by penalties aggregated across linked fact_orders" },
+          { name: "vw_production_by_line", records: productionCountResult.count ?? 0, note: "all production-line groups ranked by rework aggregated across linked fact_orders" }
         ],
         question
       }, 200, origin);
