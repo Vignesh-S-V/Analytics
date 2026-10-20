@@ -134,6 +134,28 @@ Deno.serve(async (req: Request) => {
       return respond({ error: "Could not verify AI request quota. Please retry." }, 503, origin);
     }
     if (quotaAllowed !== true) return respond({ error: "Request burst limit reached (60 per minute per approved account). Please retry shortly." }, 429, origin);
+    // Highest-priority exact route for complete supplier revenue rankings. Keep this outside
+    // the retrieval-cache branch so a cached RAG answer cannot override the requested sort.
+    const earlyNormalizedQ = question.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/  +/g, " ").trim();
+    const asksAllSupplierRevenue = /\\bsuppliers?\\b/.test(earlyNormalizedQ)
+      && /\\b(rank|ranking|ranked|sort|list)\\b/.test(earlyNormalizedQ)
+      && /\\b(revenue|sales)\\b/.test(earlyNormalizedQ)
+      && /\\b(all|every|highest to lowest|descending|descending order)\\b/.test(earlyNormalizedQ);
+    if (asksAllSupplierRevenue) {
+      const { data, error } = await db.from("vw_supplier_scorecard")
+        .select("supplier_id,supplier_name,linked_order_count,linked_order_revenue_inr")
+        .limit(100);
+      if (error) {
+        console.error("Complete supplier revenue ranking failed:", error.message);
+        return respond({ error: "Could not rank all suppliers by linked-order revenue. Please retry." }, 502, origin);
+      }
+      const rows = (data ?? []) as Record<string, unknown>[];
+      if (!rows.length) return respond({ answer: "No supplier scorecard rows are available for this ranking.", sources: [{ name: "vw_supplier_scorecard", records: 0 }], question }, 200, origin);
+      const ranked = [...rows].sort((a, b) => num(b.linked_order_revenue_inr) - num(a.linked_order_revenue_inr));
+      const answer = "All " + ranked.length + " suppliers ranked by total linked-order revenue (highest to lowest):\\n" + ranked.map((r, i) => (i + 1) + ". " + txt(r.supplier_name) + " (" + txt(r.supplier_id) + ") — " + formatINR(num(r.linked_order_revenue_inr)) + "; linked orders " + num(r.linked_order_count).toLocaleString("en-IN")).join("\\n");
+      return respond({ answer, sources: [{ name: "vw_supplier_scorecard", records: rows.length, note: "complete supplier scorecard rows sorted descending by linked_order_revenue_inr" }], question }, 200, origin);
+    }
+
     // Deterministic trend path: return real monthly numeric points so the UI can render a chart.
     const asksTrend = /\b(trend|over time|month by month|monthly pattern|month-wise|month wise|historical pattern)\b/i.test(question);
     if (asksTrend && /\b(revenue|sales|profit|cost|expense|expenses)\b/i.test(question)) {
