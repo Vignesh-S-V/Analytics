@@ -89,7 +89,6 @@ Deno.serve(async (req: Request) => {
     const body = JSON.parse(rawBody);
     if (typeof body?.question !== "string") return respond({ error: "Question must be text." }, 400, origin);
     question = body.question.trim();
-    if (question.length > 1200) return respond({ error: "Question is too long (maximum 1,200 characters)." }, 413, origin);
     const candidateYear = typeof body?.filters?.year === "string" ? body.filters.year.trim() : "";
     requestedYear = /^20\d{2}$/.test(candidateYear) ? candidateYear : "";
     requestedCountry = typeof body?.filters?.country === "string" ? body.filters.country.trim().slice(0, 100) : "";
