@@ -62,7 +62,7 @@ test("recalculates weighted margin and does not average style percentages", () =
     { product_category: "Mixed", style_id: "low", revenue_inr: 900, profit_inr: 90, profit_margin_pct: 10 },
     { product_category: "Mixed", style_id: "high", revenue_inr: 100, profit_inr: 50, profit_margin_pct: 50 },
   ], "profit_inr");
-  assert.equal(result[0].profit_margin_pct, 14);
+  assert.ok(Math.abs(result[0].profit_margin_pct - 14) < 1e-10);
 });
 
 test("handles null, blank, and invalid numeric values without NaN", () => {
