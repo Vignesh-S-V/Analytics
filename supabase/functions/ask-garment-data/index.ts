@@ -153,7 +153,7 @@ Deno.serve(async (req: Request) => {
       if (!rows.length) return respond({ answer: "No supplier scorecard rows are available for this ranking.", sources: [{ name: "vw_supplier_scorecard", records: 0 }], question }, 200, origin);
       const ranked = [...rows].sort((a, b) => num(b.linked_order_revenue_inr) - num(a.linked_order_revenue_inr));
       const answer = "All " + ranked.length + " suppliers ranked by total linked-order revenue (highest to lowest):" + String.fromCharCode(10) + ranked.map((r, i) => (i + 1) + ". " + txt(r.supplier_name) + " (" + txt(r.supplier_id) + ") — " + formatINR(num(r.linked_order_revenue_inr)) + "; linked orders " + num(r.linked_order_count).toLocaleString("en-IN")).join(String.fromCharCode(10));
-      return respond({ answer, supplierRanking: ranked.map((r, i) => ({ rank: i + 1, supplierName: txt(r.supplier_name), supplierId: txt(r.supplier_id), revenueInr: num(r.linked_order_revenue_inr), linkedOrders: num(r.linked_order_count), averageDelayDays: num(r.avg_delay_days), qualityRating: num(r.quality_rating) })), sources: [{ name: "vw_supplier_scorecard", records: rows.length, note: "complete supplier scorecard rows sorted descending by linked_order_revenue_inr" }], question }, 200, origin);
+      return respond({ answer, rankingTable: { title: "Supplier revenue ranking", subtitle: "Highest to lowest · " + ranked.length + " suppliers", columns: [{key:"rank",label:"Rank",type:"number"},{key:"supplier_name",label:"Supplier Name"},{key:"supplier_id",label:"Supplier Code"},{key:"revenue_inr",label:"Linked-Order Revenue",type:"currency"},{key:"linked_order_count",label:"Linked Orders",type:"number"},{key:"avg_delay_days",label:"Average Delay (Days)",type:"decimal"},{key:"quality_rating",label:"Quality Rating (/5)",type:"decimal"}], rows: ranked.map((r,i)=>({rank:i+1,supplier_name:txt(r.supplier_name),supplier_id:txt(r.supplier_id),revenue_inr:num(r.linked_order_revenue_inr),linked_order_count:num(r.linked_order_count),avg_delay_days:num(r.avg_delay_days),quality_rating:num(r.quality_rating)})) }, sources: [{ name: "vw_supplier_scorecard", records: rows.length, note: "complete supplier scorecard rows sorted descending by linked_order_revenue_inr" }], question }, 200, origin);
     }
 
     // Deterministic trend path: return real monthly numeric points so the UI can render a chart.
@@ -336,7 +336,7 @@ Deno.serve(async (req: Request) => {
       if(rows.length){
         const r=rows[0];
         const answer="Highest "+(metric==="profit_inr"?"recorded-profit":"revenue")+" buyer: "+txt(r.buyer_name)+" ("+txt(r.country)+"). Revenue: "+formatINR(num(r.revenue_inr))+"; recorded profit: "+formatINR(num(r.profit_inr))+"; orders: "+num(r.order_count).toLocaleString("en-IN")+"; profit margin: "+num(r.profit_margin_pct).toFixed(2)+"%. Ranked across "+rows.length+" buyer groups.";
-        return respond({answer,sources:[{name:"vw_sales_by_buyer",records:rows.length,note:"all buyer groups sorted by requested metric"}],question},200,origin);
+        return respond({answer,rankingTable:{title:"Buyer ranking",subtitle:"Sorted by "+(metric==="profit_inr"?"recorded profit":"revenue")+" · "+rows.length+" buyers",columns:[{key:"rank",label:"Rank",type:"number"},{key:"buyer_name",label:"Buyer"},{key:"country",label:"Country"},{key:"revenue_inr",label:"Revenue",type:"currency"},{key:"profit_inr",label:"Recorded Profit",type:"currency"},{key:"order_count",label:"Orders",type:"number"},{key:"profit_margin_pct",label:"Profit Margin",type:"percent"}],rows:rows.map((r,i)=>({rank:i+1,buyer_name:txt(r.buyer_name),country:txt(r.country),revenue_inr:num(r.revenue_inr),profit_inr:num(r.profit_inr),order_count:num(r.order_count),profit_margin_pct:num(r.profit_margin_pct)}))},sources:[{name:"vw_sales_by_buyer",records:rows.length,note:"all buyer groups sorted by requested metric"}],question},200,origin);
       }
     }
 
@@ -367,7 +367,7 @@ Deno.serve(async (req: Request) => {
         const answer=ranked.length===1
           ?"Highest "+label+" country: "+txt(ranked[0].country)+". "+(metric==="profit_inr"?"Recorded profit: ":"Revenue: ")+formatINR(num(ranked[0][metric]))+"; orders: "+num(ranked[0].order_count).toLocaleString("en-IN")+"."
           :"Countries ranked by "+label+" (top "+ranked.length+"):\n"+ranked.map((r,i)=>(i+1)+". "+txt(r.country)+" — "+formatINR(num(r[metric]))+"; orders "+num(r.order_count).toLocaleString("en-IN")).join("\n");
-        return respond({answer,sources:[{name:"vw_sales_monthly_by_country",records:rows.length,note:"all retrieved country-month rows aggregated by country before ranking"}],question},200,origin);
+        return respond({answer,rankingTable:ranked.length>1?{title:"Country sales ranking",subtitle:"Sorted by "+label+" · "+ranked.length+" countries",columns:[{key:"rank",label:"Rank",type:"number"},{key:"country",label:"Country"},{key:metric,label:label==="revenue"?"Revenue":"Recorded Profit",type:"currency"},{key:"order_count",label:"Orders",type:"number"}],rows:ranked.map((r,i)=>({rank:i+1,country:txt(r.country),[metric]:num(r[metric]),order_count:num(r.order_count)}))}:null,sources:[{name:"vw_sales_monthly_by_country",records:rows.length,note:"all retrieved country-month rows aggregated by country before ranking"}],question},200,origin);
       }
     }
 
@@ -709,7 +709,7 @@ Deno.serve(async (req: Request) => {
       if(ranked) {
         const label=[txt(ranked.product_category),txt(ranked.fabric),txt(ranked.style_id)].filter(x=>x&&x!=="Unknown").join(" / ")||"Product group";
         const answer="Top "+(metric==="profit_inr"?"profit":"sales")+" product group: "+label+". Revenue: "+formatINR(num(ranked.revenue_inr))+"; recorded profit: "+formatINR(num(ranked.profit_inr))+".";
-        return respond({answer,sources:[{name:"vw_sales_by_product",records:products.length}],question},200,origin);
+        return respond({answer,rankingTable:{title:"Product profitability ranking",subtitle:"Sorted by "+(metric==="profit_inr"?"recorded profit":"revenue"),columns:[{key:"rank",label:"Rank",type:"number"},{key:"product_category",label:"Product Group"},{key:"fabric",label:"Fabric"},{key:"style_id",label:"Style"},{key:"revenue_inr",label:"Revenue",type:"currency"},{key:"profit_inr",label:"Recorded Profit",type:"currency"},{key:"profit_margin_pct",label:"Profit Margin",type:"percent"}],rows:topBy(products,metric,20).map((r,i)=>({rank:i+1,product_category:txt(r.product_category),fabric:txt(r.fabric),style_id:txt(r.style_id),revenue_inr:num(r.revenue_inr),profit_inr:num(r.profit_inr),profit_margin_pct:num(r.profit_margin_pct)}))},sources:[{name:"vw_sales_by_product",records:products.length}],question},200,origin);
       }
     }
     const asksHighestBuyer = /(which|top|highest|most profitable|best).*(buyer|customer)|((buyer|customer).*(highest|top|most profitable))/.test(normalizedQuestion);
