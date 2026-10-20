@@ -145,15 +145,27 @@ function AskAI({db,range,country}){
  const speakAnswer=(text)=>{if(typeof window==='undefined'||!window.speechSynthesis){setError('Voice playback is not supported in this browser.');return}window.speechSynthesis.cancel();const utterance=new SpeechSynthesisUtterance(text);utterance.lang=voiceLang;utterance.rate=0.96;window.speechSynthesis.speak(utterance)};
  const ask=async(value,fromVoice=false,batchItem=false)=>{
   const question=String(value??input).trim();if(!question||(busy&&!batchItem))return;
-  // Allow a pasted numbered test list to run as separate, valid requests.
+  // Detect both plain numbered lists ("1. ...") and labeled test suites ("Q01. ..."),
+  // even when the pasted prompt also contains instructions, section headings, or markdown.
   if(!batchItem){
    const numbered=question.split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
-   const batch=numbered.length>1&&numbered.every(line=>/^\d{1,2}[.)]\s+/.test(line))
-    ?numbered.map(line=>line.replace(/^\d{1,2}[.)]\s+/,'').trim()).filter(Boolean):[];
+   let batch=[];
+   const qMatches=[...question.matchAll(/(?:^|\n)\s*Q(\d{1,2})[.)]\s*/g)];
+   if(qMatches.length>1){
+    batch=qMatches.map((match,index)=>{
+     const start=match.index+(match[0].startsWith('\n')?match[0].length- match[0].trimStart().length:0);
+     const bodyStart=match.index+match[0].length;
+     const end=index+1<qMatches.length?qMatches[index+1].index:question.length;
+     return {number:Number(match[1]),text:question.slice(bodyStart,end).trim()};
+    }).filter(item=>item.text).sort((a,b)=>a.number-b.number).map(item=>item.text);
+   }else{
+    batch=numbered.length>1&&numbered.every(line=>/^\d{1,2}[.)]\s+/.test(line))
+     ?numbered.map(line=>line.replace(/^\d{1,2}[.)]\s+/,'').trim()).filter(Boolean):[];
+   }
    if(batch.length>1){
     setError('');setInput('');
     for(let index=0;index<batch.length;index++){
-     // Respect the server-side 12-requests/minute quota; avoid a burst of 19 requests.
+     // Stay below the server-side request burst limit while preserving every answer.
      if(index>0) await new Promise(resolve=>setTimeout(resolve,5200));
      await ask(batch[index], false, true);
     }
