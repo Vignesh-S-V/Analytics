@@ -239,20 +239,99 @@ Deno.serve(async (req: Request) => {
     }
 
     const asksProductRankingEarly = /\b(product|products|product group|style|styles|fabric|category|categories)\b/.test(normalizedQ)
-      && /\b(rank|ranking|ranked|top|highest|lowest|sort|list|most profitable)\b/.test(normalizedQ)
+      && /\b(rank|ranking|ranked|top|highest|lowest|sort|list|most profitable|generated|generates|makes)\b/.test(normalizedQ)
       && /\b(profit|revenue|sales|margin)\b/.test(normalizedQ);
     if (asksProductRankingEarly) {
-      const explicitProfitRank = /\b(by\s+(?:total\s+)?(?:recorded\s+)?(?:profit|net profit|np)|most profitable|highest (?:recorded )?profit|maximum profit|top profit|profit highest)\b/.test(normalizedQ);
+      const explicitProfitRank = /\b(by\s+(?:total\s+)?(?:recorded\s+)?(?:profit|net profit|np)|most profitable|highest (?:recorded )?profit|maximum profit|top profit|profit highest|generated the highest recorded profit|generated highest profit)\b/.test(normalizedQ);
       const explicitRevenueRank = /\b(by\s+(?:total\s+)?(?:revenue|sales)|highest (?:total )?(?:revenue|sales)|top (?:revenue|sales))\b/.test(normalizedQ);
       const metric = explicitProfitRank && !explicitRevenueRank ? "profit_inr" : "revenue_inr";
+      const asksGroupTotal = /\b(product group|product groups|by group|group level|across (?:all )?styles)\b/.test(normalizedQ)
+        || /\bwhich product group\b/.test(normalizedQ);
       const { data, error } = await db.from("vw_sales_by_product")
         .select("product_category,fabric,style_id,order_count,revenue_inr,profit_inr,profit_margin_pct")
-        .order(metric,{ascending:false,nullsFirst:false}).limit(500);
-      if (error) { console.error("Product ranking failed:",error.message); return respond({error:"Could not calculate product rankings. Please retry."},502,origin); }
-      const rows=(data??[]) as Record<string,unknown>[];
-      const ranked=[...rows].sort((a,b)=>num(b[metric])-num(a[metric])).slice(0,50);
-      if(!ranked.length)return respond({answer:"No product ranking rows are available.",sources:[{name:"vw_sales_by_product",records:0}],question},200,origin);
-      return respond({answer:"Products ranked by "+(metric==="profit_inr"?"recorded profit":"revenue")+" (highest to lowest); showing "+ranked.length+" product groups.",rankingTable:{title:"Product ranking",subtitle:"Sorted by "+(metric==="profit_inr"?"recorded profit":"revenue")+" · "+ranked.length+" products",columns:[{key:"rank",label:"Rank",type:"number"},{key:"product_category",label:"Product Group"},{key:"fabric",label:"Fabric"},{key:"style_id",label:"Style"},{key:"revenue_inr",label:"Revenue",type:"currency"},{key:"profit_inr",label:"Recorded Profit",type:"currency"},{key:"profit_margin_pct",label:"Profit Margin",type:"percent"},{key:"order_count",label:"Orders",type:"number"}],rows:ranked.map((r,i)=>({rank:i+1,product_category:txt(r.product_category),fabric:txt(r.fabric),style_id:txt(r.style_id),revenue_inr:num(r.revenue_inr),profit_inr:num(r.profit_inr),profit_margin_pct:num(r.profit_margin_pct),order_count:num(r.order_count)}))},sources:[{name:"vw_sales_by_product",records:rows.length,note:"complete retrieved product groups sorted by requested metric"}],question},200,origin);
+        .order(metric, { ascending: false, nullsFirst: false }).limit(1000);
+      if (error) {
+        console.error("Product ranking failed:", error.message);
+        return respond({ error: "Could not calculate product rankings. Please retry." }, 502, origin);
+      }
+      const rows = (data ?? []) as Record<string, unknown>[];
+      if (!rows.length) return respond({ answer: "No product ranking rows are available.", sources: [{ name: "vw_sales_by_product", records: 0 }], question }, 200, origin);
+
+      // Product views are style-level. When the user asks for a product group, aggregate every
+      // returned style into its group before ranking; never present the top style as the top group.
+      if (asksGroupTotal) {
+        const groups = new Map<string, { product_category: string; revenue_inr: number; profit_inr: number; styles: Set<string> }>();
+        for (const row of rows) {
+          const name = txt(row.product_category) || "Unknown";
+          const group = groups.get(name) ?? { product_category: name, revenue_inr: 0, profit_inr: 0, styles: new Set<string>() };
+          group.revenue_inr += num(row.revenue_inr);
+          group.profit_inr += num(row.profit_inr);
+          const style = txt(row.style_id);
+          if (style && style !== "Unknown") group.styles.add(style);
+          groups.set(name, group);
+        }
+        const rankedGroups = [...groups.values()].map(group => ({
+          ...group,
+          profit_margin_pct: group.revenue_inr !== 0 ? group.profit_inr / group.revenue_inr * 100 : 0,
+          style_count: group.styles.size
+        })).sort((a, b) => num(b[metric]) - num(a[metric]));
+        const top = rankedGroups[0];
+        const metricLabel = metric === "profit_inr" ? "recorded profit" : "revenue";
+        const answer = "Highest " + metricLabel + " product group: " + top.product_category + ". Combined revenue: " + formatINR(top.revenue_inr)
+          + "; combined recorded profit: " + formatINR(top.profit_inr) + "; weighted profit margin: " + top.profit_margin_pct.toFixed(2)
+          + "%; styles included: " + top.style_count + ". It ranks first because the sum of the included styles' " + metricLabel
+          + " is the highest among the returned product groups. Revenue and margin help explain the result, but this data alone does not establish a causal reason.";
+        return respond({
+          answer,
+          rankingTable: {
+            title: "Product-group ranking",
+            subtitle: "Aggregated across styles · sorted by " + metricLabel + " · " + rankedGroups.length + " groups",
+            columns: [
+              { key: "rank", label: "Rank", type: "number" },
+              { key: "product_category", label: "Product Group" },
+              { key: "revenue_inr", label: "Revenue", type: "currency" },
+              { key: "profit_inr", label: "Recorded Profit", type: "currency" },
+              { key: "profit_margin_pct", label: "Weighted Profit Margin", type: "percent" },
+              { key: "style_count", label: "Styles", type: "number" }
+            ],
+            rows: rankedGroups.map((group, index) => ({
+              rank: index + 1,
+              product_category: group.product_category,
+              revenue_inr: group.revenue_inr,
+              profit_inr: group.profit_inr,
+              profit_margin_pct: group.profit_margin_pct,
+              style_count: group.style_count
+            }))
+          },
+          sources: [{ name: "vw_sales_by_product", records: rows.length, note: "style-level rows aggregated to product_category; margin recalculated from total profit / total revenue" }],
+          question
+        }, 200, origin);
+      }
+
+      const ranked = [...rows].sort((a, b) => num(b[metric]) - num(a[metric])).slice(0, 50);
+      return respond({
+        answer: "Individual product styles ranked by " + (metric === "profit_inr" ? "recorded profit" : "revenue") + " (highest to lowest); showing " + ranked.length + " styles.",
+        rankingTable: {
+          title: "Product-style ranking",
+          subtitle: "Sorted by " + (metric === "profit_inr" ? "recorded profit" : "revenue") + " · " + ranked.length + " styles",
+          columns: [
+            { key: "rank", label: "Rank", type: "number" },
+            { key: "product_category", label: "Product Group" },
+            { key: "fabric", label: "Fabric" },
+            { key: "style_id", label: "Style" },
+            { key: "revenue_inr", label: "Revenue", type: "currency" },
+            { key: "profit_inr", label: "Recorded Profit", type: "currency" },
+            { key: "profit_margin_pct", label: "Profit Margin", type: "percent" },
+            { key: "order_count", label: "Orders", type: "number" }
+          ],
+          rows: ranked.map((r, i) => ({
+            rank: i + 1, product_category: txt(r.product_category), fabric: txt(r.fabric), style_id: txt(r.style_id),
+            revenue_inr: num(r.revenue_inr), profit_inr: num(r.profit_inr), profit_margin_pct: num(r.profit_margin_pct), order_count: num(r.order_count)
+          }))
+        },
+        sources: [{ name: "vw_sales_by_product", records: rows.length, note: "individual style rows sorted by requested metric" }],
+        question
+      }, 200, origin);
     }
 
     // Explicit comparison between named countries must use country-level aggregates, not buyer snippets or a single-country fallback.
