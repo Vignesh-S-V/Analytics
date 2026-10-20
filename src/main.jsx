@@ -145,27 +145,24 @@ function AskAI({db,range,country}){
  const speakAnswer=(text)=>{if(typeof window==='undefined'||!window.speechSynthesis){setError('Voice playback is not supported in this browser.');return}window.speechSynthesis.cancel();const utterance=new SpeechSynthesisUtterance(text);utterance.lang=voiceLang;utterance.rate=0.96;window.speechSynthesis.speak(utterance)};
  const ask=async(value,fromVoice=false,batchItem=false)=>{
   const question=String(value??input).trim();if(!question||(busy&&!batchItem))return;
-  // Detect both plain numbered lists ("1. ...") and labeled test suites ("Q01. ..."),
-  // even when the pasted prompt also contains instructions, section headings, or markdown.
+  // Batch pasted question lists into independent requests. Supports Q01...Q100 and
+  // plain "1. ..." lists; ignores surrounding instructions and section headings.
   if(!batchItem){
-   const numbered=question.split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
-   let batch=[];
-   const qMatches=[...question.matchAll(/(?:^|\n)\s*Q(\d{1,2})[.)]\s*/g)];
-   if(qMatches.length>1){
-    batch=qMatches.map((match,index)=>{
-     const start=match.index+(match[0].startsWith('\n')?match[0].length- match[0].trimStart().length:0);
-     const bodyStart=match.index+match[0].length;
-     const end=index+1<qMatches.length?qMatches[index+1].index:question.length;
-     return {number:Number(match[1]),text:question.slice(bodyStart,end).trim()};
-    }).filter(item=>item.text).sort((a,b)=>a.number-b.number).map(item=>item.text);
-   }else{
-    batch=numbered.length>1&&numbered.every(line=>/^\d{1,2}[.)]\s+/.test(line))
-     ?numbered.map(line=>line.replace(/^\d{1,2}[.)]\s+/,'').trim()).filter(Boolean):[];
-   }
+   const lines=question.split(/\r?\n/);
+   const qBatch=lines.map(line=>{
+    const match=line.trim().match(/^Q\s*(\d{1,3})[.):]\s*(.+)$/i);
+    return match?{number:Number(match[1]),text:match[2].trim()}:null;
+   }).filter(Boolean).sort((a,b)=>a.number-b.number);
+   const nonEmpty=lines.map(line=>line.trim()).filter(Boolean);
+   const plainBatch=qBatch.length>1?[]:
+    (nonEmpty.length>1&&nonEmpty.every(line=>/^\d{1,3}[.)]\s+/.test(line))
+      ?nonEmpty.map(line=>line.replace(/^\d{1,3}[.)]\s+/,'').trim()).filter(Boolean):[]);
+   const batch=qBatch.length>1?qBatch.map(item=>item.text):plainBatch;
    if(batch.length>1){
     setError('');setInput('');
+    // Send each question separately so the backend's intent routing handles it correctly.
+    // The delay keeps requests comfortably below the 60/minute account quota.
     for(let index=0;index<batch.length;index++){
-     // Stay below the server-side request burst limit while preserving every answer.
      if(index>0) await new Promise(resolve=>setTimeout(resolve,5200));
      await ask(batch[index], false, true);
     }
