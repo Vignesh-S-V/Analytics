@@ -178,8 +178,8 @@ function AskAI({db,range,country}){
     const data=await response.json();
     if(data?.error){if(data.code==='AI_KEY_MISSING'||data.help)setSetupRequired(true);throw new Error(data.help||data.error)}
     if(!data?.answer)throw new Error('AI returned no answer. Please try again.');
-    finalAnswer=data.answer;finalSources=Array.isArray(data.sources)?data.sources:[];finalSummary=data.summary&&typeof data.summary==='object'?data.summary:null;finalChartData=data.chartData&&typeof data.chartData==='object'?data.chartData:null;
-    patchReply({content:finalAnswer,sources:finalSources,summary:finalSummary,chartData:finalChartData,streaming:false});
+    finalAnswer=data.answer;finalSources=Array.isArray(data.sources)?data.sources:[];finalSummary=data.summary&&typeof data.summary==='object'?data.summary:null;finalChartData=data.chartData&&typeof data.chartData==='object'?data.chartData:null;finalSupplierRanking=Array.isArray(data.supplierRanking)?data.supplierRanking:null;
+    patchReply({content:finalAnswer,sources:finalSources,summary:finalSummary,chartData:finalChartData,supplierRanking:finalSupplierRanking,streaming:false});
    }else{
     if(!response.body)throw new Error('Streaming response is not available in this browser.');
     const reader=response.body.getReader();const decoder=new TextDecoder();let buffer='';
@@ -198,7 +198,7 @@ function AskAI({db,range,country}){
     }
     buffer+=decoder.decode();if(buffer.trim())processLine(buffer);
     if(!finalAnswer.trim())throw new Error('AI returned an empty answer. Please retry or simplify your question.');
-    patchReply({content:finalAnswer,sources:finalSources,summary:finalSummary,streaming:false});
+    patchReply({content:finalAnswer,sources:finalSources,summary:finalSummary,supplierRanking:finalSupplierRanking,streaming:false});
    }
    if(fromVoice&&finalAnswer)speakAnswer(finalAnswer);
   }catch(e){
