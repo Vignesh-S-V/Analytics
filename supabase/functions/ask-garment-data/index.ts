@@ -137,10 +137,10 @@ Deno.serve(async (req: Request) => {
     // Highest-priority exact route for complete supplier revenue rankings. Keep this outside
     // the retrieval-cache branch so a cached RAG answer cannot override the requested sort.
     const earlyNormalizedQ = question.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/  +/g, " ").trim();
-    const asksAllSupplierRevenue = /\\bsuppliers?\\b/.test(earlyNormalizedQ)
-      && /\\b(rank|ranking|ranked|sort|list)\\b/.test(earlyNormalizedQ)
-      && /\\b(revenue|sales)\\b/.test(earlyNormalizedQ)
-      && /\\b(all|every|highest to lowest|descending|descending order)\\b/.test(earlyNormalizedQ);
+    const asksAllSupplierRevenue = /\bsuppliers?\b/.test(earlyNormalizedQ)
+      && /\b(rank|ranking|ranked|sort|list)\b/.test(earlyNormalizedQ)
+      && /\b(revenue|sales)\b/.test(earlyNormalizedQ)
+      && /\b(all|every|highest to lowest|descending|descending order)\b/.test(earlyNormalizedQ);
     if (asksAllSupplierRevenue) {
       const { data, error } = await db.from("vw_supplier_scorecard")
         .select("supplier_id,supplier_name,linked_order_count,linked_order_revenue_inr")
