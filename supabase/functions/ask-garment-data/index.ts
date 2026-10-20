@@ -255,7 +255,7 @@ Deno.serve(async (req: Request) => {
 
     // Explicit comparison between named countries must use country-level aggregates, not buyer snippets or a single-country fallback.
     const countryNames = ["usa","uae","germany","uk","france","spain","italy","netherlands","sweden","canada","japan","australia"];
-    const requestedCountries = countryNames.filter(name => new RegExp("\\\\b"+name+"\\\\b","i").test(normalizedQ));
+    const requestedCountries = countryNames.filter(name => new RegExp("\\b"+name+"\\b","i").test(normalizedQ));
     const asksCountryComparison = requestedCountries.length >= 2
       && /\\b(compare|comparison|versus|vs|difference|between|and)\\b/.test(normalizedQ)
       && /\\b(revenue|sales|profit|margin|orders)\\b/.test(normalizedQ);
