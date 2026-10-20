@@ -81,6 +81,21 @@ test("country comparison intent requires two countries and a metric", () => {
   assert.equal(isCountryComparisonQuestion("compare usa vs uae weather", 2), false);
 });
 
+test("recognizes category rankings as category aggregates, not style rankings", () => {
+  assert.deepEqual(
+    detectProductRankingIntent("rank all available product categories by revenue"),
+    { metric: "revenue_inr", asksGroupTotal: true },
+  );
+  assert.deepEqual(
+    detectProductRankingIntent("identify the product category with the highest recorded profit"),
+    { metric: "profit_inr", asksGroupTotal: true },
+  );
+});
+
+test("recognizes Tamil country-comparison requests when country names and metric are present", () => {
+  assert.equal(isCountryComparisonQuestion("தமிழில் usa மற்றும் germany வருவாய் லாபம் ஆர்டர்கள் ஒப்பிடு", 2), true);
+});
+
 test("rejects unsupported product-group ranking metrics", () => {
   assert.throws(() => aggregateProductGroups([], "order_count"), /metric must be/);
 });
