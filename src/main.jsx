@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createClient } from '@supabase/supabase-js';
 import { Activity, ArrowDownRight, ArrowUpRight, AudioLines, Bot, Boxes, BriefcaseBusiness, CheckCircle2, ChevronDown, CircleDollarSign, Factory, Filter, Globe2, LayoutDashboard, Lightbulb, LogOut, Megaphone, Mic, PackageCheck, Search, Send, Settings2, ShieldAlert, Shirt, Sparkles, Square, Target, TrendingUp, Truck, Volume2, Wallet } from 'lucide-react';
-import { Area, AreaChart, Bar, CartesianGrid, Cell, ComposedChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, Bar, CartesianGrid, Cell, ComposedChart, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import './styles.css';
 
 const colors=['#65e0c4','#8e9bff','#f5bf69','#f28aa5','#7dd3fc'];
@@ -135,6 +135,7 @@ function AskAI({db,range,country}){
   let finalAnswer='';
   let finalSources=[];
   let finalSummary=null;
+  let finalChartData=null;
   setError('');setSetupRequired(false);setInput('');
   setMessages(prev=>[...prev,{role:'user',content:question,voice:fromVoice},{role:'assistant',id:replyId,content:'',sources:[],streaming:true}]);
   setBusy(true);
@@ -160,8 +161,8 @@ function AskAI({db,range,country}){
     const data=await response.json();
     if(data?.error){if(data.code==='AI_KEY_MISSING'||data.help)setSetupRequired(true);throw new Error(data.help||data.error)}
     if(!data?.answer)throw new Error('AI returned no answer. Please try again.');
-    finalAnswer=data.answer;finalSources=Array.isArray(data.sources)?data.sources:[];finalSummary=data.summary&&typeof data.summary==='object'?data.summary:null;
-    patchReply({content:finalAnswer,sources:finalSources,summary:finalSummary,streaming:false});
+    finalAnswer=data.answer;finalSources=Array.isArray(data.sources)?data.sources:[];finalSummary=data.summary&&typeof data.summary==='object'?data.summary:null;finalChartData=data.chartData&&typeof data.chartData==='object'?data.chartData:null;
+    patchReply({content:finalAnswer,sources:finalSources,summary:finalSummary,chartData:finalChartData,streaming:false});
    }else{
     if(!response.body)throw new Error('Streaming response is not available in this browser.');
     const reader=response.body.getReader();const decoder=new TextDecoder();let buffer='';
@@ -169,7 +170,7 @@ function AskAI({db,range,country}){
      if(!line.trim())return;
      let event;try{event=JSON.parse(line)}catch{return}
      if(event.type==='token'&&event.text){finalAnswer+=event.text;patchReply({content:finalAnswer,streaming:true})}
-     else if(event.type==='done'){finalSources=Array.isArray(event.sources)?event.sources:[];finalSummary=event.summary&&typeof event.summary==='object'?event.summary:null;patchReply({content:finalAnswer,sources:finalSources,summary:finalSummary,streaming:false})}
+     else if(event.type==='done'){finalSources=Array.isArray(event.sources)?event.sources:[];finalSummary=event.summary&&typeof event.summary==='object'?event.summary:null;finalChartData=event.chartData&&typeof event.chartData==='object'?event.chartData:null;patchReply({content:finalAnswer,sources:finalSources,summary:finalSummary,chartData:finalChartData,streaming:false})}
      else if(event.type==='error')throw new Error(event.error||'AI stream stopped unexpectedly.');
     };
     while(true){
@@ -255,7 +256,7 @@ function AskAI({db,range,country}){
   <div className="panel ask-ai-chat">
    <div className="ask-ai-chat-head"><div><strong><Sparkles size={16}/> ThreadIQ AI</strong><span>Sales intelligence · Source-grounded answers</span></div><label className="voice-language">Voice language<select value={voiceLang} onChange={e=>setVoiceLang(e.target.value)}><option value="ta-IN">Tamil / Tanglish</option><option value="en-IN">English (India)</option><option value="hi-IN">Hindi</option></select></label></div>
    <div className="ask-ai-messages" ref={listRef} aria-live="polite">
-    {messages.map((m,i)=><div className={'ask-message '+(m.role==='user'?'ask-user':'ask-assistant')} key={i}><div className="ask-message-avatar">{m.role==='user'?'You':<Bot size={16}/>}</div><div className="ask-message-body"><div className="ask-message-text">{m.content}</div>{m.role==='assistant'&&m.summary&&summaryCards(m.summary).length>0&&<div className="ask-answer-metrics">{summaryCards(m.summary).map(metric=><div className="ask-answer-metric" key={metric.label}><span>{metric.label}</span><strong>{metric.value}</strong></div>)}</div>}{m.role==='assistant'&&i>0&&!m.streaming&&Array.isArray(m.sources)&&m.sources.length>0&&<div className="ask-source-wrap"><div className="ask-source-heading"><CheckCircle2 size={13}/><span>Grounded in workspace data</span></div><div className="ask-source-list">{m.sources.map((source,j)=><span className="ask-source-chip" key={(source.name||'source')+'-'+j} title={source.name||'Supabase analytics view'}>{sourceLabel(source.name)}{Number.isFinite(Number(source.records))&&source.records!==undefined?<small>{Number(source.records).toLocaleString('en-IN')} rows</small>:null}</span>)}</div></div>}{m.role==='assistant'&&i>0&&!m.streaming&&m.content&&<button className="ask-read-aloud" type="button" onClick={()=>speakAnswer(m.content)}><Volume2 size={14}/> Listen to answer</button>}</div></div>)}
+    {messages.map((m,i)=><div className={'ask-message '+(m.role==='user'?'ask-user':'ask-assistant')} key={i}><div className="ask-message-avatar">{m.role==='user'?'You':<Bot size={16}/>}</div><div className="ask-message-body"><div className="ask-message-text">{m.content}</div>{m.role==='assistant'&&m.chartData?.type==='line'&&Array.isArray(m.chartData.data)&&m.chartData.data.length>1&&Array.isArray(m.chartData.series)&&<div className="ask-trend-chart" role="img" aria-label="Monthly trend line chart"><div className="ask-trend-chart-title">Monthly trend</div><div style={{width:'100%',height:280}}><ResponsiveContainer width="100%" height="100%"><LineChart data={m.chartData.data} margin={{top:12,right:14,left:8,bottom:8}}><CartesianGrid strokeDasharray="3 3" stroke="var(--border,#334155)"/><XAxis dataKey={m.chartData.xKey||'month'} tick={{fontSize:11}} tickFormatter={v=>String(v).slice(0,7)}/><YAxis tick={{fontSize:11}} tickFormatter={v=>compactIN(v)}/><Tooltip labelFormatter={v=>String(v)} formatter={(value,name)=>[inr(Number(value)),String(name)]}/>{m.chartData.series.map((series,index)=><Line key={series.key} type="monotone" dataKey={series.key} name={series.label||series.key} stroke={colors[index%colors.length]} strokeWidth={2.5} dot={{r:3}} activeDot={{r:5}} connectNulls={false}/>)}</LineChart></ResponsiveContainer></div></div>}{m.role==='assistant'&&m.summary&&summaryCards(m.summary).length>0&&<div className="ask-answer-metrics">{summaryCards(m.summary).map(metric=><div className="ask-answer-metric" key={metric.label}><span>{metric.label}</span><strong>{metric.value}</strong></div>)}</div>}{m.role==='assistant'&&i>0&&!m.streaming&&Array.isArray(m.sources)&&m.sources.length>0&&<div className="ask-source-wrap"><div className="ask-source-heading"><CheckCircle2 size={13}/><span>Grounded in workspace data</span></div><div className="ask-source-list">{m.sources.map((source,j)=><span className="ask-source-chip" key={(source.name||'source')+'-'+j} title={source.name||'Supabase analytics view'}>{sourceLabel(source.name)}{Number.isFinite(Number(source.records))&&source.records!==undefined?<small>{Number(source.records).toLocaleString('en-IN')} rows</small>:null}</span>)}</div></div>}{m.role==='assistant'&&i>0&&!m.streaming&&m.content&&<button className="ask-read-aloud" type="button" onClick={()=>speakAnswer(m.content)}><Volume2 size={14}/> Listen to answer</button>}</div></div>)}
     {busy&&<div className="ask-message ask-assistant"><div className="ask-message-avatar"><Bot size={16}/></div><div className="ask-message-body"><div className="ask-thinking"><span></span><span></span><span></span> Thinking…</div></div></div>}
    </div>
    {error&&<div className="ask-error" role="alert">{error}{keyboardDictationFallback&&<button type="button" onClick={()=>{setError('Tap the microphone icon on the iPhone keyboard to dictate your question into this box, then tap Ask.');composerInputRef.current?.focus()}} style={{display:'inline-flex',alignItems:'center',marginTop:8,padding:'8px 10px',border:'1px solid #cbdcf0',borderRadius:8,background:'#f4f8ff',color:'#245e96',fontSize:12,fontWeight:600,cursor:'pointer'}}>Use device keyboard dictation</button>}{setupRequired&&<a className="ask-setup-link" href="https://supabase.com/dashboard/project/rzsgdfpwnxhseyxtrrlx/settings/functions" target="_blank" rel="noreferrer">Open Supabase Function settings</a>}</div>}
