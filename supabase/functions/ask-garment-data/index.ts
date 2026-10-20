@@ -242,7 +242,8 @@ Deno.serve(async (req: Request) => {
       && /\b(rank|ranking|ranked|top|highest|lowest|sort|list|most profitable)\b/.test(normalizedQ)
       && /\b(profit|revenue|sales|margin)\b/.test(normalizedQ);
     if (asksProductRankingEarly) {
-      const explicitProfitRank = /\b(by\s+(?:total\s+)?(?:recorded\s+)?(?:profit|net profit|np)|most profitable|highest (?:recorded )?profit|maximum profit|top profit|profit highest)\b/.test(normalizedQ);\n      const explicitRevenueRank = /\b(by\s+(?:total\s+)?(?:revenue|sales)|highest (?:total )?(?:revenue|sales)|top (?:revenue|sales))\b/.test(normalizedQ);\n      const metric = explicitProfitRank && !explicitRevenueRank ? "profit_inr" : "revenue_inr";
+      const explicitProfitRank = /\b(by\s+(?:total\s+)?(?:recorded\s+)?(?:profit|net profit|np)|most profitable|highest (?:recorded )?profit|maximum profit|top profit|profit highest)\b/.test(normalizedQ);
+      const explicitRevenueRank = /\b(by\s+(?:total\s+)?(?:revenue|sales)|highest (?:total )?(?:revenue|sales)|top (?:revenue|sales))\b/.test(normalizedQ);\n      const metric = explicitProfitRank && !explicitRevenueRank ? "profit_inr" : "revenue_inr";
       const { data, error } = await db.from("vw_sales_by_product")
         .select("product_category,fabric,style_id,order_count,revenue_inr,profit_inr,profit_margin_pct")
         .order(metric,{ascending:false,nullsFirst:false}).limit(500);
