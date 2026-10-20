@@ -7,7 +7,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "node --test supabase/functions/ask-garment-data/analytics-utils.test.mjs"
+    "test": "node --test supabase/functions/ask-garment-data/*.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.0",
