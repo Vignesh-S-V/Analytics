@@ -138,17 +138,26 @@ Deno.serve(async (req: Request) => {
     // Deterministic trend path: return real monthly numeric points so the UI can render a chart.
     const asksTrend = /\b(trend|over time|month by month|monthly pattern|month-wise|month wise|historical pattern)\b/i.test(question);
     if (asksTrend && /\b(revenue|sales|profit|cost|expense|expenses)\b/i.test(question)) {
-      const trendQuery = await db.from("vw_sales_monthly_by_country")
-        .select("month,country,revenue_inr,total_cost_inr,profit_inr")
-        .order("month", { ascending: true }).limit(1000);
-      if (trendQuery.error) {
-        console.error("Trend chart query failed:", trendQuery.error.message);
-        return respond({ error: "Could not retrieve monthly trend data. Please retry." }, 502, origin);
+      // Paginate the complete view; a single Supabase response can be capped at 1,000 rows.
+      const trendRows: Record<string,unknown>[] = [];
+      const pageSize = 1000;
+      for (let offset = 0; ; offset += pageSize) {
+        const page = await db.from("vw_sales_monthly_by_country")
+          .select("month,country,revenue_inr,total_cost_inr,profit_inr")
+          .order("month", { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (page.error) {
+          console.error("Trend chart query failed:", page.error.message);
+          return respond({ error: "Could not retrieve the complete monthly trend data. Please retry." }, 502, origin);
+        }
+        const rows = (page.data ?? []) as Record<string,unknown>[];
+        trendRows.push(...rows);
+        if (rows.length < pageSize) break;
       }
       const q = question.toLowerCase();
       const yearMatch = question.match(/20[0-9]{2}/)?.[0] ?? requestedYear;
       const monthTotalsForChart = new Map<string, {month:string; revenue_inr:number; total_cost_inr:number; profit_inr:number}>();
-      for (const row of (trendQuery.data ?? []) as Record<string,unknown>[]) {
+      for (const row of trendRows) {
         const month = monthOf(row);
         if (!month || (yearMatch && !month.startsWith(yearMatch))) continue;
         if (requestedCountry && requestedCountry !== "All countries" && txt(row.country).toLowerCase() !== requestedCountry.toLowerCase()) continue;
@@ -175,7 +184,7 @@ Deno.serve(async (req: Request) => {
           (series.some(s=>s.key==="revenue_inr") ? "Revenue total: "+formatINR(sumMetric("revenue_inr"))+". Highest revenue month: "+highestRevenue.month+" ("+formatINR(highestRevenue.revenue_inr)+"); lowest: "+lowestRevenue.month+" ("+formatINR(lowestRevenue.revenue_inr)+"). " : "") +
           (series.some(s=>s.key==="profit_inr") ? "Recorded profit total: "+formatINR(sumMetric("profit_inr"))+". Highest profit month: "+highestProfit.month+" ("+formatINR(highestProfit.profit_inr)+"). " : "") +
           "The chart shows recorded monthly totals; it does not infer missing months.";
-        return respond({answer, chartData:{type:"line",xKey:"month",series,data:points.map(p=>({month:p.month,...Object.fromEntries(series.map(s=>[s.key,(p as unknown as Record<string,unknown>)[s.key]]))}))},sources:[{name:"vw_sales_monthly_by_country",records:points.length,note:"monthly totals aggregated from returned rows"}],question},200,origin);
+        return respond({answer, chartData:{type:"line",xKey:"month",series,data:points.map(p=>({month:p.month,...Object.fromEntries(series.map(s=>[s.key,(p as unknown as Record<string,unknown>)[s.key]]))}))},sources:[{name:"vw_sales_monthly_by_country",records:points.length,note:"all rows paginated from the monthly-by-country view; grouped into month totals"}],question},200,origin);
       }
     }
     let datasets: Record<string, unknown>[][];
