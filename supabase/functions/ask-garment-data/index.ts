@@ -456,7 +456,10 @@ Deno.serve(async (req: Request) => {
     const asksProductionRankingEarly = /\b(production lines?|production line performance|manufacturing lines?)\b/.test(normalizedQ)
       && /\b(rank|ranking|ranked|top|highest|lowest|sort|list|rework|rejection|reject|overtime|efficiency|performance)\b/.test(normalizedQ);
     if (asksProductionRankingEarly) {
-      const metric = /\brework\b/.test(normalizedQ) ? "rework_cost_inr"
+      const explicitlyAsksEfficiency = /\b(highest|highest recorded|most|best)\b.{0,24}\befficiency\b/.test(normalizedQ)
+        || /\befficiency\b.{0,24}\b(highest|most|best)\b/.test(normalizedQ);
+      const metric = explicitlyAsksEfficiency ? "avg_actual_efficiency_pct"
+        : /\brework\b/.test(normalizedQ) ? "rework_cost_inr"
         : /\brejection|reject\b/.test(normalizedQ) ? "rejection_rate_pct"
         : /\bovertime\b/.test(normalizedQ) ? "overtime_hours" : "avg_actual_efficiency_pct";
       const {data,error}=await db.from("vw_production_by_line").select("line_id,unit,specialisation,order_count,order_qty,shipped_qty,rejection_qty,rejection_rate_pct,avg_actual_efficiency_pct,avg_target_efficiency_pct,overtime_hours,rework_cost_inr").limit(100);
@@ -795,8 +798,15 @@ Deno.serve(async (req: Request) => {
       if(error)return respond({error:"Could not read marketing aggregates from Supabase."},502,origin);
       const grouped=new Map<string,Record<string,unknown>>();
       for(const row of (rows??[]) as Record<string,unknown>[]){const channel=txt(row.channel)||"Unknown";const v=grouped.get(channel)??{channel,spend:0,value:0,orders_won:0};v.spend=num(v.spend)+num(row.marketing_spend_inr);v.value=num(v.value)+num(row.attributed_order_value_inr);v.orders_won=num(v.orders_won)+num(row.orders_won);grouped.set(channel,v);}
-      const ranked=[...grouped.values()].sort((a,b)=>(num(b.spend)?num(b.value)/num(b.spend):0)-(num(a.spend)?num(a.value)/num(a.spend):0));
-      if(ranked.length){const r=ranked[0];return respond({answer:"Highest attributed ROAS channel: "+txt(r.channel)+". Attributed order value: "+formatINR(num(r.value))+"; marketing spend: "+formatINR(num(r.spend))+"; ROAS: "+(num(r.spend)?(num(r.value)/num(r.spend)).toFixed(2)+"x":"not available")+"; won orders: "+num(r.orders_won).toLocaleString("en-IN")+". ROAS uses attributed sales value, not profit",sources:[{name:"vw_marketing_channel_performance",records:(rows??[]).length}],question},200,origin);}
+      const ranked=[...grouped.values()].map(r=>({...r,roas:num(r.spend)>0?num(r.value)/num(r.spend):null})).sort((a,b)=>(b.roas??-1)-(a.roas??-1));
+      if(ranked.length){
+        const asksProfitRoi=/\b(profit roi|roi|return on investment|attributable profit)\b/.test(normalizedQ);
+        const wantsFullRanking=/\b(rank|ranking|ranked|all|every|each|compare)\b/.test(normalizedQ);
+        const top=ranked[0];
+        const answer=(wantsFullRanking?"Marketing channels ranked by attributed ROAS (highest to lowest):\n"+ranked.map((r,i)=>(i+1)+". "+txt(r.channel)+" — ROAS: "+(r.roas===null?"N/A":r.roas.toFixed(2)+"x")+"; attributed revenue: "+formatINR(num(r.value))+"; spend: "+formatINR(num(r.spend))+"; won orders: "+num(r.orders_won).toLocaleString("en-IN")).join("\n"):"Highest attributed ROAS channel: "+txt(top.channel)+". Attributed order value: "+formatINR(num(top.value))+"; marketing spend: "+formatINR(num(top.spend))+"; ROAS: "+(top.roas===null?"not available":top.roas.toFixed(2)+"x")+"; won orders: "+num(top.orders_won).toLocaleString("en-IN"))
+          + (asksProfitRoi?". Profit ROI is unavailable from this view because attributable profit is not included; ROAS is revenue divided by spend, not profit ROI.":". ROAS = attributed revenue / marketing spend; this is not profit ROI.");
+        return respond({answer,rankingTable:{title:"Marketing channel ROAS ranking",subtitle:"Sorted by attributed revenue / marketing spend · "+ranked.length+" channels",columns:[{key:"rank",label:"Rank",type:"number"},{key:"channel",label:"Channel"},{key:"value",label:"Attributed Revenue",type:"currency"},{key:"spend",label:"Marketing Spend",type:"currency"},{key:"roas",label:"ROAS",type:"decimal"},{key:"orders_won",label:"Won Orders",type:"number"}],rows:ranked.map((r,i)=>({rank:i+1,channel:txt(r.channel),value:num(r.value),spend:num(r.spend),roas:r.roas,orders_won:num(r.orders_won)}))},sources:[{name:"vw_marketing_channel_performance",records:(rows??[]).length,note:"grouped by channel; ROAS computed from summed attributed order value / summed spend; profit ROI unavailable from selected fields"}],question},200,origin);
+      }
     }
     // Metric-aware supplier ranking: select the exact requested measure and direction.
     const asksSupplierEarly=/supplier/.test(normalizedQ)&&/(top|best|highest|lowest|worst|quality|delay|late|risk|revenue|profit|penalt|attention)/.test(normalizedQ);
