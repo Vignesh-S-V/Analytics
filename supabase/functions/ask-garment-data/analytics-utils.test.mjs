@@ -99,3 +99,17 @@ test("recognizes Tamil country-comparison requests when country names and metric
 test("rejects unsupported product-group ranking metrics", () => {
   assert.throws(() => aggregateProductGroups([], "order_count"), /metric must be/);
 });
+
+test("keeps highest-profit category ranking when follow-up mentions highest revenue", () => {
+  assert.deepEqual(
+    detectProductRankingIntent("identify the product category with the highest recorded profit verify the result against the complete category ranking and state whether highest profit also means highest revenue"),
+    { metric: "profit_inr", asksGroupTotal: true },
+  );
+});
+
+test("keeps revenue as the primary metric when ranking by revenue then asking about profit", () => {
+  assert.deepEqual(
+    detectProductRankingIntent("rank all product categories by revenue and state whether the highest revenue category also has the highest recorded profit"),
+    { metric: "revenue_inr", asksGroupTotal: true },
+  );
+});
