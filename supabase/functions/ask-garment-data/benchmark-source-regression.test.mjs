@@ -43,6 +43,6 @@ test("average revenue per distinct order displays precise rupee value rather tha
 });
 
 
-test("Tamil average revenue per distinct order also displays precise rupee value", () => {
+  assert.match(source, /ஒரு தனித்த ஆர்டருக்கான சராசரி வருவாய்[\s\S]{0,260}all\.averageOrderRevenue\.toLocaleString\("en-IN", \{ minimumFractionDigits: 2, maximumFractionDigits: 2 \}\)/);
   assert.match(source, /ஒரு தனித்த ஆர்டருக்கான சராசரி வருவாய்[\\s\\S]{0,260}all\.averageOrderRevenue\.toLocaleString\("en-IN", \{ minimumFractionDigits: 2, maximumFractionDigits: 2 \}\)/);
 });
