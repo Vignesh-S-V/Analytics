@@ -159,7 +159,8 @@ Deno.serve(async (req: Request) => {
 
     // Deterministic date coverage and annual peak-month checks. Never ask the LLM to
     // guess whether a month exists or to substitute a different year for a missing period.
-    const coverageQuestion = /\b(date coverage|month coverage|data coverage|available period|earliest month|latest month|earliest date|latest date|date range)\b/i.test(question);
+    const asksTrend = /\b(trend|over time|month by month|monthly pattern|month-wise|month wise|historical pattern)\b/i.test(question);
+    const coverageQuestion = /\b(date coverage|month coverage|data coverage|available period|earliest month|latest month|earliest date|latest date|date range)\b/i.test(question) && !asksTrend;
     const peakYear = question.match(/20[0-9]{2}/)?.[0] ?? "";
     const annualPeakQuestion = !!peakYear
       && /\b(highest|highest-revenue|peak|top)\b/i.test(question)
@@ -224,7 +225,6 @@ Deno.serve(async (req: Request) => {
     }
 
     // Deterministic trend path: return real monthly numeric points so the UI can render a chart.
-    const asksTrend = /\b(trend|over time|month by month|monthly pattern|month-wise|month wise|historical pattern)\b/i.test(question);
     if (asksTrend && /\b(revenue|sales|profit|cost|expense|expenses)\b/i.test(question)) {
       // Paginate the complete view; a single Supabase response can be capped at 1,000 rows.
       const trendRows: Record<string,unknown>[] = [];
@@ -423,6 +423,29 @@ Deno.serve(async (req: Request) => {
       const answer=compareRows.map(r=>txt(r.country)+": revenue "+formatINR(num(r.revenue_inr))+", recorded profit "+formatINR(num(r.profit_inr))+", margin "+margin(r).toFixed(2)+"%, "+num(r.order_count).toLocaleString("en-IN")+" orders").join(". ")
         + ". Revenue difference: "+formatINR(Math.abs(num(first.revenue_inr)-num(second.revenue_inr)))+"; recorded-profit difference: "+formatINR(Math.abs(num(first.profit_inr)-num(second.profit_inr)))+".";
       return respond({answer,rankingTable:{title:"Country comparison",subtitle:"Country-level aggregates"+(qYear?" · "+qYear:"")+(qMonth?" · selected month":""),columns:[{key:"country",label:"Country"},{key:"revenue_inr",label:"Revenue",type:"currency"},{key:"profit_inr",label:"Recorded Profit",type:"currency"},{key:"margin_pct",label:"Profit Margin",type:"percent"},{key:"order_count",label:"Orders",type:"number"}],rows:compareRows.map(r=>({country:txt(r.country),revenue_inr:num(r.revenue_inr),profit_inr:num(r.profit_inr),margin_pct:margin(r),order_count:num(r.order_count)}))},sources:[{name:"vw_sales_monthly_by_country",records:rows.length,note:"all monthly rows aggregated to country level for the requested comparison"}],question},200,origin);
+    }
+
+    const asksLatestMonthCountry = /\b(latest|most recent|last available)\b/.test(normalizedQ)
+      && /\b(month|period)\b/.test(normalizedQ)
+      && /\b(country|countries)\b/.test(normalizedQ)
+      && /\b(highest|top|rank|revenue|sales)\b/.test(normalizedQ);
+    if (asksLatestMonthCountry) {
+      const rows: Record<string,unknown>[] = [];
+      const pageSize = 1000;
+      for (let offset=0;;offset+=pageSize) {
+        const page=await db.from("vw_sales_monthly_by_country").select("month,country,order_count,revenue_inr,profit_inr")
+          .order("month",{ascending:false}).order("country",{ascending:true}).range(offset,offset+pageSize-1);
+        if(page.error){console.error("Latest-month country ranking failed:",page.error.message);return respond({error:"Could not verify latest-month country rankings. Please retry."},502,origin);}
+        const batch=(page.data??[]) as Record<string,unknown>[]; rows.push(...batch); if(batch.length<pageSize)break;
+      }
+      const months=rows.map(monthOf).filter(m=>/^20\d{2}-\d{2}$/.test(m)).sort();
+      const latest=months.at(-1);
+      if(!latest)return respond({answer:"No monthly country data is available, so a latest-month ranking cannot be calculated.",sources:[{name:"vw_sales_monthly_by_country",records:rows.length}],question},200,origin);
+      const grouped=new Map<string,{country:string;revenue_inr:number;profit_inr:number;order_count:number}>();
+      for(const r of rows.filter(r=>monthOf(r)===latest)){const country=txt(r.country)||"Unknown";const cur=grouped.get(country)??{country,revenue_inr:0,profit_inr:0,order_count:0};cur.revenue_inr+=num(r.revenue_inr);cur.profit_inr+=num(r.profit_inr);cur.order_count+=num(r.order_count);grouped.set(country,cur);}
+      const ranked=[...grouped.values()].sort((a,b)=>b.revenue_inr-a.revenue_inr),top=ranked.slice(0,5);
+      const margin=(r:{revenue_inr:number;profit_inr:number})=>r.revenue_inr!==0?r.profit_inr/r.revenue_inr*100:0;
+      return respond({answer:"Latest available month in source: "+latest+". Countries ranked by revenue for that month only (top "+top.length+"): "+top.map((r,i)=>(i+1)+". "+r.country+" — revenue "+formatINR(r.revenue_inr)+", recorded profit "+formatINR(r.profit_inr)+", orders "+r.order_count.toLocaleString("en-IN")+", weighted margin "+margin(r).toFixed(2)+"%").join("; ")+". This is not an all-time ranking.",rankingTable:{title:"Latest-month country ranking",subtitle:latest+" · sorted by revenue · top "+top.length,columns:[{key:"rank",label:"Rank",type:"number"},{key:"country",label:"Country"},{key:"revenue_inr",label:"Revenue",type:"currency"},{key:"profit_inr",label:"Recorded Profit",type:"currency"},{key:"order_count",label:"Orders",type:"number"},{key:"profit_margin_pct",label:"Weighted Profit Margin",type:"percent"}],rows:top.map((r,i)=>({rank:i+1,country:r.country,revenue_inr:r.revenue_inr,profit_inr:r.profit_inr,order_count:r.order_count,profit_margin_pct:margin(r)}))},sources:[{name:"vw_sales_monthly_by_country",records:rows.length,note:"all pages read; restricted to latest available YYYY-MM before country aggregation"}],question},200,origin);
     }
 
     const asksCountryRankingEarly = /\b(countr(?:y|ies))\b/.test(normalizedQ)
