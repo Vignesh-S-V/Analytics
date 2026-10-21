@@ -269,7 +269,7 @@ Deno.serve(async (req: Request) => {
       && /\b(highest|highest-revenue|peak|top)\b/i.test(question)
       && /\b(month|revenue|sales)\b/i.test(question);
     const monthNames: Record<string,string> = { january:"01", jan:"01", february:"02", feb:"02", march:"03", mar:"03", april:"04", apr:"04", may:"05", june:"06", jun:"06", july:"07", jul:"07", august:"08", aug:"08", september:"09", sep:"09", october:"10", oct:"10", november:"11", nov:"11", december:"12", dec:"12" };
-    const monthNameMatch = normalizedQ.match(/\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|october|oct|november|nov|december|dec)\b/);
+    const monthNameMatch = question.toLowerCase().match(/\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|october|oct|november|nov|december|dec)\b/);
     const numericMonthMatch = question.match(/\b(20[0-9]{2})[-/](0[1-9]|1[0-2])\b/);
     const exactMonthKey = numericMonthMatch ? numericMonthMatch[1] + "-" + numericMonthMatch[2] : (monthNameMatch && peakYear ? peakYear + "-" + monthNames[monthNameMatch[1]] : "");
     const asksSpecificMonth = !!exactMonthKey && /\b(revenue|sales|month|data|records|available|missing|unavailable)\b/i.test(question);
