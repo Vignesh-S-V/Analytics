@@ -995,8 +995,8 @@ Deno.serve(async (req: Request) => {
       const pageSize = 1000;
       for (let offset = 0; ; offset += pageSize) {
         const {data:page,error}=await db.from("vw_marketing_channel_performance")
-          .select("channel,marketing_spend_inr,attributed_order_value_inr,orders_won")
-          .order("month",{ascending:true}).order("channel",{ascending:true})
+          .select("month,country,channel,marketing_spend_inr,attributed_order_value_inr,orders_won")
+          .order("month",{ascending:true}).order("country",{ascending:true}).order("channel",{ascending:true})
           .range(offset,offset+pageSize-1);
         if(error)return respond({error:"Could not read complete marketing aggregates from Supabase."},502,origin);
         const pageRows=(page??[]) as Record<string,unknown>[];

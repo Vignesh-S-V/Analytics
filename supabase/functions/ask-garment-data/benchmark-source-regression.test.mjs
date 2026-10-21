@@ -14,6 +14,7 @@ test("country margin differences use percentage points, not percent", () => {
 test("marketing ROAS aggregation paginates beyond Supabase's default row cap", () => {
   assert.match(source, /const pageSize = 1000;[\s\S]{0,700}\.range\(offset,offset\+pageSize-1\)/);
   assert.match(source, /if\(pageRows\.length < pageSize\) break;/);
+  assert.match(source, /\.order\("month",\{ascending:true\}\)\.order\("country",\{ascending:true\}\)\.order\("channel",\{ascending:true\}\)/);
   assert.match(source, /Could not read complete marketing aggregates from Supabase/);
 });
 
