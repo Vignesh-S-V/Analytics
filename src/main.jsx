@@ -211,10 +211,11 @@ function AskAI({db,range,country}){
   const profit=summary.profit_inr??summary.net_profit_inr;
   const cost=summary.cost_inr??summary.total_cost_inr;
   const orders=summary.orders??summary.order_count;
-  if(revenue!==undefined&&Number.isFinite(Number(revenue)))cards.push({label:'Revenue',value:inr(revenue)});
-  if(profit!==undefined&&Number.isFinite(Number(profit)))cards.push({label:'Recorded profit',value:inr(profit)});
-  if(cost!==undefined&&Number.isFinite(Number(cost)))cards.push({label:'Cost',value:inr(cost)});
-  if(orders!==undefined&&Number.isFinite(Number(orders)))cards.push({label:'Orders',value:Number(orders).toLocaleString('en-IN')});
+  const hasNumber=(value)=>value!==null&&value!==undefined&&!(typeof value==='string'&&value.trim()==='')&&Number.isFinite(Number(value));
+  if(hasNumber(revenue))cards.push({label:'Revenue',value:inr(revenue)});
+  if(hasNumber(profit))cards.push({label:'Recorded profit',value:inr(profit)});
+  if(hasNumber(cost))cards.push({label:'Cost',value:inr(cost)});
+  if(hasNumber(orders))cards.push({label:'Orders',value:Number(orders).toLocaleString('en-IN')});
   return cards;
  };
  return <section className="ask-ai-page">
