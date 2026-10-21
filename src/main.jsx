@@ -97,7 +97,7 @@ function AskAIBenchmarkRunner({db,onBack}){
    for(let i=0;i<ASK_AI_BENCHMARK_QUESTIONS.length;i++){
     setCurrent(i+1);const question=ASK_AI_BENCHMARK_QUESTIONS[i];
     try{
-     const res=await fetch(SUPABASE_URL.replace(/\\/$/,'')+'/functions/v1/ask-garment-data',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_PUBLIC_KEY,'Authorization':'Bearer '+session.access_token,'Accept':'application/json'},body:JSON.stringify({question,filters:{year:'',country:''}})});
+     const res=await fetch(SUPABASE_URL.replace(/\/$/,'')+'/functions/v1/ask-garment-data',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_PUBLIC_KEY,'Authorization':'Bearer '+session.access_token,'Accept':'application/json'},body:JSON.stringify({question,filters:{year:'',country:''}})});
      let data={};try{data=await res.json()}catch{}const answer=String(data.answer||data.error||'');
      const must=i===16?['roas','profit roi']:i===21?['cannot guarantee','implemented']:i===22?['unavailable','estimate']:i===23?['llm','retrieval','deterministic']:i===24?['llm','rag','deterministic']:i===25?['unverified','trained']:i===28?['missing','needed']:[];
      const missing=must.filter(term=>!answer.toLowerCase().includes(term));
