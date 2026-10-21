@@ -302,7 +302,7 @@ Deno.serve(async (req: Request) => {
     // Deterministic date coverage and annual peak-month checks. Never ask the LLM to
     // guess whether a month exists or to substitute a different year for a missing period.
     const asksTrend = /\b(trend|over time|month by month|monthly pattern|month-wise|month wise|historical pattern)\b/i.test(question);
-    const coverageQuestion = /\b(date coverage|month coverage|data coverage|available period|earliest month|latest month|earliest date|latest date|date range|missing month|unavailable month|missing data|unavailable data|unavailable revenue|not present in the database|do not invent|fabricate)\b/i.test(question) && !asksTrend;
+    const coverageQuestion = /\b(date coverage|month coverage|data coverage|available period|earliest month|latest month|earliest date|latest date|date range|missing month|unavailable month|missing data|unavailable data|unavailable revenue|not present in the database|do not invent|fabricate|specific revenue figure|metric is unavailable|required month or metric|next data needed|what is missing)\b/i.test(question) && !asksTrend;
     const peakYear = question.match(/20[0-9]{2}/)?.[0] ?? "";
     const annualPeakQuestion = !!peakYear
       && /\b(highest|highest-revenue|peak|top)\b/i.test(question)
