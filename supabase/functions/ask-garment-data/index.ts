@@ -135,6 +135,60 @@ Deno.serve(async (req: Request) => {
       return respond({ error: "Could not verify AI request quota. Please retry." }, 503, origin);
     }
     if (quotaAllowed !== true) return respond({ error: "Request burst limit reached (60 per minute per approved account). Please retry shortly." }, 429, origin);
+    // Deterministic KPI and country comparison route; compute from all raw order pages.
+    const normalizedKpiQ = question.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\u0B80-\u0BFF ]+/g, " ").replace(/\s+/g, " ").trim();
+    const asksTamil = /[\u0B80-\u0BFF]/.test(question);
+    const asksComparison = /\b(compare|comparison|versus|vs|difference)\b/.test(normalizedKpiQ) || /ஒப்பிட|ஒப்பீடு/.test(question);
+    const asksRanking = /\b(rank|ranking|ranked|top|highest|lowest|sort|list|best|most profitable)\b/.test(normalizedKpiQ);
+    const countryAliases: Record<string,string> = { "usa":"USA","united states":"USA","america":"USA","germany":"Germany","uae":"UAE","united arab emirates":"UAE","uk":"UK","united kingdom":"UK","france":"France","spain":"Spain","italy":"Italy","netherlands":"Netherlands","sweden":"Sweden","canada":"Canada","japan":"Japan","australia":"Australia" };
+    const mentionedCountries = Object.entries(countryAliases).filter(([alias]) => (" " + normalizedKpiQ + " ").includes(" " + alias + " ")).map(([,country])=>country);
+    const uniqueCountries = [...new Set(mentionedCountries)];
+    const asksCoreKpi = !asksRanking && /\b(total revenue|total sales|total recorded profit|recorded profit|weighted profit margin|profit margin|total recorded cost|total cost|total expenses|average revenue per order|average revenue|distinct order count|distinct orders|number of orders|total orders|numerator|denominator|formula)\b/.test(normalizedKpiQ);
+    if ((asksCoreKpi || (asksComparison && uniqueCountries.length >= 2 && /\b(revenue|sales|profit|orders|margin|cost|வருவாய்|விற்பனை|லாபம்|ஆர்டர்|மார்ஜின்)\b/.test(normalizedKpiQ))) && !/\b(product|buyer|supplier|marketing|production|channel|style|category|month|monthly|trend|forecast)\b/.test(normalizedKpiQ)) {
+      const factRows: Record<string, unknown>[] = [];
+      const pageSize = 1000;
+      for (let offset = 0; ; offset += pageSize) {
+        const page = await db.from("fact_orders").select("order_id,order_date,country,revenue_inr,total_cost_inr,profit_inr").order("order_id", { ascending: true }).range(offset, offset + pageSize - 1);
+        if (page.error) {
+          console.error("Deterministic KPI query failed:", page.error.message);
+          return respond({ error: "Could not calculate the requested KPI from all raw order records. Please retry." }, 502, origin);
+        }
+        const rows = (page.data ?? []) as Record<string, unknown>[];
+        factRows.push(...rows);
+        if (rows.length < pageSize) break;
+      }
+      const aggregate = (rows: Record<string, unknown>[]) => {
+        const orderIds = new Set(rows.map(r => txt(r.order_id).trim()).filter(Boolean));
+        const revenue = sum(rows, "revenue_inr"), cost = sum(rows, "total_cost_inr"), profit = sum(rows, "profit_inr");
+        return { revenue, cost, profit, orders: orderIds.size, margin: revenue !== 0 ? profit / revenue * 100 : null, averageOrderRevenue: orderIds.size ? revenue / orderIds.size : null, reconciliation: revenue - cost - profit };
+      };
+      const scopedRows = uniqueCountries.length === 1 && !asksComparison
+        ? factRows.filter(r => txt(r.country).trim().toLowerCase() === uniqueCountries[0].toLowerCase())
+        : factRows;
+      const all = aggregate(scopedRows);
+      const scopeLabel = uniqueCountries.length === 1 && !asksComparison ? " Country filter applied: " + uniqueCountries[0] + "." : "";
+      const currency = (n: number | null) => n === null ? "N/A" : formatINR(n);
+      if (asksComparison && uniqueCountries.length >= 2) {
+        const countryRows = uniqueCountries.map(country => ({ country, ...aggregate(factRows.filter(r => txt(r.country).trim().toLowerCase() === country.toLowerCase())) }));
+        const metrics = [["Revenue","revenue"],["Recorded profit","profit"],["Distinct orders","orders"],["Weighted profit margin","margin"]] as const;
+        const fmt = (key: typeof metrics[number][1], n: number) => key === "orders" ? n.toLocaleString("en-IN") : key === "margin" ? n.toFixed(2) + "%" : currency(n);
+        const comparisonLines = metrics.map(([label,key]) => {
+          const sorted = [...countryRows].sort((a,b) => (b[key] ?? -Infinity) - (a[key] ?? -Infinity));
+          const lead = sorted[0], second = sorted[1], difference = (lead[key] ?? 0) - (second[key] ?? 0);
+          return label + ": " + countryRows.map(r => r.country + " " + fmt(key, r[key] ?? 0)).join("; ") + ". Lead: " + lead.country + "; absolute difference: " + fmt(key, difference) + ".";
+        });
+        const answer = asksTamil
+          ? "நேரடி fact_orders பதிவுகள்: " + factRows.length.toLocaleString("en-IN") + ". " + comparisonLines.map(line => line.replace("Revenue:", "வருவாய்:").replace("Recorded profit:", "பதிவான லாபம்:").replace("Distinct orders:", "தனித்த ஆர்டர்கள்:").replace("Weighted profit margin:", "எடையிட்ட லாப விகிதம்:").replace(". Lead:", ". முன்னிலை:").replace("; absolute difference:", "; முழு வேறுபாடு:")).join(" ")
+          : "Country comparison from " + factRows.length.toLocaleString("en-IN") + " raw fact-order rows. " + comparisonLines.join(" ");
+        return respond({ answer, countryComparison: countryRows.map(r => ({country:r.country,revenue_inr:r.revenue,cost_inr:r.cost,profit_inr:r.profit,distinct_orders:r.orders,weighted_profit_margin_pct:r.margin})), sources:[{name:"fact_orders",records:factRows.length,note:"all pages read; distinct order IDs deduplicated; weighted margin = sum(profit) / sum(revenue) × 100"}], question },200,origin);
+      }
+      const parts = ["Total revenue: " + currency(all.revenue), "Total recorded profit: " + currency(all.profit), "Total recorded cost: " + currency(all.cost), "Distinct order count: " + all.orders.toLocaleString("en-IN"), "Weighted profit margin = SUM(recorded profit) / SUM(revenue) × 100 = " + currency(all.profit) + " / " + currency(all.revenue) + " × 100 = " + (all.margin === null ? "N/A (zero revenue)" : all.margin.toFixed(2) + "%"), "Average revenue per distinct order = " + currency(all.revenue) + " / " + all.orders.toLocaleString("en-IN") + " = " + currency(all.averageOrderRevenue), "Reconciliation check: revenue - cost - recorded profit = " + currency(all.reconciliation) + (Math.abs(all.reconciliation) <= 0.01 ? " (matches within ₹0.01 tolerance)." : " (does not reconcile; investigate source definitions or data).")];
+      const answer = asksTamil
+        ? "முழு raw order data (" + factRows.length.toLocaleString("en-IN") + " பதிவுகள்) அடிப்படையில்: மொத்த வருவாய் " + currency(all.revenue) + "; பதிவான லாபம் " + currency(all.profit) + "; மொத்த செலவு " + currency(all.cost) + "; தனித்த ஆர்டர்கள் " + all.orders.toLocaleString("en-IN") + ". எடையிட்ட லாப விகிதம் = மொத்த பதிவான லாபம் ÷ மொத்த வருவாய் × 100 = " + currency(all.profit) + " ÷ " + currency(all.revenue) + " × 100 = " + (all.margin === null ? "கணக்கிட முடியாது (வருவாய் பூஜ்ஜியம்)" : all.margin.toFixed(2) + "%") + ". ஒரு தனித்த ஆர்டருக்கான சராசரி வருவாய் = " + currency(all.revenue) + " ÷ " + all.orders.toLocaleString("en-IN") + " = " + currency(all.averageOrderRevenue) + ". சரிபார்ப்பு: வருவாய் − செலவு − பதிவான லாபம் = " + currency(all.reconciliation) + (Math.abs(all.reconciliation) <= 0.01 ? " (₹0.01 வரம்புக்குள் பொருந்துகிறது)." : " (பொருந்தவில்லை; source-ஐ ஆய்வு செய்ய வேண்டும்).")
+        : parts.join(" ") + scopeLabel;
+      return respond({ answer, kpis:{revenue_inr:all.revenue,cost_inr:all.cost,recorded_profit_inr:all.profit,distinct_order_count:all.orders,weighted_profit_margin_pct:all.margin,average_revenue_per_order_inr:all.averageOrderRevenue,reconciliation_difference_inr:all.reconciliation,checked_rows:scopedRows.length}, sources:[{name:"fact_orders",records:scopedRows.length,note:"all pages read; " + (uniqueCountries.length === 1 && !asksComparison ? "country-filtered to " + uniqueCountries[0] + "; " : "") + "distinct order IDs counted; margin uses SUM(profit)/SUM(revenue); average revenue uses total revenue/distinct order count"}], question },200,origin);
+    }
+
     // Highest-priority exact route for complete supplier revenue rankings. Keep this outside
     // the retrieval-cache branch so a cached RAG answer cannot override the requested sort.
     const earlyNormalizedQ = question.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/  +/g, " ").trim();
@@ -209,7 +263,7 @@ Deno.serve(async (req: Request) => {
     // Deterministic date coverage and annual peak-month checks. Never ask the LLM to
     // guess whether a month exists or to substitute a different year for a missing period.
     const asksTrend = /\b(trend|over time|month by month|monthly pattern|month-wise|month wise|historical pattern)\b/i.test(question);
-    const coverageQuestion = /\b(date coverage|month coverage|data coverage|available period|earliest month|latest month|earliest date|latest date|date range|missing month|unavailable month)\b/i.test(question) && !asksTrend;
+    const coverageQuestion = /\b(date coverage|month coverage|data coverage|available period|earliest month|latest month|earliest date|latest date|date range|missing month|unavailable month|missing data|unavailable data|unavailable revenue|not present in the database|do not invent|fabricate)\b/i.test(question) && !asksTrend;
     const peakYear = question.match(/20[0-9]{2}/)?.[0] ?? "";
     const annualPeakQuestion = !!peakYear
       && /\b(highest|highest-revenue|peak|top)\b/i.test(question)
@@ -400,10 +454,16 @@ Deno.serve(async (req: Request) => {
         const rankedGroups = aggregateProductGroups(rows, metric);
         const top = rankedGroups[0];
         const metricLabel = metric === "profit_inr" ? "recorded profit" : "revenue";
+        const revenueLeader = [...rankedGroups].sort((a,b)=>b.revenue_inr-a.revenue_inr)[0];
+        const profitLeader = [...rankedGroups].sort((a,b)=>b.profit_inr-a.profit_inr)[0];
+        const sameLeader = revenueLeader.product_category === profitLeader.product_category;
         const answer = "Highest " + metricLabel + " product group: " + top.product_category + ". Combined revenue: " + formatINR(top.revenue_inr)
           + "; combined recorded profit: " + formatINR(top.profit_inr) + "; weighted profit margin: " + top.profit_margin_pct.toFixed(2)
           + "%; styles included: " + top.style_count + ". It ranks first because the sum of the included styles' " + metricLabel
-          + " is the highest among the returned product groups. Revenue and margin help explain the result, but this data alone does not establish a causal reason.";
+          + " is the highest among the returned product groups. Highest-revenue group: " + revenueLeader.product_category + " (" + formatINR(revenueLeader.revenue_inr)
+          + "); highest-profit group: " + profitLeader.product_category + " (" + formatINR(profitLeader.profit_inr) + "). "
+          + (sameLeader ? "The same group ranks first for revenue and recorded profit." : "The highest-profit group is not the highest-revenue group.")
+          + " Rankings are based on complete retrieved product-group aggregates; this data alone does not establish a causal reason.";
         return respond({
           answer,
           rankingTable: {
