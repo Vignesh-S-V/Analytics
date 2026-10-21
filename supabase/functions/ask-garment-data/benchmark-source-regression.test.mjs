@@ -25,3 +25,11 @@ test("three-area investigation request uses deterministic complete-view rankings
   assert.match(source, /This line was selected by rework cost, not by overtime/);
   assert.match(source, /complete buyer view; sorted by recorded late penalties/);
 });
+
+test("monthly-average wording does not bypass deterministic average-revenue KPI routing", () => {
+  const route = source.match(/if \(\(asksCoreKpi[\s\S]{0,260}\) \{/);
+  assert.ok(route, "deterministic core KPI route should exist");
+  assert.match(source, /average revenue per order\|average revenue/);
+  assert.match(route[0], /category\|month\|trend\|forecast/);
+  assert.doesNotMatch(route[0], /category\|month\|monthly\|trend\|forecast/);
+});
