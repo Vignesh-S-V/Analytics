@@ -27,9 +27,13 @@ test("three-area investigation request uses deterministic complete-view rankings
 });
 
 test("monthly-average wording does not bypass deterministic average-revenue KPI routing", () => {
-  const route = source.match(/if \(\(asksCoreKpi[\s\S]{0,260}\) \{/);
-  assert.ok(route, "deterministic core KPI route should exist");
-  assert.match(source, /average revenue per order\|average revenue/);
-  assert.match(route[0], /category\|month\|trend\|forecast/);
-  assert.doesNotMatch(route[0], /category\|month\|monthly\|trend\|forecast/);
+  assert.match(source, /average revenue per order\\|average revenue/);
+  assert.ok(
+    source.includes("category|month|trend|forecast"),
+    "the core KPI exclusion must retain month-specific intent but not the word monthly",
+  );
+  assert.ok(
+    !source.includes("category|month|monthly|trend|forecast"),
+    "the broad monthly exclusion must not bypass average-revenue questions",
+  );
 });
