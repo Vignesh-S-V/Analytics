@@ -25,3 +25,15 @@ test("three-area investigation request uses deterministic complete-view rankings
   assert.match(source, /This line was selected by rework cost, not by overtime/);
   assert.match(source, /complete buyer view; sorted by recorded late penalties/);
 });
+
+test("monthly-average wording does not bypass deterministic average-revenue KPI routing", () => {
+  assert.match(source, /average revenue per order\\|average revenue/);
+  assert.ok(
+    source.includes("category|month|trend|forecast"),
+    "the core KPI exclusion must retain month-specific intent but not the word monthly",
+  );
+  assert.ok(
+    !source.includes("category|month|monthly|trend|forecast"),
+    "the broad monthly exclusion must not bypass average-revenue questions",
+  );
+});
