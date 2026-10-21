@@ -284,6 +284,21 @@ Deno.serve(async (req: Request) => {
       return respond({ answer, sources: [{ name: "supabase/functions/ask-garment-data/index.ts", records: 1, note: "implementation inspection; no claim that every route has been exhaustively tested" }], question }, 200, origin);
     }
 
+    // Deterministic architecture explanation: avoid LLM-generated unit errors or
+    // unsupported claims about training on workspace data.
+    const asksArchitectureEvidence = /\b(llm|rag|retrieval augmented generation|deterministic sql analytics|trained using rlhf|fine tuning|fine-tuning|custom transformer|how this ask ai application answers|how this application works)\b/i.test(question)
+      && /\b(application|workspace|demonstrably|evidence|trained|sql|rag|architecture|assistant|model)\b/i.test(question);
+    if (asksArchitectureEvidence) {
+      const answer = [
+        "LLM: a language model generates and formats natural-language responses; this is general model knowledge, not evidence that the model was trained on this workspace.",
+        "Retrieval: the verified code queries Supabase analytics views and supplies retrieved rows/context to the response workflow. This is retrieval-grounded answering; call it RAG only in the broad sense that external retrieved data is used with generation, not as proof of a separate vector-search system.",
+        "Deterministic analytics: verified code paths calculate core revenue, recorded profit, distinct orders and weighted margin from database rows; weighted margin is SUM(recorded profit) / SUM(revenue) × 100. Other questions may still use a general retrieval/LLM path and can make mistakes.",
+        "Training: the inspected application code does not establish that the workspace dataset was used to train or fine-tune the model, nor does it prove RLHF or a custom transformer. Those claims are unverified and should not be made.",
+        "Unit check: the verified all-time revenue is about ₹699.85 crore (₹6,998,511,331), not ₹6,998.51 crore; the latter is a 10× unit error."
+      ].join(" ");
+      return respond({ answer, sources: [{ name: "supabase/functions/ask-garment-data/index.ts", records: 1, note: "implementation route and formulas inspected; training claims not inferred" }], question }, 200, origin);
+    }
+
     // Deterministic date coverage and annual peak-month checks. Never ask the LLM to
     // guess whether a month exists or to substitute a different year for a missing period.
     const asksTrend = /\b(trend|over time|month by month|monthly pattern|month-wise|month wise|historical pattern)\b/i.test(question);
@@ -340,6 +355,7 @@ Deno.serve(async (req: Request) => {
           }
         }
         const asksUnavailableMonthDemo = /\b(revenue for a month|month that is not present|unavailable month|month is not present|never estimate|never fabricate|not present in the database)\b/i.test(question);
+        const asksMissingEvidenceNextSteps = /\b(specific revenue figure|metric is unavailable|what is missing|next data needed|do not invent a number|required month or metric)\b/i.test(question);
         const answer = availableMonths.length
           ? "Verified monthly coverage: " + availableMonths[0] + " to " + availableMonths[availableMonths.length - 1]
             + "; " + availableMonths.length + " distinct months present."
@@ -347,6 +363,9 @@ Deno.serve(async (req: Request) => {
             + (asksUnavailableMonthDemo
               ? " Example check: " + (() => { const end = availableMonths[availableMonths.length - 1].split("-").map(Number); const next = end[1] === 12 ? (end[0] + 1) + "-01" : end[0] + "-" + String(end[1] + 1).padStart(2, "0"); return next; })()
                 + " is outside the verified monthly coverage, so its revenue is unavailable in this source; no estimate is made. If the source is later extended, re-check this month before treating it as missing."
+              : "")
+            + (asksMissingEvidenceNextSteps
+              ? " Evidence limitation: I will not invent a revenue figure. To calculate it, provide the exact YYYY-MM period, requested metric (revenue or recorded profit), and a source containing records for that period; then verify the matching month key and aggregate the underlying rows."
               : "")
           : "No valid YYYY-MM month keys were returned by the monthly sales view. Date coverage is unavailable.";
         return respond({ answer, sources: [{ name: "vw_sales_monthly_by_country", records: coverageRows.length, note: "all pages read; distinct YYYY-MM keys checked" }], question }, 200, origin);
@@ -982,7 +1001,7 @@ Deno.serve(async (req: Request) => {
         const top=ranked[0];
         const answer=(wantsFullRanking?"Marketing channels ranked by attributed ROAS (highest to lowest):\n"+ranked.map((r,i)=>(i+1)+". "+txt(r.channel)+" — ROAS: "+(r.roas===null?"N/A":r.roas.toFixed(2)+"x")+"; attributed revenue: "+formatINR(num(r.value))+"; spend: "+formatINR(num(r.spend))+"; won orders: "+num(r.orders_won).toLocaleString("en-IN")).join("\n"):"Highest attributed ROAS channel: "+txt(top.channel)+". Attributed order value: "+formatINR(num(top.value))+"; marketing spend: "+formatINR(num(top.spend))+"; ROAS: "+(top.roas===null?"not available":top.roas.toFixed(2)+"x")+"; won orders: "+num(top.orders_won).toLocaleString("en-IN"))
           + (asksProfitRoi?". Profit ROI is unavailable from this view because attributable profit is not included; ROAS is revenue divided by spend, not profit ROI.":". ROAS = attributed revenue / marketing spend; this is not profit ROI.");
-        return respond({answer,rankingTable:{title:"Marketing channel ROAS ranking",subtitle:"Sorted by attributed revenue / marketing spend · "+ranked.length+" channels",columns:[{key:"rank",label:"Rank",type:"number"},{key:"channel",label:"Channel"},{key:"value",label:"Attributed Revenue",type:"currency"},{key:"spend",label:"Marketing Spend",type:"currency"},{key:"roas",label:"ROAS",type:"decimal"},{key:"orders_won",label:"Won Orders",type:"number"}],rows:ranked.map((r,i)=>({rank:i+1,channel:txt(r.channel),value:num(r.value),spend:num(r.spend),roas:r.roas,orders_won:num(r.orders_won)}))},sources:[{name:"vw_marketing_channel_performance",records:(rows??[]).length,note:"grouped by channel; ROAS computed from summed attributed order value / summed spend; profit ROI unavailable from selected fields"}],question},200,origin);
+        return respond({answer,rankingTable:{title:"Marketing channel ROAS ranking",subtitle:"Sorted by attributed revenue / marketing spend · "+ranked.length+" channels"+(asksProfitRoi?" · Profit ROI unavailable: attributable profit is not in this view":""),columns:[{key:"rank",label:"Rank",type:"number"},{key:"channel",label:"Channel"},{key:"value",label:"Attributed Revenue",type:"currency"},{key:"spend",label:"Marketing Spend",type:"currency"},{key:"roas",label:"ROAS",type:"decimal"},{key:"orders_won",label:"Won Orders",type:"number"}],rows:ranked.map((r,i)=>({rank:i+1,channel:txt(r.channel),value:num(r.value),spend:num(r.spend),roas:r.roas,orders_won:num(r.orders_won)}))},sources:[{name:"vw_marketing_channel_performance",records:(rows??[]).length,note:"grouped by channel; ROAS computed from summed attributed order value / summed spend; profit ROI unavailable from selected fields"}],question},200,origin);
       }
     }
     // Metric-aware supplier ranking: select the exact requested measure and direction.
