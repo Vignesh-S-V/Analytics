@@ -138,12 +138,12 @@ Deno.serve(async (req: Request) => {
     // Deterministic KPI and country comparison route; compute from all raw order pages.
     const normalizedKpiQ = question.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\u0B80-\u0BFF ]+/g, " ").replace(/\s+/g, " ").trim();
     const asksTamil = /[\u0B80-\u0BFF]/.test(question);
-    const asksComparison = /\b(compare|comparison|versus|vs|difference|ஒப்பிடு|ஒப்பிடுக|ஒப்பீடு)\b/.test(normalizedKpiQ);
+    const asksComparison = /\\b(compare|comparison|versus|vs|difference)\\b/.test(normalizedKpiQ) || /ஒப்பிட|ஒப்பீடு/.test(question);
     const asksRanking = /\b(rank|ranking|ranked|top|highest|lowest|sort|list|best|most profitable)\b/.test(normalizedKpiQ);
     const countryAliases: Record<string,string> = { "usa":"USA","united states":"USA","america":"USA","germany":"Germany","uae":"UAE","united arab emirates":"UAE","uk":"UK","united kingdom":"UK","france":"France","spain":"Spain","italy":"Italy","netherlands":"Netherlands","sweden":"Sweden","canada":"Canada","japan":"Japan","australia":"Australia" };
     const mentionedCountries = Object.entries(countryAliases).filter(([alias]) => (" " + normalizedKpiQ + " ").includes(" " + alias + " ")).map(([,country])=>country);
     const uniqueCountries = [...new Set(mentionedCountries)];
-    const asksCoreKpi = !asksRanking && /\b(total revenue|total sales|total recorded profit|recorded profit|weighted profit margin|profit margin|total cost|total expenses|average revenue per order|average revenue|distinct order count|distinct orders|number of orders|total orders|numerator|denominator|formula)\b/.test(normalizedKpiQ);
+    const asksCoreKpi = !asksRanking && /\b(total revenue|total sales|total recorded profit|recorded profit|weighted profit margin|profit margin|total recorded cost|total cost|total expenses|average revenue per order|average revenue|distinct order count|distinct orders|number of orders|total orders|numerator|denominator|formula)\b/.test(normalizedKpiQ);
     if ((asksCoreKpi || (asksComparison && uniqueCountries.length >= 2 && /\b(revenue|sales|profit|orders|margin|cost|வருவாய்|விற்பனை|லாபம்|ஆர்டர்|மார்ஜின்)\b/.test(normalizedKpiQ))) && !/\b(product|buyer|supplier|marketing|production|channel|style|category|month|monthly|trend|forecast)\b/.test(normalizedKpiQ)) {
       const factRows: Record<string, unknown>[] = [];
       const pageSize = 1000;
@@ -450,10 +450,16 @@ Deno.serve(async (req: Request) => {
         const rankedGroups = aggregateProductGroups(rows, metric);
         const top = rankedGroups[0];
         const metricLabel = metric === "profit_inr" ? "recorded profit" : "revenue";
+        const revenueLeader = [...rankedGroups].sort((a,b)=>b.revenue_inr-a.revenue_inr)[0];
+        const profitLeader = [...rankedGroups].sort((a,b)=>b.profit_inr-a.profit_inr)[0];
+        const sameLeader = revenueLeader.product_category === profitLeader.product_category;
         const answer = "Highest " + metricLabel + " product group: " + top.product_category + ". Combined revenue: " + formatINR(top.revenue_inr)
           + "; combined recorded profit: " + formatINR(top.profit_inr) + "; weighted profit margin: " + top.profit_margin_pct.toFixed(2)
           + "%; styles included: " + top.style_count + ". It ranks first because the sum of the included styles' " + metricLabel
-          + " is the highest among the returned product groups. Revenue and margin help explain the result, but this data alone does not establish a causal reason.";
+          + " is the highest among the returned product groups. Highest-revenue group: " + revenueLeader.product_category + " (" + formatINR(revenueLeader.revenue_inr)
+          + "); highest-profit group: " + profitLeader.product_category + " (" + formatINR(profitLeader.profit_inr) + "). "
+          + (sameLeader ? "The same group ranks first for revenue and recorded profit." : "The highest-profit group is not the highest-revenue group.")
+          + " Rankings are based on complete retrieved product-group aggregates; this data alone does not establish a causal reason.";
         return respond({
           answer,
           rankingTable: {
