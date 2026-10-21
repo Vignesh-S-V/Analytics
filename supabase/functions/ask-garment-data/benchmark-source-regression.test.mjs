@@ -41,3 +41,8 @@ test("monthly-average wording does not bypass deterministic average-revenue KPI 
 test("average revenue per distinct order displays precise rupee value rather than rounded lakh abbreviation", () => {
   assert.match(source, /Average revenue per distinct order = [\s\S]{0,220}all\.averageOrderRevenue\.toLocaleString\("en-IN", \{ minimumFractionDigits: 2, maximumFractionDigits: 2 \}\)/);
 });
+
+
+test("Tamil average revenue per distinct order also displays precise rupee value", () => {
+  assert.match(source, /ஒரு தனித்த ஆர்டருக்கான சராசரி வருவாய்[\s\S]{0,260}all\.averageOrderRevenue\.toLocaleString\("en-IN", \{ minimumFractionDigits: 2, maximumFractionDigits: 2 \}\)/);
+});
