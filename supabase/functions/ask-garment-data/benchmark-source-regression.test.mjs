@@ -37,3 +37,7 @@ test("monthly-average wording does not bypass deterministic average-revenue KPI 
     "the broad monthly exclusion must not bypass average-revenue questions",
   );
 });
+
+test("average revenue per distinct order displays precise rupee value rather than rounded lakh abbreviation", () => {
+  assert.match(source, /Average revenue per distinct order = [\s\S]{0,220}all\.averageOrderRevenue\.toLocaleString\("en-IN", \{ minimumFractionDigits: 2, maximumFractionDigits: 2 \}\)/);
+});
