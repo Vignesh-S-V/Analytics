@@ -138,7 +138,7 @@ Deno.serve(async (req: Request) => {
     // Deterministic KPI and country comparison route; compute from all raw order pages.
     const normalizedKpiQ = question.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\u0B80-\u0BFF ]+/g, " ").replace(/\s+/g, " ").trim();
     const asksTamil = /[\u0B80-\u0BFF]/.test(question);
-    const asksComparison = /\\b(compare|comparison|versus|vs|difference)\\b/.test(normalizedKpiQ) || /ஒப்பிட|ஒப்பீடு/.test(question);
+    const asksComparison = /\b(compare|comparison|versus|vs|difference)\b/.test(normalizedKpiQ) || /ஒப்பிட|ஒப்பீடு/.test(question);
     const asksRanking = /\b(rank|ranking|ranked|top|highest|lowest|sort|list|best|most profitable)\b/.test(normalizedKpiQ);
     const countryAliases: Record<string,string> = { "usa":"USA","united states":"USA","america":"USA","germany":"Germany","uae":"UAE","united arab emirates":"UAE","uk":"UK","united kingdom":"UK","france":"France","spain":"Spain","italy":"Italy","netherlands":"Netherlands","sweden":"Sweden","canada":"Canada","japan":"Japan","australia":"Australia" };
     const mentionedCountries = Object.entries(countryAliases).filter(([alias]) => (" " + normalizedKpiQ + " ").includes(" " + alias + " ")).map(([,country])=>country);
@@ -162,7 +162,11 @@ Deno.serve(async (req: Request) => {
         const revenue = sum(rows, "revenue_inr"), cost = sum(rows, "total_cost_inr"), profit = sum(rows, "profit_inr");
         return { revenue, cost, profit, orders: orderIds.size, margin: revenue !== 0 ? profit / revenue * 100 : null, averageOrderRevenue: orderIds.size ? revenue / orderIds.size : null, reconciliation: revenue - cost - profit };
       };
-      const all = aggregate(factRows);
+      const scopedRows = uniqueCountries.length === 1 && !asksComparison
+        ? factRows.filter(r => txt(r.country).trim().toLowerCase() === uniqueCountries[0].toLowerCase())
+        : factRows;
+      const all = aggregate(scopedRows);
+      const scopeLabel = uniqueCountries.length === 1 && !asksComparison ? " Country filter applied: " + uniqueCountries[0] + "." : "";
       const currency = (n: number | null) => n === null ? "N/A" : formatINR(n);
       if (asksComparison && uniqueCountries.length >= 2) {
         const countryRows = uniqueCountries.map(country => ({ country, ...aggregate(factRows.filter(r => txt(r.country).trim().toLowerCase() === country.toLowerCase())) }));
@@ -181,8 +185,8 @@ Deno.serve(async (req: Request) => {
       const parts = ["Total revenue: " + currency(all.revenue), "Total recorded profit: " + currency(all.profit), "Total recorded cost: " + currency(all.cost), "Distinct order count: " + all.orders.toLocaleString("en-IN"), "Weighted profit margin = SUM(recorded profit) / SUM(revenue) × 100 = " + currency(all.profit) + " / " + currency(all.revenue) + " × 100 = " + (all.margin === null ? "N/A (zero revenue)" : all.margin.toFixed(2) + "%"), "Average revenue per distinct order = " + currency(all.revenue) + " / " + all.orders.toLocaleString("en-IN") + " = " + currency(all.averageOrderRevenue), "Reconciliation check: revenue - cost - recorded profit = " + currency(all.reconciliation) + (Math.abs(all.reconciliation) <= 0.01 ? " (matches within ₹0.01 tolerance)." : " (does not reconcile; investigate source definitions or data).")];
       const answer = asksTamil
         ? "முழு raw order data (" + factRows.length.toLocaleString("en-IN") + " பதிவுகள்) அடிப்படையில்: மொத்த வருவாய் " + currency(all.revenue) + "; பதிவான லாபம் " + currency(all.profit) + "; மொத்த செலவு " + currency(all.cost) + "; தனித்த ஆர்டர்கள் " + all.orders.toLocaleString("en-IN") + ". எடையிட்ட லாப விகிதம் = மொத்த பதிவான லாபம் ÷ மொத்த வருவாய் × 100 = " + currency(all.profit) + " ÷ " + currency(all.revenue) + " × 100 = " + (all.margin === null ? "கணக்கிட முடியாது (வருவாய் பூஜ்ஜியம்)" : all.margin.toFixed(2) + "%") + ". ஒரு தனித்த ஆர்டருக்கான சராசரி வருவாய் = " + currency(all.revenue) + " ÷ " + all.orders.toLocaleString("en-IN") + " = " + currency(all.averageOrderRevenue) + ". சரிபார்ப்பு: வருவாய் − செலவு − பதிவான லாபம் = " + currency(all.reconciliation) + (Math.abs(all.reconciliation) <= 0.01 ? " (₹0.01 வரம்புக்குள் பொருந்துகிறது)." : " (பொருந்தவில்லை; source-ஐ ஆய்வு செய்ய வேண்டும்).")
-        : parts.join(" ");
-      return respond({ answer, kpis:{revenue_inr:all.revenue,cost_inr:all.cost,recorded_profit_inr:all.profit,distinct_order_count:all.orders,weighted_profit_margin_pct:all.margin,average_revenue_per_order_inr:all.averageOrderRevenue,reconciliation_difference_inr:all.reconciliation,checked_rows:factRows.length}, sources:[{name:"fact_orders",records:factRows.length,note:"all pages read; distinct order IDs counted; margin uses SUM(profit)/SUM(revenue); average revenue uses total revenue/distinct order count"}], question },200,origin);
+        : parts.join(" ") + scopeLabel;
+      return respond({ answer, kpis:{revenue_inr:all.revenue,cost_inr:all.cost,recorded_profit_inr:all.profit,distinct_order_count:all.orders,weighted_profit_margin_pct:all.margin,average_revenue_per_order_inr:all.averageOrderRevenue,reconciliation_difference_inr:all.reconciliation,checked_rows:scopedRows.length}, sources:[{name:"fact_orders",records:scopedRows.length,note:"all pages read; " + (uniqueCountries.length === 1 && !asksComparison ? "country-filtered to " + uniqueCountries[0] + "; " : "") + "distinct order IDs counted; margin uses SUM(profit)/SUM(revenue); average revenue uses total revenue/distinct order count"}], question },200,origin);
     }
 
     // Highest-priority exact route for complete supplier revenue rankings. Keep this outside
