@@ -1026,10 +1026,10 @@ Deno.serve(async (req: Request) => {
 
     const allSales = { orders: sum(monthlyCountry, "order_count"), revenue_inr: sum(monthlyCountry, "revenue_inr"), cost_inr: sum(monthlyCountry, "total_cost_inr"), profit_inr: sum(monthlyCountry, "profit_inr"), order_qty: sum(monthlyCountry, "order_qty"), shipped_qty: sum(monthlyCountry, "shipped_qty"), delayed_orders: sum(monthlyCountry, "delayed_order_count") };
     const detectedYear = question.match(/20[0-9]{2}/)?.[0] ?? requestedYear;
-    const monthNames: Record<string,string> = { january:"01",jan:"01",february:"02",feb:"02",march:"03",mar:"03",april:"04",apr:"04",may:"05",june:"06",jun:"06",july:"07",jul:"07",august:"08",aug:"08",september:"09",sep:"09",sept:"09",october:"10",oct:"10",november:"11",nov:"11",december:"12",dec:"12" };
+    const monthNamesByWord: Record<string,string> = { january:"01",jan:"01",february:"02",feb:"02",march:"03",mar:"03",april:"04",apr:"04",may:"05",june:"06",jun:"06",july:"07",jul:"07",august:"08",aug:"08",september:"09",sep:"09",sept:"09",october:"10",oct:"10",november:"11",nov:"11",december:"12",dec:"12" };
     const lower = question.toLowerCase();
     const alphaQuestion = " " + lower.replace(/[^a-z]/g, " ") + " ";
-    const monthEntry = Object.entries(monthNames).find(([name]) => alphaQuestion.includes(" " + name + " "));
+    const monthEntry = Object.entries(monthNamesByWord).find(([name]) => alphaQuestion.includes(" " + name + " "));
     const detectedMonth = monthEntry?.[1] ?? "";
     const countryNames = [...new Set([...countries.map((r)=>txt(r.country)), ...monthlyCountry.map((r)=>txt(r.country))])].filter(Boolean);
     const detectedCountry = countryNames.find((name)=>lower.includes(name.toLowerCase())) ?? requestedCountry;
