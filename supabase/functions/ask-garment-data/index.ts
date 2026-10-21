@@ -157,15 +157,69 @@ Deno.serve(async (req: Request) => {
       return respond({ answer, rankingTable: { title: "Supplier revenue ranking", subtitle: "Highest to lowest · " + ranked.length + " suppliers", columns: [{key:"rank",label:"Rank",type:"number"},{key:"supplier_name",label:"Supplier Name"},{key:"supplier_id",label:"Supplier Code"},{key:"revenue_inr",label:"Linked-Order Revenue",type:"currency"},{key:"linked_order_count",label:"Linked Orders",type:"number"},{key:"avg_delay_days",label:"Average Delay (Days)",type:"decimal"},{key:"quality_rating",label:"Quality Rating (/5)",type:"decimal"}], rows: ranked.map((r,i)=>({rank:i+1,supplier_name:txt(r.supplier_name),supplier_id:txt(r.supplier_id),revenue_inr:num(r.linked_order_revenue_inr),linked_order_count:num(r.linked_order_count),avg_delay_days:num(r.avg_delay_days),quality_rating:num(r.quality_rating)})) }, sources: [{ name: "vw_supplier_scorecard", records: rows.length, note: "complete supplier scorecard rows sorted descending by linked_order_revenue_inr" }], question }, 200, origin);
     }
 
+    // Deterministic raw-fact data quality checks: all pages, explicit checks only.
+    const asksDataQuality = /\b(data quality|data validation|validate the data|missing values|duplicate order|duplicate ids|invalid dates|negative revenue|negative profit|inconsistent totals|integrity check|quality checks)\b/i.test(question)
+      || /காணாமல் போன மதிப்புகள்|நகல் ஆர்டர்|தரவு சரிபார்ப்பு|தரவு தரம்/.test(question);
+    if (asksDataQuality) {
+      const auditRows: Record<string, unknown>[] = [];
+      const auditPageSize = 1000;
+      for (let offset = 0; ; offset += auditPageSize) {
+        const page = await db.from("fact_orders")
+          .select("order_id,order_date,ship_due_date,actual_ship_date,buyer_id,country,revenue_inr,total_cost_inr,profit_inr,profit_margin_pct,order_qty,rejection_qty,shipped_qty")
+          .order("order_id", { ascending: true })
+          .range(offset, offset + auditPageSize - 1);
+        if (page.error) {
+          console.error("Raw fact data quality audit failed:", page.error.message);
+          return respond({ error: "Could not complete the raw-order data quality audit. Please retry." }, 502, origin);
+        }
+        const rows = (page.data ?? []) as Record<string, unknown>[];
+        auditRows.push(...rows);
+        if (rows.length < auditPageSize) break;
+      }
+      const requiredFields = ["order_id", "order_date", "buyer_id", "country", "revenue_inr", "total_cost_inr", "profit_inr"];
+      const missingByField = requiredFields.map(field => ({
+        field,
+        count: auditRows.filter(row => row[field] === null || row[field] === undefined || String(row[field]).trim() === "").length,
+      }));
+      const ids = new Map<string, number>();
+      for (const row of auditRows) {
+        const id = txt(row.order_id).trim();
+        if (id) ids.set(id, (ids.get(id) ?? 0) + 1);
+      }
+      const duplicateIds = [...ids.values()].filter(count => count > 1).reduce((total, count) => total + count - 1, 0);
+      const negativeRevenue = auditRows.filter(row => row.revenue_inr !== null && num(row.revenue_inr) < 0).length;
+      const negativeProfit = auditRows.filter(row => row.profit_inr !== null && num(row.profit_inr) < 0).length;
+      const negativeCost = auditRows.filter(row => row.total_cost_inr !== null && num(row.total_cost_inr) < 0).length;
+      const inconsistentProfitFormula = auditRows.filter(row => row.revenue_inr !== null && row.total_cost_inr !== null && row.profit_inr !== null
+        && Math.abs(num(row.revenue_inr) - num(row.total_cost_inr) - num(row.profit_inr)) > 0.01).length;
+      const impossibleDateOrder = auditRows.filter(row => {
+        const orderDate = txt(row.order_date), shipDate = txt(row.actual_ship_date), dueDate = txt(row.ship_due_date);
+        return (!!orderDate && !!shipDate && shipDate < orderDate) || (!!orderDate && !!dueDate && dueDate < orderDate);
+      }).length;
+      const answer = "Raw fact-order data quality audit completed on " + auditRows.length.toLocaleString("en-IN") + " retrieved rows (all pages read). "
+        + "Missing/null/blank counts by required field: " + missingByField.map(field => field.field + "=" + field.count.toLocaleString("en-IN")).join(", ") + ". "
+        + "Duplicate order IDs (extra occurrences): " + duplicateIds.toLocaleString("en-IN") + ". "
+        + "Negative revenue rows: " + negativeRevenue.toLocaleString("en-IN") + "; negative cost rows: " + negativeCost.toLocaleString("en-IN") + "; negative recorded-profit rows: " + negativeProfit.toLocaleString("en-IN") + ". "
+        + "Rows where revenue - total cost differs from recorded profit by more than ₹0.01: " + inconsistentProfitFormula.toLocaleString("en-IN") + ". "
+        + "Rows with actual ship date before order date or due date before order date: " + impossibleDateOrder.toLocaleString("en-IN") + ". "
+        + "This checks only the listed fields and rules; it does not guarantee that every business rule or source value is correct.";
+      return respond({ answer, audit: { checked_rows: auditRows.length, missing_by_field: missingByField, duplicate_order_id_extra_occurrences: duplicateIds, negative_revenue_rows: negativeRevenue, negative_cost_rows: negativeCost, negative_profit_rows: negativeProfit, revenue_minus_cost_profit_mismatches: inconsistentProfitFormula, impossible_date_order_rows: impossibleDateOrder, all_pages_read: true }, sources: [{ name: "fact_orders", records: auditRows.length, note: "raw transaction rows paginated and checked" }], question }, 200, origin);
+    }
+
     // Deterministic date coverage and annual peak-month checks. Never ask the LLM to
     // guess whether a month exists or to substitute a different year for a missing period.
     const asksTrend = /\b(trend|over time|month by month|monthly pattern|month-wise|month wise|historical pattern)\b/i.test(question);
-    const coverageQuestion = /\b(date coverage|month coverage|data coverage|available period|earliest month|latest month|earliest date|latest date|date range)\b/i.test(question) && !asksTrend;
+    const coverageQuestion = /\b(date coverage|month coverage|data coverage|available period|earliest month|latest month|earliest date|latest date|date range|missing month|unavailable month)\b/i.test(question) && !asksTrend;
     const peakYear = question.match(/20[0-9]{2}/)?.[0] ?? "";
     const annualPeakQuestion = !!peakYear
       && /\b(highest|highest-revenue|peak|top)\b/i.test(question)
       && /\b(month|revenue|sales)\b/i.test(question);
-    if (coverageQuestion || annualPeakQuestion) {
+    const monthNames: Record<string,string> = { january:"01", jan:"01", february:"02", feb:"02", march:"03", mar:"03", april:"04", apr:"04", may:"05", june:"06", jun:"06", july:"07", jul:"07", august:"08", aug:"08", september:"09", sep:"09", october:"10", oct:"10", november:"11", nov:"11", december:"12", dec:"12" };
+    const monthNameMatch = normalizedQ.match(/\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|october|oct|november|nov|december|dec)\b/);
+    const numericMonthMatch = question.match(/\b(20[0-9]{2})[-/](0[1-9]|1[0-2])\b/);
+    const exactMonthKey = numericMonthMatch ? numericMonthMatch[1] + "-" + numericMonthMatch[2] : (monthNameMatch && peakYear ? peakYear + "-" + monthNames[monthNameMatch[1]] : "");
+    const asksSpecificMonth = !!exactMonthKey && /\b(revenue|sales|month|data|records|available|missing|unavailable)\b/i.test(question);
+    if (coverageQuestion || annualPeakQuestion || asksSpecificMonth) {
       const coverageRows: Record<string, unknown>[] = [];
       const pageSize = 1000;
       for (let offset = 0; ; offset += pageSize) {
@@ -182,6 +236,16 @@ Deno.serve(async (req: Request) => {
         if (rows.length < pageSize) break;
       }
       const availableMonths = [...new Set(coverageRows.map(monthOf).filter(m => /^20\d{2}-\d{2}$/.test(m)))].sort();
+      if (asksSpecificMonth && !coverageQuestion && !annualPeakQuestion) {
+        const matchingRows = coverageRows.filter(row => monthOf(row) === exactMonthKey);
+        if (!matchingRows.length) {
+          const answer = "No monthly sales records were found for " + exactMonthKey + ". Verified available coverage in this source is "
+            + (availableMonths.length ? availableMonths[0] + " to " + availableMonths[availableMonths.length - 1] : "unavailable")
+            + ". Revenue is unavailable for this month; no estimate has been made.";
+          return respond({ answer, sources: [{ name: "vw_sales_monthly_by_country", records: coverageRows.length, note: "all pages read; exact requested YYYY-MM key checked" }], question }, 200, origin);
+        }
+        return respond({ answer: "Verified month " + exactMonthKey + ": revenue " + formatINR(sum(matchingRows, "revenue_inr")) + "; recorded profit " + formatINR(sum(matchingRows, "profit_inr")) + "; summed monthly country order counts " + sum(matchingRows, "order_count").toLocaleString("en-IN") + ".", sources: [{ name: "vw_sales_monthly_by_country", records: matchingRows.length, note: "all country rows for exact requested month" }], question }, 200, origin);
+      }
       if (coverageQuestion && !annualPeakQuestion) {
         const gaps: string[] = [];
         if (availableMonths.length) {
