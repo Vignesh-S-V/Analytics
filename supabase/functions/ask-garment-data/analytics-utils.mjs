@@ -12,7 +12,7 @@ export function detectProductRankingIntent(normalizedQ) {
     || /\bwhich product group\b/.test(normalizedQ);
 
   return {
-    metric: explicitProfitRank && !explicitRevenueRank ? "profit_inr" : "revenue_inr",
+    metric: rankByProfit ? "profit_inr" : "revenue_inr",
     asksGroupTotal,
   };
 }
