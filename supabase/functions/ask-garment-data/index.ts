@@ -4,7 +4,19 @@ import { aggregateProductGroups, detectProductRankingIntent, isCountryComparison
 
 const allowedOrigins = new Set(["https://analytics.vigneshw-5416.workers.dev", "https://analytics-threadiq.onrender.com"]);
 function isAllowedOrigin(origin: string | null) {
-  return !!origin && allowedOrigins.has(origin);
+  if (!origin) return false;
+  if (allowedOrigins.has(origin)) return true;
+  // Codespaces forwards ports through ephemeral hosts. Allow only HTTPS GitHub
+  // forwarded-port hosts ending in a numeric port label; never wildcard arbitrary origins.
+  try {
+    const url = new URL(origin);
+    return url.protocol === "https:"
+      && url.hostname.endsWith(".app.github.dev")
+      && /^[a-z0-9-]+-\d+\.app\.github\.dev$/.test(url.hostname)
+      && !url.port;
+  } catch {
+    return false;
+  }
 }
 let retrievalCache: { createdAt: number; datasets: Record<string, unknown>[][] } | null = null;
 function corsHeaders(origin: string | null) {
@@ -690,7 +702,7 @@ Deno.serve(async (req: Request) => {
         const answer=metric==="rework_cost_inr"
           ?"Highest total rework cost: line "+txt(r.line_id)+" ("+txt(r.unit)+", "+txt(r.specialisation)+"). Rework cost: "+rework+"; rejection rate: "+rejection+"; orders: "+num(r.order_count).toLocaleString("en-IN")+". Ranked across all "+rows.length+" production-line groups."
           :"Highest "+metric.replaceAll("_"," ")+": line "+txt(r.line_id)+" ("+txt(r.unit)+"). "+(metric==="rejection_rate_pct"?"Rejection rate: "+rejection:metric==="overtime_hours"?"Overtime: "+num(r.overtime_hours).toLocaleString("en-IN")+" hours":"Actual efficiency: "+num(r.avg_actual_efficiency_pct).toFixed(2)+"%; target: "+num(r.avg_target_efficiency_pct).toFixed(2)+"%")+".";
-        return respond({answer,rankingTable:{title:"Production line performance",subtitle:"Sorted by "+metric.replaceAll("_"," ")+" · "+ranked.length+" lines",columns:[{key:"rank",label:"Rank",type:"number"},{key:"line_id",label:"Line"},{key:"unit",label:"Unit"},{key:"specialisation",label:"Specialisation"},{key:"order_count",label:"Orders",type:"number"},{key:"rework_cost_inr",label:"Rework Cost",type:"currency"},{key:"rejection_rate_pct",label:"Rejection Rate",type:"percent"},{key:"avg_actual_efficiency_pct",label:"Actual Efficiency",type:"percent"},{key:"avg_target_efficiency_pct",label:"Target Efficiency",type:"percent"},{key:"overtime_hours",label:"Overtime Hours",type:"decimal"}],rows:rows.map((r,i)=>({rank:i+1,line_id:txt(r.line_id),unit:txt(r.unit),specialisation:txt(r.specialisation),order_count:num(r.order_count),rework_cost_inr:num(r.rework_cost_inr),rejection_rate_pct:num(r.rejection_rate_pct),avg_actual_efficiency_pct:num(r.avg_actual_efficiency_pct)*100,avg_target_efficiency_pct:num(r.avg_target_efficiency_pct)*100,overtime_hours:num(r.overtime_hours)}))},sources:[{name:"vw_production_by_line",records:rows.length,note:"all line groups ranked server-side by requested metric"}],question},200,origin);
+        return respond({answer,rankingTable:{title:"Production line performance",subtitle:"Sorted by "+metric.replaceAll("_"," ")+" · "+rows.length+" lines",columns:[{key:"rank",label:"Rank",type:"number"},{key:"line_id",label:"Line"},{key:"unit",label:"Unit"},{key:"specialisation",label:"Specialisation"},{key:"order_count",label:"Orders",type:"number"},{key:"rework_cost_inr",label:"Rework Cost",type:"currency"},{key:"rejection_rate_pct",label:"Rejection Rate",type:"percent"},{key:"avg_actual_efficiency_pct",label:"Actual Efficiency",type:"percent"},{key:"avg_target_efficiency_pct",label:"Target Efficiency",type:"percent"},{key:"overtime_hours",label:"Overtime Hours",type:"decimal"}],rows:rows.map((r,i)=>({rank:i+1,line_id:txt(r.line_id),unit:txt(r.unit),specialisation:txt(r.specialisation),order_count:num(r.order_count),rework_cost_inr:num(r.rework_cost_inr),rejection_rate_pct:num(r.rejection_rate_pct),avg_actual_efficiency_pct:num(r.avg_actual_efficiency_pct)*100,avg_target_efficiency_pct:num(r.avg_target_efficiency_pct)*100,overtime_hours:num(r.overtime_hours)}))},sources:[{name:"vw_production_by_line",records:rows.length,note:"all line groups ranked server-side by requested metric"}],question},200,origin);
       }
     }
 
