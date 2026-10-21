@@ -553,3 +553,6 @@ button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-vis
  .heading-actions select,.filter-button{min-height:38px!important;font-size:10px!important}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.nav-item,.icon-btn,.table-scroll tbody tr{transition:none!important}.nav-item:hover,.icon-btn:hover{transform:none!important}}
+
+/* Keep the Ask AI panel usable on short tablet and landscape viewports. */
+@media(max-width:700px){.ask-ai-chat{min-height:calc(100dvh - 225px)!important;max-height:calc(100dvh - 205px)!important}}
