@@ -187,7 +187,8 @@ Deno.serve(async (req: Request) => {
         const comparisonLines = metrics.map(([label,key]) => {
           const sorted = [...countryRows].sort((a,b) => (b[key] ?? -Infinity) - (a[key] ?? -Infinity));
           const lead = sorted[0], second = sorted[1], difference = (lead[key] ?? 0) - (second[key] ?? 0);
-          return label + ": " + countryRows.map(r => r.country + " " + fmt(key, r[key] ?? 0)).join("; ") + ". Lead: " + lead.country + "; absolute difference: " + fmt(key, difference) + ".";
+          const differenceText = key === "margin" ? Math.abs(difference).toFixed(2) + " percentage points" : fmt(key, Math.abs(difference));
+          return label + ": " + countryRows.map(r => r.country + " " + fmt(key, r[key] ?? 0)).join("; ") + ". Lead: " + lead.country + "; absolute difference: " + differenceText + ".";
         });
         const answer = asksTamil
           ? "நேரடி fact_orders பதிவுகள்: " + factRows.length.toLocaleString("en-IN") + ". " + comparisonLines.map(line => line.replace("Revenue:", "வருவாய்:").replace("Recorded profit:", "பதிவான லாபம்:").replace("Distinct orders:", "தனித்த ஆர்டர்கள்:").replace("Weighted profit margin:", "எடையிட்ட லாப விகிதம்:").replace(". Lead:", ". முன்னிலை:").replace("; absolute difference:", "; முழு வேறுபாடு:")).join(" ")
@@ -990,10 +991,20 @@ Deno.serve(async (req: Request) => {
     }
     const asksChannelEarly=/marketing channel|which channel|best channel|top channel|highest roas|campaign performance|marketing roi|roas/.test(normalizedQ);
     if(asksChannelEarly){
-      const {data:rows,error}=await db.from("vw_marketing_channel_performance").select("channel,marketing_spend_inr,attributed_order_value_inr,orders_won").limit(2000);
-      if(error)return respond({error:"Could not read marketing aggregates from Supabase."},502,origin);
+      const rows: Record<string,unknown>[] = [];
+      const pageSize = 1000;
+      for (let offset = 0; ; offset += pageSize) {
+        const {data:page,error}=await db.from("vw_marketing_channel_performance")
+          .select("channel,marketing_spend_inr,attributed_order_value_inr,orders_won")
+          .order("month",{ascending:true}).order("channel",{ascending:true})
+          .range(offset,offset+pageSize-1);
+        if(error)return respond({error:"Could not read complete marketing aggregates from Supabase."},502,origin);
+        const pageRows=(page??[]) as Record<string,unknown>[];
+        rows.push(...pageRows);
+        if(pageRows.length < pageSize) break;
+      }
       const grouped=new Map<string,Record<string,unknown>>();
-      for(const row of (rows??[]) as Record<string,unknown>[]){const channel=txt(row.channel)||"Unknown";const v=grouped.get(channel)??{channel,spend:0,value:0,orders_won:0};v.spend=num(v.spend)+num(row.marketing_spend_inr);v.value=num(v.value)+num(row.attributed_order_value_inr);v.orders_won=num(v.orders_won)+num(row.orders_won);grouped.set(channel,v);}
+      for(const row of rows){const channel=txt(row.channel)||"Unknown";const v=grouped.get(channel)??{channel,spend:0,value:0,orders_won:0};v.spend=num(v.spend)+num(row.marketing_spend_inr);v.value=num(v.value)+num(row.attributed_order_value_inr);v.orders_won=num(v.orders_won)+num(row.orders_won);grouped.set(channel,v);}
       const ranked=[...grouped.values()].map(r=>({...r,roas:num(r.spend)>0?num(r.value)/num(r.spend):null})).sort((a,b)=>(b.roas??-1)-(a.roas??-1));
       if(ranked.length){
         const asksProfitRoi=/\b(profit roi|roi|return on investment|attributable profit)\b/.test(normalizedQ);
@@ -1189,9 +1200,9 @@ Deno.serve(async (req: Request) => {
     };
     // Deterministic priority answer: rank each complete Supabase view server-side,
     // rather than sorting the generic RAG sample. These two risk metrics remain separate.
-    const asksBusinessAreaPriority = /which business area needs attention first|business area.{0,30}attention|area needs attention first|attention first/.test(normalizedQuestion);
+    const asksBusinessAreaPriority = /which business area needs attention first|business area.{0,30}attention|area needs attention first|attention first|three business areas|business areas worth investigating|identify.{0,40}business areas|business area.{0,30}investigat/.test(normalizedQuestion);
     if (asksBusinessAreaPriority) {
-      const [supplierResult, productionResult, supplierCountResult, productionCountResult, factOrderCountResult] = await Promise.all([
+      const [supplierResult, productionResult, buyerResult, supplierCountResult, productionCountResult, buyerCountResult, factOrderCountResult] = await Promise.all([
         db.from("vw_supplier_scorecard")
           .select("supplier_id,supplier_name,supply_type,avg_delay_days,quality_rating,linked_order_late_penalty_inr")
           .order("linked_order_late_penalty_inr", { ascending: false, nullsFirst: false })
@@ -1200,31 +1211,42 @@ Deno.serve(async (req: Request) => {
           .select("line_id,unit,specialisation,rework_cost_inr,rejection_rate_pct,overtime_hours")
           .order("rework_cost_inr", { ascending: false, nullsFirst: false })
           .limit(1),
+        db.from("vw_sales_by_buyer")
+          .select("buyer_name,country,buyer_tier,revenue_inr,profit_inr,profit_margin_pct,late_penalty_inr")
+          .order("late_penalty_inr", { ascending: false, nullsFirst: false })
+          .limit(2),
         db.from("vw_supplier_scorecard").select("*", { count: "exact", head: true }),
         db.from("vw_production_by_line").select("*", { count: "exact", head: true }),
+        db.from("vw_sales_by_buyer").select("*", { count: "exact", head: true }),
         db.from("fact_orders").select("*", { count: "exact", head: true })
       ]);
-      if (supplierResult.error || productionResult.error || supplierCountResult.error || productionCountResult.error || factOrderCountResult.error) {
-        console.error("Business-area priority query failed:", supplierResult.error?.message ?? productionResult.error?.message ?? supplierCountResult.error?.message ?? productionCountResult.error?.message ?? factOrderCountResult.error?.message);
-        return respond({ error: "Could not rank supplier and production risks from the complete analytics views. Please retry." }, 502, origin);
+      if (supplierResult.error || productionResult.error || buyerResult.error || supplierCountResult.error || productionCountResult.error || buyerCountResult.error || factOrderCountResult.error) {
+        console.error("Business-area priority query failed:", supplierResult.error?.message ?? productionResult.error?.message ?? buyerResult.error?.message ?? supplierCountResult.error?.message ?? productionCountResult.error?.message ?? buyerCountResult.error?.message ?? factOrderCountResult.error?.message);
+        return respond({ error: "Could not rank supplier, production and buyer risks from the complete analytics views. Please retry." }, 502, origin);
       }
       const s = (supplierResult.data ?? [])[0] as Record<string,unknown> | undefined;
       const p = (productionResult.data ?? [])[0] as Record<string,unknown> | undefined;
-      if (!s && !p) return respond({ error: "Supplier and production risk data is unavailable for this request." }, 502, origin);
+      const buyerRows = (buyerResult.data ?? []) as Record<string,unknown>[];
+      const b = buyerRows[0];
+      const nextBuyer = buyerRows[1];
+      if (!s && !p && !b) return respond({ error: "Supplier, production and buyer risk data is unavailable for this request." }, 502, origin);
       const supplierPenalty = s ? num(s.linked_order_late_penalty_inr) : 0;
       const productionRework = p ? num(p.rework_cost_inr) : 0;
+      const buyerPenalty = b ? num(b.late_penalty_inr) : 0;
+      const buyerBaseline = nextBuyer ? "; comparison baseline " + txt(nextBuyer.buyer_name) + " (" + txt(nextBuyer.country) + ") late penalties " + formatINR(num(nextBuyer.late_penalty_inr)) : "";
       const answer = [
-        s ? "Recommended first investigation: supplier delivery risk. Highest linked late-penalty exposure in the supplier scorecard: " + txt(s.supplier_name) + " (" + txt(s.supplier_id) + "), " + formatINR(supplierPenalty) + "; average delay " + num(s.avg_delay_days).toFixed(1) + " days; quality rating " + num(s.quality_rating).toFixed(1) + "/5." : "Supplier scorecard returned no rows.",
-        p ? "Separate production concern: line " + txt(p.line_id) + " (" + txt(p.unit) + "), recorded rework cost " + formatINR(productionRework) + ", rejection rate " + num(p.rejection_rate_pct).toFixed(2) + "% and " + num(p.overtime_hours).toLocaleString("en-IN") + " overtime hours." : "Production-line view returned no rows.",
-        "Decision basis: supplier late penalties are the direct financial exposure used for the first investigation. Production rework is a different metric and is not added to late penalties; these figures alone do not establish causation.",
-        "Scope: ranked all supplier and production-line groups after aggregating their linked orders. The views contain " + num(supplierCountResult.count).toLocaleString("en-IN") + " supplier groups and " + num(productionCountResult.count).toLocaleString("en-IN") + " production-line groups, summarizing " + num(factOrderCountResult.count).toLocaleString("en-IN") + " fact-order rows in the current database. The 20-row counts are grouped entities, not a 20-order sample. No date filter was selected, so this covers the full current database scope, not a date-specific comparison.",
-        "Next action: inspect the named supplier's delayed orders and penalty drivers, and run a separate corrective-action review for the named production line."
+        s ? "Supplier delivery-risk area: " + txt(s.supplier_name) + " (" + txt(s.supplier_id) + ") has the highest linked late-penalty exposure in the supplier scorecard at " + formatINR(supplierPenalty) + "; average delay " + num(s.avg_delay_days).toFixed(1) + " days; quality rating " + num(s.quality_rating).toFixed(1) + "/5. Investigate the delayed orders and penalty drivers; these metrics do not prove supplier-caused delays." : "Supplier scorecard returned no rows.",
+        p ? "Production-quality area: line " + txt(p.line_id) + " (" + txt(p.unit) + ", " + txt(p.specialisation) + ") has the highest recorded rework cost at " + formatINR(productionRework) + "; rejection rate " + num(p.rejection_rate_pct).toFixed(2) + "%; overtime " + num(p.overtime_hours).toLocaleString("en-IN") + " hours. This line was selected by rework cost, not by overtime; inspect causes before attributing them." : "Production-line view returned no rows.",
+        b ? "Buyer fulfillment/penalty area: " + txt(b.buyer_name) + " (" + txt(b.country) + ") has the highest late-penalty amount in the buyer scorecard at " + formatINR(buyerPenalty) + "; revenue " + formatINR(num(b.revenue_inr)) + "; recorded profit " + formatINR(num(b.profit_inr)) + "; recorded margin " + num(b.profit_margin_pct).toFixed(2) + "%" + buyerBaseline + ". Review order-level penalty terms and delivery history; do not assume penalties alone explain the margin." : "Buyer scorecard returned no rows.",
+        "Comparison basis: each area is ranked only within its own complete source view using its named metric. Supplier penalties, production rework and buyer penalties are different measures and must not be added together or treated as directly comparable. These are investigation priorities, not causal findings.",
+        "Scope: " + num(supplierCountResult.count).toLocaleString("en-IN") + " supplier groups; " + num(productionCountResult.count).toLocaleString("en-IN") + " production-line groups; " + num(buyerCountResult.count).toLocaleString("en-IN") + " buyer groups; " + num(factOrderCountResult.count).toLocaleString("en-IN") + " raw fact-order rows. No date filter was selected, so the results cover the current database scope."
       ].join(" ");
       return respond({
         answer,
         sources: [
-          { name: "vw_supplier_scorecard", records: supplierCountResult.count ?? 0, note: "all supplier groups ranked by penalties aggregated across linked fact_orders" },
-          { name: "vw_production_by_line", records: productionCountResult.count ?? 0, note: "all production-line groups ranked by rework aggregated across linked fact_orders" }
+          { name: "vw_supplier_scorecard", records: supplierCountResult.count ?? 0, note: "complete supplier view; sorted by linked-order late penalties" },
+          { name: "vw_production_by_line", records: productionCountResult.count ?? 0, note: "complete production-line view; sorted by recorded rework cost, not overtime" },
+          { name: "vw_sales_by_buyer", records: buyerCountResult.count ?? 0, note: "complete buyer view; sorted by recorded late penalties; second buyer used as a comparison baseline" }
         ],
         question
       }, 200, origin);
