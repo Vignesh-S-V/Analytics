@@ -272,6 +272,18 @@ Deno.serve(async (req: Request) => {
       return respond({ answer, audit: { checked_rows: auditRows.length, missing_by_field: missingByField, duplicate_order_id_extra_occurrences: duplicateIds, negative_revenue_rows: negativeRevenue, negative_cost_rows: negativeCost, negative_profit_rows: negativeProfit, revenue_minus_cost_profit_mismatches: inconsistentProfitFormula, impossible_date_order_rows: impossibleDateOrder, all_pages_read: true }, sources: [{ name: "fact_orders", records: auditRows.length, note: "raw transaction rows paginated and checked" }], question }, 200, origin);
     }
 
+    // Explicitly distinguish implemented safeguards from a guarantee of correctness.
+    const asksGuaranteeControls = /\b(can you guarantee|guarantee that every|every ai answer|controls used to validate|implemented controls|future controls)\b/i.test(question);
+    if (asksGuaranteeControls) {
+      const answer = [
+        "No. The application cannot guarantee that every AI answer is correct.",
+        "Verified implementation controls in this Edge Function: signed-in user validation; active workspace membership check; per-user quota check; strict request-size and content-type checks; origin allow-list; deterministic calculations for core revenue/profit/order KPIs; weighted margin computed as SUM(recorded profit) / SUM(revenue) × 100; pagination for raw fact-order KPI and data-quality reads; explicit monthly-coverage checks; and source names/record counts returned for supported deterministic routes.",
+        "Known limitations: not every question is routed through a deterministic calculation; generic retrieval/LLM answers can still misinterpret intent or source semantics; view-specific branches may have separate row limits; and source attribution does not itself prove that a calculation is correct.",
+        "Recommended future controls, not a claim of current implementation: automated regression tests for the full 30-question benchmark; expected-value assertions against independent SQL; checks for ranking monotonicity and percentage denominators; end-to-end browser tests; and a second validation pass before rendering numeric answers."
+      ].join(" ");
+      return respond({ answer, sources: [{ name: "supabase/functions/ask-garment-data/index.ts", records: 1, note: "implementation inspection; no claim that every route has been exhaustively tested" }], question }, 200, origin);
+    }
+
     // Deterministic date coverage and annual peak-month checks. Never ask the LLM to
     // guess whether a month exists or to substitute a different year for a missing period.
     const asksTrend = /\b(trend|over time|month by month|monthly pattern|month-wise|month wise|historical pattern)\b/i.test(question);
@@ -327,10 +339,15 @@ Deno.serve(async (req: Request) => {
             cursor++;
           }
         }
+        const asksUnavailableMonthDemo = /\b(revenue for a month|month that is not present|unavailable month|month is not present|never estimate|never fabricate|not present in the database)\b/i.test(question);
         const answer = availableMonths.length
           ? "Verified monthly coverage: " + availableMonths[0] + " to " + availableMonths[availableMonths.length - 1]
             + "; " + availableMonths.length + " distinct months present."
             + (gaps.length ? " Missing month keys inside this range: " + gaps.join(", ") + "." : " No missing month keys inside this range.")
+            + (asksUnavailableMonthDemo
+              ? " Example check: " + (() => { const end = availableMonths[availableMonths.length - 1].split("-").map(Number); const next = end[1] === 12 ? (end[0] + 1) + "-01" : end[0] + "-" + String(end[1] + 1).padStart(2, "0"); return next; })()
+                + " is outside the verified monthly coverage, so its revenue is unavailable in this source; no estimate is made. If the source is later extended, re-check this month before treating it as missing."
+              : "")
           : "No valid YYYY-MM month keys were returned by the monthly sales view. Date coverage is unavailable.";
         return respond({ answer, sources: [{ name: "vw_sales_monthly_by_country", records: coverageRows.length, note: "all pages read; distinct YYYY-MM keys checked" }], question }, 200, origin);
       }
