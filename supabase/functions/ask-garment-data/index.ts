@@ -302,7 +302,7 @@ Deno.serve(async (req: Request) => {
         "LLM: a language model generates and formats natural-language responses; this is general model knowledge, not evidence that the model was trained on this workspace.",
         "Retrieval: the verified code queries Supabase analytics views and supplies retrieved rows/context to the response workflow. This is retrieval-grounded answering; call it RAG only in the broad sense that external retrieved data is used with generation, not as proof of a separate vector-search system.",
         "Deterministic analytics: verified code paths calculate core revenue, recorded profit, distinct orders and weighted margin from database rows; weighted margin is SUM(recorded profit) / SUM(revenue) × 100. Other questions may still use a general retrieval/LLM path and can make mistakes.",
-        "Training: the inspected application code does not establish that the workspace dataset was used to train or fine-tune the model, nor does it prove RLHF or a custom transformer. Those claims are unverified and should not be made.",
+        "Training evidence: the inspected application code does not establish that the workspace dataset was used to train or fine-tune the model. No verified implementation evidence was found here for RLHF training or a custom transformer model; therefore whether RLHF, fine-tuning, or a custom transformer was used is unavailable from the inspected code and must not be claimed.",
         "Unit check: the verified all-time revenue is about ₹699.85 crore (₹6,998,511,331), not ₹6,998.51 crore; the latter is a 10× unit error."
       ].join(" ");
       return respond({ answer, sources: [{ name: "supabase/functions/ask-garment-data/index.ts", records: 1, note: "implementation route and formulas inspected; training claims not inferred" }], question }, 200, origin);
@@ -443,10 +443,11 @@ Deno.serve(async (req: Request) => {
         const highestRevenue=[...points].sort((a,b)=>b.revenue_inr-a.revenue_inr)[0];
         const lowestRevenue=[...points].sort((a,b)=>a.revenue_inr-b.revenue_inr)[0];
         const highestProfit=[...points].sort((a,b)=>b.profit_inr-a.profit_inr)[0];
+        const monthlyTable = points.map(p => p.month + ": " + series.map(item => item.label + " " + formatINR(num((p as unknown as Record<string, unknown>)[item.key]))).join(", ")).join("; ");
         const answer = "Monthly trend based on " + points.length + " available months" + (yearMatch ? " in " + yearMatch : "") + ". " +
           (series.some(s=>s.key==="revenue_inr") ? "Revenue total: "+formatINR(sumMetric("revenue_inr"))+". Highest revenue month: "+highestRevenue.month+" ("+formatINR(highestRevenue.revenue_inr)+"); lowest: "+lowestRevenue.month+" ("+formatINR(lowestRevenue.revenue_inr)+"). " : "") +
           (series.some(s=>s.key==="profit_inr") ? "Recorded profit total: "+formatINR(sumMetric("profit_inr"))+". Highest profit month: "+highestProfit.month+" ("+formatINR(highestProfit.profit_inr)+"). " : "") +
-          "The chart shows recorded monthly totals; it does not infer missing months.";
+          "Month-by-month values in chronological order: " + monthlyTable + ". The chart shows recorded monthly totals; it does not infer missing months.";
         return respond({answer, chartData:{type:"line",xKey:"month",series,data:points.map(p=>({month:p.month,...Object.fromEntries(series.map(s=>[s.key,(p as unknown as Record<string,unknown>)[s.key]]))}))},sources:[{name:"vw_sales_monthly_by_country",records:points.length,note:"all rows paginated from the monthly-by-country view; grouped into month totals"}],question},200,origin);
       }
     }
