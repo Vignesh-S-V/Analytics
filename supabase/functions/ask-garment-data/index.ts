@@ -156,7 +156,7 @@ Deno.serve(async (req: Request) => {
     const mentionedCountries = Object.entries(countryAliases).filter(([alias]) => (" " + normalizedKpiQ + " ").includes(" " + alias + " ")).map(([,country])=>country);
     const uniqueCountries = [...new Set(mentionedCountries)];
     const asksCoreKpi = !asksRanking && /\b(total revenue|total sales|total recorded profit|recorded profit|weighted profit margin|profit margin|total recorded cost|total cost|total expenses|average revenue per order|average revenue|distinct order count|distinct orders|number of orders|total orders|numerator|denominator|formula)\b/.test(normalizedKpiQ);
-    if ((asksCoreKpi || (asksComparison && uniqueCountries.length >= 2 && /\b(revenue|sales|profit|orders|margin|cost|வருவாய்|விற்பனை|லாபம்|ஆர்டர்|மார்ஜின்)\b/.test(normalizedKpiQ))) && !/\b(product|buyer|supplier|marketing|production|channel|style|category|month|monthly|trend|forecast)\b/.test(normalizedKpiQ)) {
+    if ((asksCoreKpi || (asksComparison && uniqueCountries.length >= 2 && /\b(revenue|sales|profit|orders|margin|cost|வருவாய்|விற்பனை|லாபம்|ஆர்டர்|மார்ஜின்)\b/.test(normalizedKpiQ))) && !/\b(product|buyer|supplier|marketing|production|channel|style|category|month|trend|forecast)\b/.test(normalizedKpiQ)) {
       const factRows: Record<string, unknown>[] = [];
       const pageSize = 1000;
       for (let offset = 0; ; offset += pageSize) {
