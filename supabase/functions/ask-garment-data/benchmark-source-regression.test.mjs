@@ -72,3 +72,15 @@ test("training evidence question directly states that RLHF/fine-tuning/custom-tr
   assert.match(source, /No verified implementation evidence was found here for RLHF training or a custom transformer model/);
   assert.match(source, /whether RLHF, fine-tuning, or a custom transformer was used is unavailable/);
 });
+
+
+test("workspace-specific LLM answers use a strict retrieved-evidence gate", () => {
+  assert.match(source, /STRICT DATA GATE/);
+  assert.match(source, /use only retrieved Supabase evidence/);
+  assert.match(source, /I do not have enough information to answer this/);
+  assert.match(source, /Do not invent or guess missing values/);
+});
+
+test("strict business-data fallback does not block general conceptual answers", () => {
+  assert.match(source, /General conceptual questions may use general knowledge/);
+});
