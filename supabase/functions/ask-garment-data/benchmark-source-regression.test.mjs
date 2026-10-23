@@ -46,3 +46,41 @@ test("average revenue per distinct order displays precise rupee value rather tha
 test("Tamil average revenue per distinct order also displays precise rupee value", () => {
   assert.match(source, /ஒரு தனித்த ஆர்டருக்கான சராசரி வருவாய்[\s\S]{0,260}all\.averageOrderRevenue\.toLocaleString\("en-IN", \{ minimumFractionDigits: 2, maximumFractionDigits: 2 \}\)/);
 });
+
+
+test("weighted margin questions explain weighted versus simple-average margin", () => {
+  assert.match(source, /marginDifferenceExplanation/);
+  assert.match(source, /each order is weighted by its revenue/);
+});
+
+test("reconciliation questions compare revenue minus cost with recorded profit", () => {
+  assert.match(source, /reconciliationExplanation/);
+  assert.match(source, /revenue .* − cost .* = .*recorded profit/);
+});
+
+test("monthly trend answers include all returned months in chronological order", () => {
+  assert.match(source, /const monthlyTable = points\.map/);
+  assert.match(source, /Month-by-month values in chronological order/);
+});
+
+test("production ranking answers disclose unavailable delayed-shipment evidence", () => {
+  assert.match(source, /Delayed-shipment counts are unavailable in vw_production_by_line/);
+  assert.match(source, /delayed shipments\?/);
+});
+
+test("training evidence question directly states that RLHF/fine-tuning/custom-transformer evidence is unavailable", () => {
+  assert.match(source, /No verified implementation evidence was found here for RLHF training or a custom transformer model/);
+  assert.match(source, /whether RLHF, fine-tuning, or a custom transformer was used is unavailable/);
+});
+
+
+test("workspace-specific LLM answers use a strict retrieved-evidence gate", () => {
+  assert.match(source, /STRICT DATA GATE/);
+  assert.match(source, /use only retrieved Supabase evidence/);
+  assert.match(source, /I do not have enough information to answer this/);
+  assert.match(source, /Do not invent or guess missing values/);
+});
+
+test("strict business-data fallback does not block general conceptual answers", () => {
+  assert.match(source, /General conceptual questions may use general knowledge/);
+});
