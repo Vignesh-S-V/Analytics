@@ -10,7 +10,7 @@
     "test": "node --test supabase/functions/ask-garment-data/*.test.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.57.0",
+    "@supabase/supabase-js": "^2.118.0",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
