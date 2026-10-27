@@ -323,6 +323,20 @@ Deno.serve(async (req: Request) => {
       return respond({ answer, kpis:{revenue_inr:all.revenue,cost_inr:all.cost,recorded_profit_inr:all.profit,distinct_order_count:all.orders,weighted_profit_margin_pct:all.margin,average_revenue_per_order_inr:all.averageOrderRevenue,reconciliation_difference_inr:all.reconciliation,checked_rows:scopedRows.length}, sources:[{name:"fact_orders",records:scopedRows.length,note:"all pages read; " + (uniqueCountries.length === 1 && !asksComparison ? "country-filtered to " + uniqueCountries[0] + "; " : "") + "distinct order IDs counted; margin uses SUM(profit)/SUM(revenue); average revenue uses total revenue/distinct order count"}], question },200,origin);
     }
 
+    // Dynamic SQL agent fallback for questions that deterministic handlers cannot answer.
+// Keep this behind the existing authentication, membership and quota checks.
+// Schema-aware SQL fallback for questions not handled by deterministic routes.
+// Existing authentication, membership and quota checks run before this function.
+// SQL agent is attempted after deterministic handlers and before the legacy retrieval fallback.
+    const agentGeminiKey = Deno.env.get("GEMINI_API_KEY");
+    if (agentGeminiKey) {
+      try {
+        const agent = await runSqlAgent(db, agentGeminiKey, question, history, requestedYear, requestedCountry);
+        if (agent) return respond({ answer: agent.answer, sources: agent.sources, question }, 200, origin);
+      } catch (error) {
+        console.error("SQL agent failed; falling back to current retrieval:", error instanceof Error ? error.message : String(error));
+      }
+    }
     // Highest-priority exact route for complete supplier revenue rankings. Keep this outside
     // the retrieval-cache branch so a cached RAG answer cannot override the requested sort.
     const earlyNormalizedQ = question.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/  +/g, " ").trim();
@@ -1306,20 +1320,6 @@ Deno.serve(async (req: Request) => {
       if(ranked) {
         const answer="Top "+(metric==="profit_inr"?"profit":"revenue")+" buyer: "+txt(ranked.buyer_name)+". Country: "+txt(ranked.country)+". Revenue: "+formatINR(num(ranked.revenue_inr))+"; recorded profit: "+formatINR(num(ranked.profit_inr))+".";
         return respond({answer,sources:[{name:"vw_sales_by_buyer",records:buyers.length}],question},200,origin);
-      }
-    }
-    // Dynamic SQL agent fallback for questions that deterministic handlers cannot answer.
-// Keep this behind the existing authentication, membership and quota checks.
-// Schema-aware SQL fallback for questions not handled by deterministic routes.
-// Existing authentication, membership and quota checks run before this function.
-// SQL agent is attempted after deterministic handlers and before the legacy retrieval fallback.
-    const agentGeminiKey = Deno.env.get("GEMINI_API_KEY");
-    if (agentGeminiKey) {
-      try {
-        const agent = await runSqlAgent(db, agentGeminiKey, question, history, requestedYear, requestedCountry);
-        if (agent) return respond({ answer: agent.answer, sources: agent.sources, question }, 200, origin);
-      } catch (error) {
-        console.error("SQL agent failed; falling back to current retrieval:", error instanceof Error ? error.message : String(error));
       }
     }
     const geminiKey = Deno.env.get("GEMINI_API_KEY");
