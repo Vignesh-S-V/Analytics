@@ -323,16 +323,6 @@ Deno.serve(async (req: Request) => {
       return respond({ answer, kpis:{revenue_inr:all.revenue,cost_inr:all.cost,recorded_profit_inr:all.profit,distinct_order_count:all.orders,weighted_profit_margin_pct:all.margin,average_revenue_per_order_inr:all.averageOrderRevenue,reconciliation_difference_inr:all.reconciliation,checked_rows:scopedRows.length}, sources:[{name:"fact_orders",records:scopedRows.length,note:"all pages read; " + (uniqueCountries.length === 1 && !asksComparison ? "country-filtered to " + uniqueCountries[0] + "; " : "") + "distinct order IDs counted; margin uses SUM(profit)/SUM(revenue); average revenue uses total revenue/distinct order count"}], question },200,origin);
     }
 
-    // SQL-agent fallback comes after deterministic analytics paths, before generic retrieval.
-    const agentGeminiKey = Deno.env.get("GEMINI_API_KEY");
-    if(agentGeminiKey) {
-      try {
-        const agent = await runSqlAgent(db,agentGeminiKey,question,history,requestedYear,requestedCountry);
-        if(agent) return respond({answer:agent.answer,sources:agent.sources,question},200,origin);
-      } catch(error) {
-        console.error("SQL agent failed; using existing retrieval fallback:",error instanceof Error?error.message:String(error));
-      }
-    }
     // Highest-priority exact route for complete supplier revenue rankings. Keep this outside
     // the retrieval-cache branch so a cached RAG answer cannot override the requested sort.
     const earlyNormalizedQ = question.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/  +/g, " ").trim();
@@ -1322,6 +1312,16 @@ Deno.serve(async (req: Request) => {
 // Keep this behind the existing authentication, membership and quota checks.
 const geminiKey = Deno.env.get("GEMINI_API_KEY");
     if (!geminiKey) return respond({ error: "AI_KEY_MISSING", code: "AI_KEY_MISSING", help: "Add GEMINI_API_KEY to Supabase Edge Function secrets to enable AI answers. Basic total KPI answers still work directly from Supabase." }, 503, origin);
+    // SQL-agent fallback comes after deterministic analytics paths, before generic retrieval.
+    const agentGeminiKey = Deno.env.get("GEMINI_API_KEY");
+    if(agentGeminiKey) {
+      try {
+        const agent = await runSqlAgent(db,agentGeminiKey,question,history,requestedYear,requestedCountry);
+        if(agent) return respond({answer:agent.answer,sources:agent.sources,question},200,origin);
+      } catch(error) {
+        console.error("SQL agent failed; using existing retrieval fallback:",error instanceof Error?error.message:String(error));
+      }
+    }
     const compactRelevance = {
       monthly_country: hasTimeScope ? scopedMonthly.slice(0, 12) : topBy(monthlyCountry, "revenue_inr", 5),
       month_totals: monthRows.length ? monthRows.slice(0, 12) : [...monthTotals.values()].slice(-6),
