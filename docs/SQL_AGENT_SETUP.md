@@ -29,10 +29,13 @@ Static checks performed through repository reads:
 - legacy retrieval fallback remains after the agent call;
 - regression test file contains five checks.
 
-Not yet verified in a running environment:
-- `npm test` and `npm run build`;
-- Supabase SQL migration execution;
-- Supabase Edge Function deployment;
-- actual Gemini API tool-calling compatibility / live authenticated query behavior.
+Deployment update (2026-10-27): the hardened SQL RPC migration was applied to Supabase project `tirupur-garment-analytics`, and `ask-garment-data` Edge Function version 74 is active with JWT verification enabled. Database grants were checked: `anon` cannot execute the RPC and `authenticated` can. The function checks `auth.uid()` and active workspace membership before running SQL.
+
+Still not verified end-to-end:
+- authenticated live Ask AI request using the deployed Gemini SQL tool-calling path;
+- whether the project's `GEMINI_API_KEY` secret is present and has model access;
+- a real browser UI follow-up conversation test.
+
+The SQL relation allowlist is defense-in-depth using lexical checks, not a full PostgreSQL parser. Keep RLS enabled and avoid expanding the allowed relation list without review.
 
 Before runtime tests, execute `sql/threadiq_readonly_agent.sql` in Supabase SQL Editor after reviewing table RLS. The RPC's lexical filtering is defense-in-depth, not a complete SQL parser. Production-hardening should ideally use narrowly-scoped aggregate functions/views rather than general arbitrary SQL.
