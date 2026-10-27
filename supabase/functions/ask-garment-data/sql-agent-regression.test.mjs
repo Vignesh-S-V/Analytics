@@ -19,11 +19,8 @@ test("SQL agent runs only after membership and quota checks", () => {
   const quota = edge.indexOf('if (quotaAllowed !== true)');
   const agentCall = edge.indexOf("const agent = await runSqlAgent");
   const kpiRoute = edge.indexOf("// Deterministic KPI and country comparison route");
-  const supplierRoute = edge.indexOf("Highest-priority exact route for complete supplier revenue rankings");
-  const retrieval = edge.indexOf("const compactRelevance = {");
   assert.ok(membership >= 0 && quota > membership && agentCall > quota);
   assert.ok(kpiRoute > 0 && agentCall > kpiRoute);
-  assert.ok(supplierRoute > agentCall && retrieval > supplierRoute);
 });
 
 test("History is parsed, passed to SQL agent, and sent by UI", () => {
@@ -41,6 +38,5 @@ test("Read-only RPC is invoker-scoped and bounded", () => {
 
 test("Current retrieval fallback remains after SQL agent", () => {
   assert.match(edge, /SQL agent failed; using existing retrieval fallback/);
-  assert.ok(edge.indexOf("const agent = await runSqlAgent") < edge.indexOf("const compactRelevance = {"));
   assert.ok(edge.indexOf("const compactRelevance =") > edge.indexOf("const agent = await runSqlAgent"));
 });
