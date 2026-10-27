@@ -1195,7 +1195,9 @@ Deno.serve(async (req: Request) => {
         return respond({answer,sources:[{name:"vw_sales_by_buyer",records:buyers.length}],question},200,origin);
       }
     }
-    const geminiKey = Deno.env.get("GEMINI_API_KEY");
+    // Dynamic SQL agent fallback for questions that deterministic handlers cannot answer.
+// Keep this behind the existing authentication, membership and quota checks.
+const geminiKey = Deno.env.get("GEMINI_API_KEY");
     if (!geminiKey) return respond({ error: "AI_KEY_MISSING", code: "AI_KEY_MISSING", help: "Add GEMINI_API_KEY to Supabase Edge Function secrets to enable AI answers. Basic total KPI answers still work directly from Supabase." }, 503, origin);
     const compactRelevance = {
       monthly_country: hasTimeScope ? scopedMonthly.slice(0, 12) : topBy(monthlyCountry, "revenue_inr", 5),
