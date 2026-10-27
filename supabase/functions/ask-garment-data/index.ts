@@ -1312,7 +1312,17 @@ Deno.serve(async (req: Request) => {
 // Keep this behind the existing authentication, membership and quota checks.
 // Schema-aware SQL fallback for questions not handled by deterministic routes.
 // Existing authentication, membership and quota checks run before this function.
-const geminiKey = Deno.env.get("GEMINI_API_KEY");
+// SQL agent is attempted after deterministic handlers and before the legacy retrieval fallback.
+    const agentGeminiKey = Deno.env.get("GEMINI_API_KEY");
+    if (agentGeminiKey) {
+      try {
+        const agent = await runSqlAgent(db, agentGeminiKey, question, history, requestedYear, requestedCountry);
+        if (agent) return respond({ answer: agent.answer, sources: agent.sources, question }, 200, origin);
+      } catch (error) {
+        console.error("SQL agent failed; falling back to current retrieval:", error instanceof Error ? error.message : String(error));
+      }
+    }
+    const geminiKey = Deno.env.get("GEMINI_API_KEY");
     if (!geminiKey) return respond({ error: "AI_KEY_MISSING", code: "AI_KEY_MISSING", help: "Add GEMINI_API_KEY to Supabase Edge Function secrets to enable AI answers. Basic total KPI answers still work directly from Supabase." }, 503, origin);
     const compactRelevance = {
       monthly_country: hasTimeScope ? scopedMonthly.slice(0, 12) : topBy(monthlyCountry, "revenue_inr", 5),
