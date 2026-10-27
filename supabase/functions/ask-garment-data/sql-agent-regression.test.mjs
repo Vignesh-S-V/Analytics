@@ -37,6 +37,6 @@ test("Read-only RPC is invoker-scoped and bounded", () => {
 });
 
 test("Current retrieval fallback remains after SQL agent", () => {
-  assert.match(edge, /SQL agent failed; using existing retrieval fallback/);
+  assert.match(edge, /SQL agent failed; (?:using existing retrieval fallback|falling back to current retrieval)/);
   assert.ok(edge.indexOf("const compactRelevance =") > edge.indexOf("const agent = await runSqlAgent"));
 });
