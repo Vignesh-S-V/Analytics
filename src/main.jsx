@@ -230,7 +230,7 @@ function AskAI({db,range,country}){
    const response=await fetch(apiUrl,{
     method:'POST',
     headers:{'Content-Type':'application/json','apikey':publicAnon,'Authorization':'Bearer '+session.access_token,'Accept':'application/x-ndjson, application/json'},
-    body:JSON.stringify({question,filters:{year:range==='All available periods'?'':range,country:country==='All countries'?'':country}})
+    body:JSON.stringify({question,filters:{year:range==='All available periods'?'':range,country:country==='All countries'?'':country},history:messages.slice(1).filter(m=>m.content&&!m.streaming&&m.role!=='system').slice(-6).map(m=>({role:m.role,content:String(m.content).slice(0,1200)}))})
    });
    const contentType=response.headers.get('content-type')||'';
    if(!response.ok){
