@@ -97,11 +97,15 @@ Deno.serve(async (req: Request) => {
   const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY");
   if (!supabaseUrl || !supabaseKey) return respond({ error: "Supabase function configuration is incomplete." }, 500, origin);
   let question = "", requestedYear = "", requestedCountry = "";
+  let history: { role: string; content: string }[] = [];
   try {
     const rawBody = await readTextLimited(req, 16 * 1024);
     const body = JSON.parse(rawBody);
     if (typeof body?.question !== "string") return respond({ error: "Question must be text." }, 400, origin);
     question = body.question.trim();
+    history = Array.isArray(body?.history)
+      ? body.history.filter((h: any) => h && typeof h.content === "string" && (h.role === "user" || h.role === "assistant")).slice(-6)
+      : [];
     const candidateYear = typeof body?.filters?.year === "string" ? body.filters.year.trim() : "";
     requestedYear = /^20\d{2}$/.test(candidateYear) ? candidateYear : "";
     requestedCountry = typeof body?.filters?.country === "string" ? body.filters.country.trim().slice(0, 100) : "";
@@ -1309,7 +1313,7 @@ async function runSqlAgent(
     const agentGeminiKey = Deno.env.get("GEMINI_API_KEY");
     if (agentGeminiKey) {
       try {
-        const agent = await runSqlAgent(db, agentGeminiKey, question, [], requestedYear, requestedCountry);
+        const agent = await runSqlAgent(db, agentGeminiKey, question, history, requestedYear, requestedCountry);
         if (agent) return respond({ answer: agent.answer, sources: agent.sources, question }, 200, origin);
       } catch (error) {
         console.error("SQL agent failed; falling back to current retrieval:", error instanceof Error ? error.message : String(error));
