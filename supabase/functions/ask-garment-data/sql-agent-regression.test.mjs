@@ -25,7 +25,7 @@ test("SQL agent runs only after membership and quota checks", () => {
 
 test("History is parsed, passed to SQL agent, and sent by UI", () => {
   assert.match(edge, /body\?\.history/);
-  assert.match(edge, /runSqlAgent\(db,\s*agentGeminiKey,\s*question,\s*history,\s*requestedYear,\s*requestedCountry\)/);
+  assert.match(edge, /runSqlAgent\(db,agentGeminiKey,question,history,requestedYear,requestedCountry\)/);
   assert.match(frontend, /history:messages\.slice\(1\)/);
 });
 
