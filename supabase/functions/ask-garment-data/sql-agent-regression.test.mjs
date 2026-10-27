@@ -18,7 +18,12 @@ test("SQL agent runs only after membership and quota checks", () => {
   const membership = edge.indexOf('if (membership?.is_active !== true)');
   const quota = edge.indexOf('if (quotaAllowed !== true)');
   const agentCall = edge.indexOf("const agent = await runSqlAgent");
+  const kpiRoute = edge.indexOf("// Deterministic KPI and country comparison route");
+  const supplierRoute = edge.indexOf("Highest-priority exact route for complete supplier revenue rankings");
+  const retrieval = edge.indexOf("const compactRelevance = {");
   assert.ok(membership >= 0 && quota > membership && agentCall > quota);
+  assert.ok(kpiRoute > 0 && agentCall > kpiRoute);
+  assert.ok(supplierRoute > agentCall && retrieval > supplierRoute);
 });
 
 test("History is parsed, passed to SQL agent, and sent by UI", () => {
