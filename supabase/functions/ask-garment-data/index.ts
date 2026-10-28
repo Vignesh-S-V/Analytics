@@ -474,9 +474,12 @@ Deno.serve(async (req: Request) => {
     const asksTrend = /\b(trend|over time|month by month|monthly pattern|month-wise|month wise|historical pattern)\b/i.test(question);
     const coverageQuestion = /\b(date coverage|month coverage|data coverage|available period|earliest month|latest month|earliest date|latest date|date range|missing month|unavailable month|missing data|unavailable data|unavailable revenue|not present in the database|do not invent|fabricate|specific revenue figure|metric is unavailable|required month or metric|next data needed|what is missing)\b/i.test(question) && !asksTrend;
     const peakYear = question.match(/20[0-9]{2}/)?.[0] ?? "";
-    const annualPeakQuestion = !!peakYear
-      && /\b(highest|highest-revenue|peak|top)\b/i.test(question)
-      && /\b(month|revenue|sales)\b/i.test(question);
+    // Route only explicit "highest-revenue month" intent here. Do not let a
+    // multi-question prompt containing "highest revenue" and a year hijack all other intents.
+    const annualPeakQuestion = !!peakYear && (
+      /\b(highest[- ]revenue month|month with the highest revenue|month had the highest revenue|which month (?:had|has) the highest revenue|peak revenue month|highest sales month|month with the highest sales)\b/i.test(question)
+      || /\b(202[0-9])\b.{0,45}\b(highest[- ]revenue month|peak revenue month)\b/i.test(question)
+    );
     const monthNames: Record<string,string> = { january:"01", jan:"01", february:"02", feb:"02", march:"03", mar:"03", april:"04", apr:"04", may:"05", june:"06", jun:"06", july:"07", jul:"07", august:"08", aug:"08", september:"09", sep:"09", october:"10", oct:"10", november:"11", nov:"11", december:"12", dec:"12" };
     const monthNameMatch = question.toLowerCase().match(/\b(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sep|october|oct|november|nov|december|dec)\b/);
     const numericMonthMatch = question.match(/\b(20[0-9]{2})[-/](0[1-9]|1[0-2])\b/);
