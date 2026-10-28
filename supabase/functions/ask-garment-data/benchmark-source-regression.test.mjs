@@ -84,3 +84,24 @@ test("workspace-specific LLM answers use a strict retrieved-evidence gate", () =
 test("strict business-data fallback does not block general conceptual answers", () => {
   assert.match(source, /General conceptual questions may use general knowledge/);
 });
+
+
+test("SQL agent exposes the complete management monthly view and its approved relation allowlist", () => {
+  assert.match(source, /vw_management_monthly\(month, order_count, revenue_inr, total_cost_inr, profit_inr/);
+  assert.match(source, /"vw_market_monthly","vw_management_monthly","fact_orders"/);
+});
+
+test("Ask AI SQL guidance covers buyer-profit rankings, monthly growth, and evidence-based profit drivers", () => {
+  assert.match(source, /which buyer gives the highest profit/);
+  assert.match(source, /For monthly growth, aggregate the requested metric by month/);
+  assert.match(source, /For "why did profit decrease\?"/);
+  assert.match(source, /Report measured contributors, not unsupported causal claims/);
+});
+
+test("deterministic core KPI route respects explicit periods and selected country/year filters", () => {
+  assert.match(source, /const explicitYears = \[\.\.\.normalizedKpiQ\.matchAll/);
+  assert.match(source, /requestedYear/);
+  assert.match(source, /const scopeCountry = asksAllTime \? "" : \(explicitCountry \|\| requestedCountry\)/);
+  assert.match(source, /No matching order records were found/);
+  assert.match(source, /this does not mean the metric is zero/);
+});
