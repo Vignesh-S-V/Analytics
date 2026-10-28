@@ -101,6 +101,7 @@ vw_marketing_channel_performance(month, country, channel, marketing_spend_inr, i
 vw_production_by_line(line_id, unit, specialisation, order_count, order_qty, shipped_qty, rejection_qty, rejection_rate_pct, avg_actual_efficiency_pct, avg_target_efficiency_pct, avg_efficiency_gap_pp, overtime_hours, rework_cost_inr, late_penalty_inr, linked_order_profit_inr)
 vw_supplier_scorecard(supplier_id, supplier_name, supply_type, avg_delay_days, quality_rating, credit_days, linked_order_count, linked_order_revenue_inr, linked_order_profit_inr, linked_order_late_penalty_inr)
 vw_market_monthly(month, cotton_yarn_30s_inr_per_kg, usd_inr, prior_month_yarn_price, yarn_price_mom_pct, prior_month_usd_inr)
+vw_management_monthly(month, order_count, revenue_inr, total_cost_inr, profit_inr, profit_margin_pct, late_penalty_inr, freight_cost_inr, rework_cost_inr, order_qty, shipped_qty, shipment_completion_pct, on_time_shipped_orders, dated_shipped_orders, on_time_delivery_pct)
 fact_orders(order_id, order_date, ship_due_date, actual_ship_date, buyer_id, buyer_name, country, buyer_tier, product_category, fabric, style_id, supplier_id, order_qty, shipped_qty, revenue_inr, total_cost_inr, profit_inr, profit_margin_pct, delay_days, fabric_cost_per_pc_inr, trims_cost_per_pc_inr, cmt_cost_per_pc_inr, ot_cost_per_pc_inr, overhead_per_pc_inr, rework_cost_inr, freight_cost_inr, late_penalty_inr, actual_efficiency, target_efficiency, rejection_qty, workers, overtime_hours)
 `;
 
@@ -112,9 +113,12 @@ ${AGENT_SCHEMA}
 Rules:
 - Use a single read-only SELECT or WITH...SELECT, with no comments or semicolons.
 - Do not query auth, storage, system catalogs, or unlisted relations. If the available schema cannot answer a question, explain exactly which field or source is missing.
-- Generate SQL from the user's intent, not by matching only exact keywords. Use aliases and aggregations as needed. Calculate totals, averages, distinct counts, growth, ratios, comparisons and rankings from database rows.
+- Generate SQL from the user's intent, not by matching only exact keywords. Use aliases and aggregations as needed. Calculate totals, averages, distinct counts, growth, ratios, comparisons and rankings from database rows. Map synonyms such as sales/turnover to revenue, profit/net profit to recorded profit, and country/market to country only when the requested meaning is supported by the schema.
+- For "which country has the highest revenue?", group by country, sum revenue, sort descending, and return the leader plus enough ranked rows to explain the result. For "which buyer gives the highest profit?", group by buyer and sort by SUM(profit_inr), not revenue.
+- For monthly growth, aggregate the requested metric by month in chronological order and calculate (current period - comparable prior period) / ABS(comparable prior period) * 100; return N/A if the baseline is zero or missing. Compare like-for-like month ranges and disclose incomplete periods.
+- For "why did profit decrease?", first establish the two comparable periods and quantify the profit change; then break down changes by available dimensions (country, buyer, product, supplier, or month) and cost drivers (late penalties, freight, rework, production efficiency) where the schema supports it. Report measured contributors, not unsupported causal claims. Ask a concise clarification if the comparison period or metric cannot be determined.
 - Weighted profit margin = SUM(profit_inr) / NULLIF(SUM(revenue_inr),0) * 100. Do not average row-level percentages when a weighted ratio is required.
-- month is a date; the financial year runs April–March. Respect requested calendar vs financial year and compare like-for-like periods.
+- month is a date; the financial year runs April–March. Respect requested calendar vs financial year and compare like-for-like periods. For "this year" and "last year", use the current calendar year unless the user explicitly says financial year; do not silently compare a partial current year against a full prior year.
 - Current UI filters: year=${year || "all"}, country=${country || "all"}. Apply the selected filters when the user refers to the current selection or leaves the scope unspecified; honor explicit periods/countries in the question.
 - For "all/every" ranking, return the complete result if available; do not cap rows unless the user requests top N. The RPC caps results at 500 rows: disclose that cap and never describe a capped result as complete.
 - If a query fails, revise it using only the approved schema and retry within the tool-call budget. If the intent is ambiguous in a way that changes the result, ask a concise clarification rather than inventing an interpretation.
@@ -143,7 +147,7 @@ async function runSqlAgent(
   }]}];
   const allowedRelations = new Set([
     "vw_sales_monthly_by_country","vw_sales_by_country","vw_sales_by_buyer","vw_sales_by_product",
-    "vw_marketing_channel_performance","vw_production_by_line","vw_supplier_scorecard","vw_market_monthly","fact_orders",
+    "vw_marketing_channel_performance","vw_production_by_line","vw_supplier_scorecard","vw_market_monthly","vw_management_monthly","fact_orders",
   ]);
   const used = new Map<string,number>();
 
