@@ -293,11 +293,26 @@ Deno.serve(async (req: Request) => {
           .map((part) => part.endsWith("?") || part.endsWith(".") ? part : part + "?");
         const answers: string[] = [];
         const allSources = new Map<string, { name: string; records: number; note: string }>();
+        const cleanAgentMarkdown = (value: string) => value
+          .replace(/\\\\r\\\\n/g, "\\n")
+          .replace(/\\\\n/g, "\\n")
+          .replace(/\\\\t/g, " ")
+          .replace(/\\\\([*_`#|])/g, "$1")
+          .replace(/\\n{3,}/g, "\\n\\n")
+          .trim();
         for (const [index, subQuestion] of questions.entries()) {
           try {
-            const result = await runSqlAgent(db, multiQuestionGeminiKey, subQuestion, history, requestedYear, requestedCountry);
+            let result = await runSqlAgent(db, multiQuestionGeminiKey, subQuestion, history, requestedYear, requestedCountry);
+            // Retry once with a schema-grounded prompt if a sub-question failed; do not discard the other answers.
+            if (!result?.answer && /profit.*decrease|decrease.*profit|profit.*declin|declin.*profit/i.test(subQuestion)) {
+              const focusedHistory = [
+                ...history,
+                { role: "user", content: "For the profit-decrease question, compare calendar-year 2023 versus 2024 using vw_management_monthly grouped by date_trunc('year', month). Return revenue, total_cost_inr, profit_inr, late_penalty_inr, freight_cost_inr, rework_cost_inr and weighted profit margin. Then compare cost drivers where the view supports it. If the requested breakdown cannot be computed, state that explicitly; do not guess causes." }
+              ];
+              result = await runSqlAgent(db, multiQuestionGeminiKey, subQuestion, focusedHistory, requestedYear, requestedCountry);
+            }
             if (result?.answer) {
-              answers.push((index + 1) + ". " + subQuestion + "\\n" + result.answer);
+              answers.push((index + 1) + ". " + subQuestion + "\\n" + cleanAgentMarkdown(result.answer));
               for (const source of result.sources) {
                 const prior = allSources.get(source.name);
                 allSources.set(source.name, {
@@ -307,11 +322,11 @@ Deno.serve(async (req: Request) => {
                 });
               }
             } else {
-              answers.push((index + 1) + ". " + subQuestion + "\\nI couldn't verify this answer from the available business data. Please retry this question separately.");
+              answers.push((index + 1) + ". " + subQuestion + "\\nI couldn't verify this answer from the available business data. The required query did not return a verifiable result.");
             }
           } catch (subError) {
             console.error("Sub-question SQL agent failed:", subQuestion, subError instanceof Error ? subError.message : String(subError));
-            answers.push((index + 1) + ". " + subQuestion + "\\nI couldn't verify this answer from the available business data. Please retry this question separately.");
+            answers.push((index + 1) + ". " + subQuestion + "\\nI couldn't verify this answer from the available business data. The required query did not return a verifiable result.");
           }
         }
         if (answers.length) {
