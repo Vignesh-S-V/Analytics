@@ -298,11 +298,28 @@ Deno.serve(async (req: Request) => {
         const revenue = sum(rows, "revenue_inr"), cost = sum(rows, "total_cost_inr"), profit = sum(rows, "profit_inr");
         return { revenue, cost, profit, orders: orderIds.size, margin: revenue !== 0 ? profit / revenue * 100 : null, averageOrderRevenue: orderIds.size ? revenue / orderIds.size : null, reconciliation: revenue - cost - profit };
       };
-      const scopedRows = uniqueCountries.length === 1 && !asksComparison
-        ? factRows.filter(r => txt(r.country).trim().toLowerCase() === uniqueCountries[0].toLowerCase())
-        : factRows;
+      const explicitYears = [...normalizedKpiQ.matchAll(/\b(20\d{2})\b/g)].map(m => m[1]);
+      const currentYear = new Date().getUTCFullYear();
+      const asksAllTime = /\b(all time|overall|entire history|all years|lifetime|full dataset)\b/.test(normalizedKpiQ) || /முழு காலம்|எல்லா ஆண்டுகளும்/.test(question);
+      let scopeYear = explicitYears.length ? explicitYears[explicitYears.length - 1] : requestedYear;
+      if (!explicitYears.length && /\b(last year|previous year|prior year)\b/.test(normalizedKpiQ)) scopeYear = String(currentYear - 1);
+      else if (!explicitYears.length && /\b(this year|current year|year to date|ytd)\b/.test(normalizedKpiQ)) scopeYear = String(currentYear);
+      if (asksAllTime) scopeYear = "";
+      const explicitCountry = uniqueCountries.length === 1 ? uniqueCountries[0] : "";
+      const scopeCountry = asksAllTime ? "" : (explicitCountry || requestedCountry);
+      const scopedRows = factRows.filter(r => {
+        const date = txt(r.order_date).slice(0, 10);
+        const inYear = !scopeYear || date.startsWith(scopeYear + "-");
+        const inCountry = !scopeCountry || txt(r.country).trim().toLowerCase() === scopeCountry.toLowerCase();
+        return inYear && inCountry;
+      });
+      if (!scopedRows.length) {
+        const periodLabel = scopeYear ? " for " + scopeYear : "";
+        const countryLabel = scopeCountry ? " in " + scopeCountry : "";
+        return respond({ answer: "No matching order records were found" + periodLabel + countryLabel + ". The requested result is unavailable in the current dataset; this does not mean the metric is zero.", unavailable: true, question }, 200, origin);
+      }
       const all = aggregate(scopedRows);
-      const scopeLabel = uniqueCountries.length === 1 && !asksComparison ? " Country filter applied: " + uniqueCountries[0] + "." : "";
+      const scopeLabel = (scopeYear ? " Period: " + scopeYear + "." : " Period: all available years.") + (scopeCountry ? " Country filter applied: " + scopeCountry + "." : "");
       const currency = (n: number | null) => n === null ? "N/A" : formatINR(n);
       if (asksComparison && uniqueCountries.length >= 2) {
         const countryRows = uniqueCountries.map(country => ({ country, ...aggregate(factRows.filter(r => txt(r.country).trim().toLowerCase() === country.toLowerCase())) }));
