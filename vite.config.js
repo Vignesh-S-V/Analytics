@@ -8,6 +8,9 @@ export default defineConfig(({ mode }) => {
   ).trim().replace(/\/$/, '');
 
   return {
+    // GitHub Pages serves this project at /Analytics/. Keep root paths for
+    // local development and the existing Cloudflare Workers deployment.
+    base: process.env.GITHUB_ACTIONS === 'true' ? '/Analytics/' : '/',
     plugins: [react()],
     server: {
       host: '0.0.0.0',
@@ -16,7 +19,7 @@ export default defineConfig(({ mode }) => {
           target: supabaseUrl,
           changeOrigin: true,
           headers: {
-            // Supabase Edge Function currently allows the deployed app origin.
+            // Preserve the origin currently allowed by the Supabase function.
             origin: 'https://analytics.vigneshw-5416.workers.dev'
           }
         }
