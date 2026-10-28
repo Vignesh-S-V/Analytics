@@ -435,8 +435,17 @@ Deno.serve(async (req: Request) => {
           }
         }
         if (answers.length) {
+          const finalAnswer = answers
+            .map((item) => item
+              .replace(/^\\s*\\d+\\.\\s*/, "")
+              .replace(/^\\s*\\*\\*?svg(?:Grounded in workspace data)?\\*\\*?\\s*$/gim, "")
+              .replace(/\\\\n/g, "\\n")
+              .replace(/\\\\([*_\\x60#|])/g, "$1")
+              .trim())
+            .map((item, index) => "## " + (index + 1) + ". " + item)
+            .join("\\n\\n");
           return respond({
-            answer: answers.join("\n\n"),
+            answer: finalAnswer,
             sources: [...allSources.values()],
             question,
             multiQuestion: true,
