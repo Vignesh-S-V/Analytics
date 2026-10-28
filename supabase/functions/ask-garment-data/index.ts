@@ -325,7 +325,7 @@ Deno.serve(async (req: Request) => {
                   const margin23 = val(y2023,"revenue_inr") ? val(y2023,"profit_inr") / val(y2023,"revenue_inr") * 100 : 0;
                   const margin24 = val(y2024,"revenue_inr") ? val(y2024,"profit_inr") / val(y2024,"revenue_inr") * 100 : 0;
                   const answer = "Profit decreased in 2024 versus 2023. Revenue changed from " + fmt(val(y2023,"revenue_inr")) + " to " + fmt(val(y2024,"revenue_inr")) + " (" + pct(val(y2023,"revenue_inr"),val(y2024,"revenue_inr")) + "), while recorded profit changed from " + fmt(val(y2023,"profit_inr")) + " to " + fmt(val(y2024,"profit_inr")) + " (" + pct(val(y2023,"profit_inr"),val(y2024,"profit_inr")) + "). Total cost changed from " + fmt(val(y2023,"total_cost_inr")) + " to " + fmt(val(y2024,"total_cost_inr")) + " (" + pct(val(y2023,"total_cost_inr"),val(y2024,"total_cost_inr")) + "). Weighted profit margin fell from " + margin23.toFixed(2) + "% to " + margin24.toFixed(2) + "%. Cost-driver changes: late penalties " + fmt(val(y2023,"late_penalty_inr")) + " → " + fmt(val(y2024,"late_penalty_inr")) + " (" + pct(val(y2023,"late_penalty_inr"),val(y2024,"late_penalty_inr")) + "); freight " + fmt(val(y2023,"freight_cost_inr")) + " → " + fmt(val(y2024,"freight_cost_inr")) + " (" + pct(val(y2023,"freight_cost_inr"),val(y2024,"freight_cost_inr")) + "); rework " + fmt(val(y2023,"rework_cost_inr")) + " → " + fmt(val(y2024,"rework_cost_inr")) + " (" + pct(val(y2023,"rework_cost_inr"),val(y2024,"rework_cost_inr")) + "). These figures show measured changes, not proof that any single factor caused the entire decline.";
-                  answers.push((index + 1) + ". " + subQuestion + "\\n" + answer);
+                  answers.push((index + 1) + ". " + subQuestion + "\n" + answer);
                   allSources.set("vw_management_monthly", { name: "vw_management_monthly", records: annualRows.length, note: "calendar-year totals and cost-driver changes aggregated directly from the monthly management view" });
                   continue;
                 }
@@ -342,7 +342,7 @@ Deno.serve(async (req: Request) => {
               result = await runSqlAgent(db, multiQuestionGeminiKey, subQuestion, focusedHistory, requestedYear, requestedCountry);
             }
             if (result?.answer) {
-              answers.push((index + 1) + ". " + subQuestion + "\\n" + cleanAgentMarkdown(result.answer));
+              answers.push((index + 1) + ". " + subQuestion + "\n" + cleanAgentMarkdown(result.answer));
               for (const source of result.sources) {
                 const prior = allSources.get(source.name);
                 allSources.set(source.name, {
@@ -361,7 +361,7 @@ Deno.serve(async (req: Request) => {
         }
         if (answers.length) {
           return respond({
-            answer: answers.join("\\n\\n"),
+            answer: answers.join("\n\n"),
             sources: [...allSources.values()],
             question,
             multiQuestion: true,
