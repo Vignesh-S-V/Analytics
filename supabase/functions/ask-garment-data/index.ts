@@ -304,6 +304,81 @@ Deno.serve(async (req: Request) => {
           .trim();
         for (const [index, subQuestion] of questions.entries()) {
           try {
+            const normalizedSubQuestion = subQuestion.toLowerCase();
+            // Deterministic routes prevent LLM unit-conversion errors in common multi-question reports.
+            if (/which country.*highest revenue|country.*highest revenue|highest revenue.*country/i.test(subQuestion)) {
+              const { data: rows, error } = await db.from("vw_sales_by_country")
+                .select("country,revenue_inr,profit_inr,order_count")
+                .order("revenue_inr", { ascending: false }).limit(5);
+              if (!error && rows?.length) {
+                const answer = "Top countries by revenue (from vw_sales_by_country):\n" + rows.map((r: any, i: number) =>
+                  (i + 1) + ". " + txt(r.country) + " — Revenue " + formatINR(num(r.revenue_inr)) +
+                  "; recorded profit " + formatINR(num(r.profit_inr)) +
+                  "; orders " + num(r.order_count).toLocaleString("en-IN")
+                ).join("\n");
+                answers.push((index + 1) + ". " + subQuestion + "\n" + answer);
+                allSources.set("vw_sales_by_country", { name: "vw_sales_by_country", records: rows.length, note: "database-ranked by revenue_inr descending" });
+                continue;
+              }
+              if (error) console.error("Country ranking route failed:", error.message);
+            }
+            if (/which buyer.*highest profit|buyer.*highest profit|highest profit.*buyer/i.test(subQuestion)) {
+              const { data: rows, error } = await db.from("vw_sales_by_buyer")
+                .select("buyer_name,country,buyer_tier,revenue_inr,profit_inr,profit_margin_pct,order_count")
+                .order("profit_inr", { ascending: false }).limit(5);
+              if (!error && rows?.length) {
+                const answer = "Top buyers by recorded profit (from vw_sales_by_buyer):\n" + rows.map((r: any, i: number) =>
+                  (i + 1) + ". " + txt(r.buyer_name) + " (" + txt(r.country) + ") — Profit " + formatINR(num(r.profit_inr)) +
+                  "; revenue " + formatINR(num(r.revenue_inr)) +
+                  "; weighted margin " + num(r.profit_margin_pct).toFixed(2) + "%" +
+                  "; orders " + num(r.order_count).toLocaleString("en-IN")
+                ).join("\n");
+                answers.push((index + 1) + ". " + subQuestion + "\n" + answer);
+                allSources.set("vw_sales_by_buyer", { name: "vw_sales_by_buyer", records: rows.length, note: "database-ranked by profit_inr descending" });
+                continue;
+              }
+              if (error) console.error("Buyer ranking route failed:", error.message);
+            }
+            if (/monthly sales growth|show monthly growth|month.on.month growth|monthly revenue growth/i.test(subQuestion)) {
+              const { data: rows, error } = await db.from("vw_management_monthly")
+                .select("month,revenue_inr,order_count,shipped_qty")
+                .gte("month", "2023-01-01").lt("month", "2025-01-01")
+                .order("month", { ascending: true });
+              if (!error && rows?.length) {
+                const ordered = rows as Record<string, unknown>[];
+                const answer = "Monthly revenue and month-on-month growth (revenue formatted from raw INR; source: vw_management_monthly):\n| Month | Revenue | MoM growth | Orders | Shipped quantity |\n|---|---:|---:|---:|---:|\n" +
+                  ordered.map((r, i) => {
+                    const prior = i > 0 ? num(ordered[i - 1].revenue_inr) : 0;
+                    const revenue = num(r.revenue_inr);
+                    const growth = i === 0 || prior === 0 ? "N/A" : (((revenue - prior) / Math.abs(prior)) * 100).toFixed(2) + "%";
+                    const monthLabel = txt(r.month).slice(0, 7);
+                    return "| " + monthLabel + " | " + formatINR(revenue) + " | " + growth + " | " + num(r.order_count).toLocaleString("en-IN") + " | " + num(r.shipped_qty).toLocaleString("en-IN") + " |";
+                  }).join("\n");
+                answers.push((index + 1) + ". " + subQuestion + "\n" + answer);
+                allSources.set("vw_management_monthly", { name: "vw_management_monthly", records: rows.length, note: "monthly revenue in raw INR; MoM growth calculated against the immediately preceding month" });
+                continue;
+              }
+              if (error) console.error("Monthly growth route failed:", error.message);
+            }
+            if (/compare.*2024.*2023.*revenue|2024.*vs.*2023.*revenue|2024.*2023.*revenue.*profit/i.test(subQuestion)) {
+              const { data: rows, error } = await db.rpc("threadiq_run_readonly_query", {
+                p_sql: "SELECT date_trunc('year', month)::date AS year_start, SUM(order_count) AS order_count, SUM(revenue_inr) AS revenue_inr, SUM(total_cost_inr) AS total_cost_inr, SUM(profit_inr) AS profit_inr FROM vw_management_monthly WHERE month >= DATE '2023-01-01' AND month < DATE '2025-01-01' GROUP BY date_trunc('year', month) ORDER BY year_start"
+              });
+              if (!error && Array.isArray(rows)) {
+                const y23 = rows.find((r: any) => String(r.year_start ?? "").startsWith("2023"));
+                const y24 = rows.find((r: any) => String(r.year_start ?? "").startsWith("2024"));
+                if (y23 && y24) {
+                  const pct = (before: number, after: number) => before ? (((after - before) / Math.abs(before)) * 100).toFixed(2) + "%" : "N/A";
+                  const answer = "| Year | Orders | Revenue | Recorded cost | Recorded profit | Weighted margin |\n|---|---:|---:|---:|---:|---:|\n" +
+                    [y23, y24].map((r: any) => "| " + String(r.year_start).slice(0, 4) + " | " + num(r.order_count).toLocaleString("en-IN") + " | " + formatINR(num(r.revenue_inr)) + " | " + formatINR(num(r.total_cost_inr)) + " | " + formatINR(num(r.profit_inr)) + " | " + (num(r.revenue_inr) ? (num(r.profit_inr) / num(r.revenue_inr) * 100).toFixed(2) : "N/A") + "% |").join("\n") +
+                    "\nRevenue change: " + pct(num(y23.revenue_inr), num(y24.revenue_inr)) + "; recorded profit change: " + pct(num(y23.profit_inr), num(y24.profit_inr)) + "; total cost change: " + pct(num(y23.total_cost_inr), num(y24.total_cost_inr)) + ".";
+                  answers.push((index + 1) + ". " + subQuestion + "\n" + answer);
+                  allSources.set("vw_management_monthly", { name: "vw_management_monthly", records: rows.length, note: "calendar-year aggregates computed in SQL" });
+                  continue;
+                }
+              }
+              if (error) console.error("Annual comparison route failed:", error.message);
+            }
             // Use deterministic, source-backed annual aggregates for profit-decline questions.
             // This avoids relying on a generated SQL query for the most important causal follow-up.
             if (/profit.*decrease|decrease.*profit|profit.*declin|declin.*profit|why.*profit/i.test(subQuestion)) {
