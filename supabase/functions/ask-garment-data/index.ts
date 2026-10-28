@@ -270,6 +270,33 @@ Deno.serve(async (req: Request) => {
       return respond({ error: "Could not verify AI request quota. Please retry." }, 503, origin);
     }
     if (quotaAllowed !== true) return respond({ error: "Request burst limit reached (60 per minute per approved account). Please retry shortly." }, 429, origin);
+
+    // Handle multi-intent prompts before any single-intent deterministic route can return.
+    // Supports multiple question marks, newline-separated questions, and sentence-separated requests.
+    const multiQuestionParts = question
+      .split(/(?:\?+\s*|[\n\r]+|(?<=[.!])\s+(?=[A-Z]))/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    const isMultiQuestionPrompt = (question.match(/\?/g) ?? []).length > 1
+      || question.split(/[\n\r]+/).map((part) => part.trim()).filter(Boolean).length > 1
+      || multiQuestionParts.length >= 3;
+    if (isMultiQuestionPrompt) {
+      const multiQuestionGeminiKey = Deno.env.get("GEMINI_API_KEY");
+      if (!multiQuestionGeminiKey) {
+        return respond({ error: "Multi-question analysis requires the configured AI service. Please retry later." }, 503, origin);
+      }
+      try {
+        const multiAnswer = await runSqlAgent(db, multiQuestionGeminiKey, question, history, requestedYear, requestedCountry);
+        if (multiAnswer) {
+          return respond({ answer: multiAnswer.answer, sources: multiAnswer.sources, question }, 200, origin);
+        }
+        console.error("Multi-question SQL agent returned no complete answer.");
+        return respond({ error: "I couldn't complete every part of that multi-question request. Please retry, or ask the questions one at a time." }, 502, origin);
+      } catch (error) {
+        console.error("Multi-question SQL agent failed:", error instanceof Error ? error.message : String(error));
+        return respond({ error: "I couldn't complete every part of that multi-question request. Please retry, or ask the questions one at a time." }, 502, origin);
+      }
+    }
     // Deterministic KPI and country comparison route; compute from all raw order pages.
     const normalizedKpiQ = question.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\u0B80-\u0BFF ]+/g, " ").replace(/\s+/g, " ").trim();
     const asksTamil = /[\u0B80-\u0BFF]/.test(question);
