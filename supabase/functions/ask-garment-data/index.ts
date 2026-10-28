@@ -437,13 +437,13 @@ Deno.serve(async (req: Request) => {
         if (answers.length) {
           const finalAnswer = answers
             .map((item) => item
-              .replace(/^\\s*\\d+\\.\\s*/, "")
-              .replace(/^\\s*\\*\\*?svg(?:Grounded in workspace data)?\\*\\*?\\s*$/gim, "")
-              .replace(/\\\\n/g, "\\n")
-              .replace(/\\\\([*_\\x60#|])/g, "$1")
+              .replace(/^\s*\d+\.\s*/, "")
+              .replace(/\*\*?svg(?:Grounded in workspace data)?\*\*?/gi, "")
+              .replace(/\\n/g, "\n")
+              .replace(/\\([*_`#|])/g, "$1")
               .trim())
             .map((item, index) => "## " + (index + 1) + ". " + item)
-            .join("\\n\\n");
+            .join("\n\n");
           return respond({
             answer: finalAnswer,
             sources: [...allSources.values()],
