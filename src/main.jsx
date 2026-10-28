@@ -14,7 +14,7 @@ function normalizeAskAnswer(value){
   .replace(/\\r\\n/g,'\n')
   .replace(/\\n/g,'\n')
   .replace(/\\([#*_|])/g,'$1')
-  .replace(/\\*\\*?svg(?:Grounded in workspace data)?\\*\\*/gi,'')
+  .replace(/\*\*?svg(?:Grounded in workspace data)?\*\*/gi,'')
   .replace(/(^|\n)\s*svgGrounded in workspace data\s*(?=\n|$)/gi,'$1')
   .replace(/\n{3,}/g,'\n\n')
   .trim();
