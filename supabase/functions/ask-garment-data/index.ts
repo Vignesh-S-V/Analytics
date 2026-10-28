@@ -286,15 +286,47 @@ Deno.serve(async (req: Request) => {
         return respond({ error: "Multi-question analysis requires the configured AI service. Please retry later." }, 503, origin);
       }
       try {
-        const multiAnswer = await runSqlAgent(db, multiQuestionGeminiKey, question, history, requestedYear, requestedCountry);
-        if (multiAnswer) {
-          return respond({ answer: multiAnswer.answer, sources: multiAnswer.sources, question }, 200, origin);
+        const questions = multiQuestionParts
+          .map((part) => part.replace(/^[\\s,;]+|[\\s,;]+$/g, "").trim())
+          .filter((part) => part.length > 5)
+          .map((part) => part.endsWith("?") || part.endsWith(".") ? part : part + "?");
+        const answers: string[] = [];
+        const allSources = new Map<string, { name: string; records: number; note: string }>();
+        for (const [index, subQuestion] of questions.entries()) {
+          try {
+            const result = await runSqlAgent(db, multiQuestionGeminiKey, subQuestion, history, requestedYear, requestedCountry);
+            if (result?.answer) {
+              answers.push((index + 1) + ". " + subQuestion + "\\n" + result.answer);
+              for (const source of result.sources) {
+                const prior = allSources.get(source.name);
+                allSources.set(source.name, {
+                  name: source.name,
+                  records: Math.max(prior?.records ?? 0, source.records),
+                  note: source.note
+                });
+              }
+            } else {
+              answers.push((index + 1) + ". " + subQuestion + "\\nI couldn't verify this answer from the available business data. Please retry this question separately.");
+            }
+          } catch (subError) {
+            console.error("Sub-question SQL agent failed:", subQuestion, subError instanceof Error ? subError.message : String(subError));
+            answers.push((index + 1) + ". " + subQuestion + "\\nI couldn't verify this answer from the available business data. Please retry this question separately.");
+          }
         }
-        console.error("Multi-question SQL agent returned no complete answer.");
-        return respond({ error: "I couldn't complete every part of that multi-question request. Please retry, or ask the questions one at a time." }, 502, origin);
+        if (answers.length) {
+          return respond({
+            answer: answers.join("\\n\\n"),
+            sources: [...allSources.values()],
+            question,
+            multiQuestion: true,
+            answeredParts: answers.filter((answer) => !answer.includes("I couldn't verify this answer")).length,
+            totalParts: questions.length
+          }, 200, origin);
+        }
+        return respond({ error: "I couldn't split this into individual questions. Please try one question per line." }, 400, origin);
       } catch (error) {
-        console.error("Multi-question SQL agent failed:", error instanceof Error ? error.message : String(error));
-        return respond({ error: "I couldn't complete every part of that multi-question request. Please retry, or ask the questions one at a time." }, 502, origin);
+        console.error("Multi-question processing failed:", error instanceof Error ? error.message : String(error));
+        return respond({ error: "I couldn't process this multi-question request. Please retry." }, 502, origin);
       }
     }
     // Deterministic KPI and country comparison route; compute from all raw order pages.
