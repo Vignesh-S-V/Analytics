@@ -320,6 +320,7 @@ Deno.serve(async (req: Request) => {
       const costText = "Total recorded cost: " + currency(all.cost) + ".";
       const ordersText = "Distinct order count: " + all.orders.toLocaleString("en-IN") + ".";
       const marginText = "Weighted profit margin = SUM(recorded profit) / SUM(revenue) × 100 = " + currency(all.profit) + " / " + currency(all.revenue) + " × 100 = " + (all.margin === null ? "N/A (zero revenue)" : all.margin.toFixed(2) + "%") + ".";
+      // ஒரு தனித்த ஆர்டருக்கான சராசரி வருவாய் must preserve exact rupee precision: all.averageOrderRevenue.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).
       const averageText = "Average revenue per distinct order = " + currency(all.revenue) + " / " + all.orders.toLocaleString("en-IN") + " = ₹" + (all.averageOrderRevenue === null ? "N/A" : all.averageOrderRevenue.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + ".";
       const reconciliationText = "Reconciliation check: revenue - cost - recorded profit = " + currency(all.reconciliation) + (Math.abs(all.reconciliation) <= 0.01 ? " (matches within ₹0.01 tolerance)." : " (does not reconcile; investigate source definitions or data).");
       const asksOverview = /\b(summar(y|ise|ize)|overview|business performance|all kpis|all metrics|complete summary|total sales cost and net profit)\b/.test(normalizedKpiQ) || /சுருக்கம்|முழு விவரம்|எல்லா kpi/.test(question);
