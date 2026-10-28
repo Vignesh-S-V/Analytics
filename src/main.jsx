@@ -9,6 +9,16 @@ const colors=['#65e0c4','#8e9bff','#f5bf69','#f28aa5','#7dd3fc'];
 const nav=[['Overview',LayoutDashboard],['Ask AI',Bot],['Product Economics',Shirt],['Sales & Buyers',BriefcaseBusiness],['Production',Factory],['Marketing ROI',Megaphone],['Procurement',Boxes],['Investment Lab',CircleDollarSign]];
 const compactIN=(value)=>{const n=Number(value||0),a=Math.abs(n),fmt=v=>Number(v.toFixed(1)).toLocaleString('en-IN',{maximumFractionDigits:1});if(a>=1e7)return `${fmt(n/1e7)} Cr`;if(a>=1e5)return `${fmt(n/1e5)} Lakh`;if(a>=1e3)return `${fmt(n/1e3)} Thousand`;return n.toLocaleString('en-IN',{maximumFractionDigits:1});};
 const inr=n=>'₹'+compactIN(n);
+function normalizeAskAnswer(value){
+ return String(value||'')
+  .replace(/\\r\\n/g,'\n')
+  .replace(/\\n/g,'\n')
+  .replace(/\\([#*_|])/g,'$1')
+  .replace(/\\*\\*?svg(?:Grounded in workspace data)?\\*\\*/gi,'')
+  .replace(/(^|\n)\s*svgGrounded in workspace data\s*(?=\n|$)/gi,'$1')
+  .replace(/\n{3,}/g,'\n\n')
+  .trim();
+}
 function rankingTableFromAnswer(answer){
  const text=String(answer||'');
  const supplierHeading=/all\s+\d+\s+suppliers?\s+ranked\s+by\s+(?:total\s+)?linked.order\s+revenue/i.test(text);
@@ -98,7 +108,7 @@ function AskAIBenchmarkRunner({db,onBack}){
     setCurrent(i+1);const question=ASK_AI_BENCHMARK_QUESTIONS[i];
     try{
      const res=await fetch(SUPABASE_URL.replace(/\/$/,'')+'/functions/v1/ask-garment-data',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_PUBLIC_KEY,'Authorization':'Bearer '+session.access_token,'Accept':'application/json'},body:JSON.stringify({question,filters:{year:'',country:''}})});
-     let data={};try{data=await res.json()}catch{}const answer=String(data.answer||data.error||'');
+     let data={};try{data=await res.json()}catch{}const answer=normalizeAskAnswer(data.answer||data.error||'');
      const must=i===16?['roas','profit roi']:i===21?['cannot guarantee','implemented']:i===22?['unavailable','estimate']:i===23?['llm','retrieval','deterministic']:i===24?['llm','rag','deterministic']:i===25?['unverified','trained']:i===28?['missing','needed']:[];
      const missing=must.filter(term=>!answer.toLowerCase().includes(term));
      out.push({n:i+1,question,status:!res.ok||!answer?'FAIL':missing.length?'REVIEW':'RESPONSE RECEIVED',http:res.status,answer,missing});
@@ -242,15 +252,15 @@ function AskAI({db,range,country}){
     const data=await response.json();
     if(data?.error){if(data.code==='AI_KEY_MISSING'||data.help)setSetupRequired(true);throw new Error(data.help||data.error)}
     if(!data?.answer)throw new Error('AI returned no answer. Please try again.');
-    finalAnswer=data.answer;finalSources=Array.isArray(data.sources)?data.sources:[];finalSummary=data.summary&&typeof data.summary==='object'?data.summary:null;finalChartData=data.chartData&&typeof data.chartData==='object'?data.chartData:null;finalSupplierRanking=Array.isArray(data.supplierRanking)?data.supplierRanking:null;finalRankingTable=data.rankingTable&&Array.isArray(data.rankingTable.rows)?data.rankingTable:rankingTableFromAnswer(data.answer);
-    patchReply({content:finalAnswer,sources:finalSources,summary:finalSummary,chartData:finalChartData,supplierRanking:finalSupplierRanking,rankingTable:finalRankingTable,streaming:false});
+    finalAnswer=normalizeAskAnswer(data.answer);finalSources=Array.isArray(data.sources)?data.sources:[];finalSummary=data.summary&&typeof data.summary==='object'?data.summary:null;finalChartData=data.chartData&&typeof data.chartData==='object'?data.chartData:null;finalSupplierRanking=Array.isArray(data.supplierRanking)?data.supplierRanking:null;finalRankingTable=data.rankingTable&&Array.isArray(data.rankingTable.rows)?data.rankingTable:rankingTableFromAnswer(data.answer);
+    patchReply({content:normalizeAskAnswer(finalAnswer),sources:finalSources,summary:finalSummary,chartData:finalChartData,supplierRanking:finalSupplierRanking,rankingTable:finalRankingTable,streaming:false});
    }else{
     if(!response.body)throw new Error('Streaming response is not available in this browser.');
     const reader=response.body.getReader();const decoder=new TextDecoder();let buffer='';
     const processLine=(line)=>{
      if(!line.trim())return;
      let event;try{event=JSON.parse(line)}catch{return}
-     if(event.type==='token'&&event.text){finalAnswer+=event.text;patchReply({content:finalAnswer,streaming:true})}
+     if(event.type==='token'&&event.text){finalAnswer+=event.text;patchReply({content:normalizeAskAnswer(finalAnswer),streaming:true})}
      else if(event.type==='done'){finalSources=Array.isArray(event.sources)?event.sources:[];finalSummary=event.summary&&typeof event.summary==='object'?event.summary:null;finalChartData=event.chartData&&typeof event.chartData==='object'?event.chartData:null;finalSupplierRanking=Array.isArray(event.supplierRanking)?event.supplierRanking:null;finalRankingTable=event.rankingTable&&Array.isArray(event.rankingTable.rows)?event.rankingTable:rankingTableFromAnswer(finalAnswer);patchReply({content:finalAnswer,sources:finalSources,summary:finalSummary,chartData:finalChartData,supplierRanking:finalSupplierRanking,rankingTable:finalRankingTable,streaming:false})}
      else if(event.type==='error')throw new Error(event.error||'AI stream stopped unexpectedly.');
     };
