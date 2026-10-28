@@ -105,3 +105,9 @@ test("deterministic core KPI route respects explicit periods and selected countr
   assert.match(source, /No matching order records were found/);
   assert.match(source, /this does not mean the metric is zero/);
 });
+
+
+test("annual peak-month route requires explicit highest-revenue-month intent", () => {
+  assert.match(source, /highest-revenue month\|month with the highest revenue\|month had the highest revenue/);
+  assert.match(source, /Do not let a[\s\S]{0,100}hijack all other intents/);
+});
