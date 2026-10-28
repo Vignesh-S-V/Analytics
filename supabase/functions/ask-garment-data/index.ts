@@ -2,7 +2,12 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { aggregateProductGroups, detectProductRankingIntent, isCountryComparisonQuestion } from "./analytics-utils.mjs";
 
-const allowedOrigins = new Set(["https://analytics.vigneshw-5416.workers.dev", "https://analytics-threadiq.onrender.com"]);
+const allowedOrigins = new Set([
+  "https://analytics.vigneshw-5416.workers.dev",
+  "https://analytics-threadiq.onrender.com",
+  // Public GitHub Pages origin for the project site at /Analytics/.
+  "https://vignesh-s-v.github.io",
+]);
 function isAllowedOrigin(origin: string | null) {
   if (!origin) return false;
   if (allowedOrigins.has(origin)) return true;
