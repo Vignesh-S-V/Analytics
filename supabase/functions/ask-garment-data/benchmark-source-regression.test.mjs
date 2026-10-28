@@ -113,3 +113,11 @@ test("annual peak-month route requires explicit highest-revenue-month intent", (
   assert.match(source, /month had the highest revenue/);
   assert.match(source, /Do not let a[\s\S]{0,100}hijack all other intents/);
 });
+
+
+test('buyer ranking honors highest-profit intent and does not hijack multi-question prompts', () => {
+  assert.ok(source.includes('const isMultiQuestionPrompt ='));
+  assert.ok(source.includes('const asksProfitRanking ='));
+  assert.ok(source.includes('const metric = asksProfitRanking ? "profit_inr" : "revenue_inr"'));
+  assert.ok(source.includes('!isMultiQuestionPrompt'));
+});
