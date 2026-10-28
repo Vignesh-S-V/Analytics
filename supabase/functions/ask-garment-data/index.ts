@@ -630,11 +630,19 @@ Deno.serve(async (req: Request) => {
     const qMonth = Object.entries(qMonths).find(([name]) => (" "+normalizedQ+" ").includes(" "+name+" "))?.[1] ?? "";
     // Deterministic ranking routes must run before generic profit/revenue KPI handlers.
     // This prevents phrases such as "buyer revenue and profit margin" being answered as company totals.
-    const asksBuyerRankingEarly = /\b(buyer|buyers|customer|customers)\b/.test(normalizedQ)
+    // Multi-question prompts must continue to the general SQL agent; a deterministic
+    // one-intent route must not swallow the remaining questions.
+    const isMultiQuestionPrompt = (question.match(/\?/g) ?? []).length > 1
+      || question.split(/[\n\r]+/).map(part => part.trim()).filter(Boolean).length > 1;
+    const asksBuyerRankingEarly = !isMultiQuestionPrompt
+      && /\b(buyer|buyers|customer|customers)\b/.test(normalizedQ)
       && /\b(rank|ranking|ranked|top|highest|lowest|sort|list|all)\b/.test(normalizedQ)
       && /\b(revenue|sales|profit|margin)\b/.test(normalizedQ);
     if (asksBuyerRankingEarly) {
-      const metric = /\bby\s+(?:total\s+)?(?:recorded\s+)?(?:profit|net profit|np)\b/.test(normalizedQ) ? "profit_inr" : "revenue_inr";
+      const asksProfitRanking = /\b(profit|net profit|recorded profit|profitability)\b/.test(normalizedQ)
+        && (/\b(highest|lowest|top|bottom|most|least|rank|ranking|ranked|sort|list)\b/.test(normalizedQ)
+          || /\bby\s+(?:total\s+)?(?:recorded\s+)?profit\b/.test(normalizedQ));
+      const metric = asksProfitRanking ? "profit_inr" : "revenue_inr";
       const { data, error } = await db.from("vw_sales_by_buyer")
         .select("buyer_id,buyer_name,country,order_count,revenue_inr,profit_inr,profit_margin_pct")
         .order(metric, { ascending: false, nullsFirst: false }).limit(100);
