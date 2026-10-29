@@ -1,14 +1,14 @@
 """Cloudflare Workers entrypoint for the server-rendered Flask app.
 
-Secrets are read from Worker bindings before importing app modules, because
-the existing Flask/FastAPI modules read configuration from os.environ at import.
+Worker secrets are copied into os.environ before importing the existing app,
+because its configuration is read when the modules are imported.
 """
 from __future__ import annotations
 
 import importlib
 import os
 
-from workers import wsgi
+from workers import WorkerEntrypoint, wsgi
 
 
 _SECRET_NAMES = (
@@ -23,14 +23,14 @@ _SECRET_NAMES = (
 )
 
 
-class Default:
-    async def fetch(self, request, env):
+class Default(WorkerEntrypoint):
+    async def fetch(self, request):
         for name in _SECRET_NAMES:
-            value = getattr(env, name, None)
+            value = getattr(self.env, name, None)
             if value is not None and str(value):
                 os.environ[name] = str(value)
 
-        # Import only after Worker bindings have been copied into the app's
-        # expected environment variables.
+        # Import after secrets are available: Flask validates FLASK_SECRET_KEY
+        # at module initialization and main.py reads Supabase/Gemini settings.
         module = importlib.import_module("web_app")
-        return await wsgi.fetch(module.app, request, env)
+        return await wsgi.fetch(module.app, request, self.env)
