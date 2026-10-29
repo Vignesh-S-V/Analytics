@@ -4,5 +4,14 @@
   "main": "cloudflare_worker.py",
   "compatibility_date": "2026-10-29",
   "compatibility_flags": ["python_workers"],
-  "workers_dev": true
+  "workers_dev": true,
+  "secrets": {
+    "required": [
+      "FLASK_SECRET_KEY",
+      "SUPABASE_URL",
+      "SUPABASE_ANON_KEY",
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "GEMINI_API_KEY"
+    ]
+  }
 }
