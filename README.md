@@ -69,9 +69,9 @@ Free-tier policies and capacity can change. Hosting has **not** been deployed or
 
 ## GitHub Pages migration status
 
-GitHub Pages can only serve static assets; it cannot run this Python WSGI app. The old Pages workflow has been changed to **manual-only rollback** so future pushes do not keep deploying the legacy JavaScript app. The already-published Pages URL may continue showing its previous static build until a Python host is configured and the public link is changed.
+GitHub Pages can only serve static assets; it cannot run this Python WSGI app. The Vite/React build, JavaScript/TypeScript frontend and Edge Function source files have been removed from this branch. GitHub Pages cannot run Python and its deployment workflow was removed. The already-published Pages URL may continue serving the last static artifact until a Python host is configured and the public link is changed.
 
-Legacy React/Edge Function source remains in the repository temporarily for rollback and comparison; it is not the target runtime. Do not delete that rollback code or cut over the public site until the Python deployment has passed authenticated end-to-end tests.
+The previous implementation remains recoverable from Git history, but is no longer part of this branch's application source. The previously deployed Supabase Edge Function may still exist remotely; do not switch the public URL until Python hosting and authenticated end-to-end tests are complete.
 
 ## Data and formula cautions
 
