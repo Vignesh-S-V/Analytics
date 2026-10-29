@@ -1,111 +1,83 @@
-# ThreadIQ — Tirupur Garment Business Intelligence
+# ThreadIQ Analytics — Python-only application
 
-A free-tier-first React/Vite dashboard and Ask AI analytics workflow for garment/export business operations.
+ThreadIQ is a private garment/export business analytics workspace. The active replacement application is a server-rendered Flask/WSGI app in `python_backend/`. The browser receives HTML and CSS only: the new app does not need React, JSX, TypeScript or browser JavaScript.
 
-## Current status (audited 2026-10-21)
+## Python application modules
 
-This repository has deterministic analytics routes in the Supabase Edge Function `ask-garment-data`, alongside a retrieval/LLM response path for questions that are not handled by a specific deterministic route.
+- **Overview:** revenue, recorded profit, weighted margin, order counts, delayed orders, monthly trends and country revenue.
+- **Ask AI:** natural-language questions grounded in read-only SQL, with source view/row metadata.
+- **Product Economics:** product/category/fabric/style sales, cost and profit, including recorded direct fabric + trims + CMT cost per piece.
+- **Sales & Buyers:** buyer-level revenue, profit, margin, order quantities and late penalties.
+- **Production:** production-line efficiency, rejected quantity, overtime, rework cost and late penalties.
+- **Marketing ROI:** spend, inquiry/sample/won-order funnel, attributed value and ROAS.
+- **Procurement:** supplier scorecard and market indicators.
+- **Investment Lab:** recorded historical return metrics plus a clearly labelled what-if model based on user assumptions.
 
-- GitHub PR [#43 — Fix benchmark insight accuracy and source completeness](https://github.com/Vignesh-S-V/Analytics/pull/43) is merged into `main`.
-- Supabase Edge Function `ask-garment-data` was confirmed **ACTIVE, version 69** during the audit.
-- The production database was queried read-only to reconcile the core sales totals.
-- The full authenticated 30-question production benchmark has **not** been completed; an approved signed-in workspace session is required. Do not interpret the sample outputs below as proof that every possible question is correct.
-- A README update does not deploy or change the Edge Function.
+The interface is server-rendered and works without client-side JavaScript. Voice input, speech playback and client-side chart interactions from the old React UI are not carried over; tables and CSS-based bars are used instead.
 
-## Verified data snapshot
+## Security
 
-Read-only SQL returned the following values for the current workspace data:
+- Supabase Auth validates credentials server-side over HTTPS.
+- Email confirmation and active `threadiq_workspace_members` membership are required.
+- Membership and the current Supabase session are rechecked on authenticated requests.
+- Browser session cookies are HTTP-only, Secure and SameSite=Lax. They contain an opaque session ID, not the access token.
+- Forms use CSRF tokens; request bodies are size-limited.
+- AI requests consume `threadiq_consume_ai_quota`.
+- AI SQL passes the Python read-only validator and explicit relation allowlist in `python_backend/main.py`.
+- Read-only queries execute through `threadiq_run_readonly_query` with the signed-in user's JWT.
+- Supabase service-role and Gemini API keys must remain server-side. Never place them in Git, HTML or client environment variables.
+- No signup flow is exposed; accounts must be approved by the workspace owner.
 
-| Metric | Verified value |
-|---|---:|
-| Raw `fact_orders` rows | 10,000 |
-| Distinct order IDs | 10,000 |
-| Total revenue | ₹6,998,511,331 (about ₹699.85 Cr) |
-| Total recorded cost | ₹6,021,538,834 (about ₹602.15 Cr) |
-| Total recorded profit | ₹976,972,497 (about ₹97.70 Cr) |
-| Weighted profit margin | 13.96% |
-| Revenue − cost − recorded profit | ₹0 |
-| `vw_sales_monthly_by_country` rows | 288 |
-| Monthly periods currently present | 2023-01 through 2024-12 (24 distinct months) |
+## Run locally
 
-**Core formulas**
+Python 3.12+ is recommended.
 
-- Weighted profit margin = `SUM(profit_inr) / SUM(revenue_inr) * 100`
-- Average revenue per distinct order = `SUM(revenue_inr) / COUNT(DISTINCT order_id)`
-- Reconciliation difference = `SUM(revenue_inr) - SUM(total_cost_inr) - SUM(profit_inr)`
+```bash
+python -m venv .venv
+# Windows: .venv\\Scripts\\activate
+# macOS/Linux: source .venv/bin/activate
+python -m pip install -r python_backend/requirements.txt
+```
 
-The raw fact table and monthly-by-country view returned matching overall revenue, cost, profit and order totals. The 2025 monthly revenue questions currently return unavailable because the monthly view contains no 2025 records. Re-check coverage after new data is loaded.
+Set these environment variables in your private shell (never commit their values):
 
-### Other source-view counts checked
+- `FLASK_SECRET_KEY`: long, random session-signing secret.
+- `SUPABASE_URL`: project URL.
+- `SUPABASE_ANON_KEY`: public anon/publishable key.
+- `SUPABASE_SERVICE_ROLE_KEY`: server-only key used for quota enforcement.
+- `GEMINI_API_KEY`: server-only Gemini key.
+- Optional `UPSTREAM_TIMEOUT_SECONDS`.
 
-These are row counts for different aggregate views; they must not be added together as unique orders.
+Run the WSGI application locally:
 
-| Source view | Rows |
-|---|---:|
-| `vw_sales_by_country` | 12 |
-| `vw_sales_by_buyer` | 40 |
-| `vw_sales_by_product` | 150 |
-| `vw_marketing_channel_performance` | 1,152 |
-| `vw_production_by_line` | 20 |
-| `vw_supplier_scorecard` | 20 |
-| `vw_market_monthly` | 24 |
+```bash
+cd python_backend
+python -m unittest -v
+python -m web_app
+```
 
-## Implemented controls and improvements
+The app listens on `http://127.0.0.1:8000` by default when run directly. `GET /health` returns a non-sensitive liveness response.
 
-The following controls were verified in the Edge Function source or in the merged PR:
+## Free hosting without Render
 
-- Signed-in user/session validation, workspace membership checks and per-user request quota.
-- Request content-type and body-size checks, plus an explicit CORS origin allow-list.
-- Deterministic core KPI calculations over paginated `fact_orders` rows.
-- Distinct order ID counting, weighted margin formula, average revenue formula and revenue/cost/profit reconciliation.
-- Country comparison calculations and margin differences expressed in **percentage points**.
-- Monthly data coverage checks, exact month-key checks and no invented revenue for unavailable periods.
-- Marketing view pagination beyond Supabase's default response cap, with deterministic ordering by month, country and channel in the current `main` source.
-- Deterministic business-area investigation routes that rank supplier penalties, production rework and buyer penalties separately, with cautions against inferring causation.
-- Source names and row counts returned for supported deterministic routes.
-- Regression checks in `supabase/functions/ask-garment-data/benchmark-source-regression.test.mjs`.
+PythonAnywhere is the first candidate because its official free-account allowlist currently includes Supabase domains and `googleapis.com`, which the application needs. Official references:
 
-## Audit findings — improvements still recommended
+- [Free-account outbound allowlist](https://www.pythonanywhere.com/whitelist/)
+- [PythonAnywhere outbound-network limitations](https://help.pythonanywhere.com/pages/403ForbiddenError/)
 
-These are **not claimed as completed**. Prioritize them before treating Ask AI as fully benchmarked.
+Free-tier policies and capacity can change. Hosting has **not** been deployed or live-authenticated yet. Use `python_backend/PYTHONANYWHERE.md` and `python_backend/wsgi.py` for configuration. Add secrets through the host's private web-app environment/WSGI configuration only. Verify login, workspace membership, filters, SQL views, quota rejection and a real AI query before sharing the new URL.
 
-1. **Average-revenue intent routing:** The supplied sample for “average revenue per distinct order” returned only total revenue and order count. Ensure phrases such as “average revenue”, “per distinct order”, and “do not average monthly averages” route to the deterministic KPI calculation and visibly return the calculated value and formula.
-2. **Training / model-evidence intent:** Questions about RLHF, fine-tuning or a custom transformer should get a concise evidence-based answer. If repository evidence does not establish those details, say that they cannot be verified; do not repeat unrelated sales metrics.
-3. **Source attribution:** Show the source actually used, filters applied, rows checked, aggregation grain and calculation method. Do not label a result as raw-order verified when it was calculated from an aggregate view.
-4. **Product grain:** Keep product category, product group, fabric and style distinct. The returned ranking title and aggregation must match the grain the user requested.
-5. **Generic retrieval limits:** Several generic retrieval queries use finite limits (for example 100, 200, 1,000 or 2,000 rows). For complete rankings or totals, use deterministic server-side aggregation/pagination; if a result is partial, disclose that limitation.
-6. **Date coverage regression:** Re-run checks when new periods arrive, including partial-year coverage, missing month keys and the latest available month.
-7. **End-to-end validation:** Run the full authenticated benchmark against independently calculated expected values, including filters, ranking order, formula denominators, missing data, negative profit, source metadata and multilingual queries.
+## GitHub Pages migration status
 
-## Data-quality audit scope
+GitHub Pages can only serve static assets; it cannot run this Python WSGI app. The old Pages workflow has been changed to **manual-only rollback** so future pushes do not keep deploying the legacy JavaScript app. The already-published Pages URL may continue showing its previous static build until a Python host is configured and the public link is changed.
 
-A read-only audit of all 10,000 retrieved `fact_orders` rows reported:
+Legacy React/Edge Function source remains in the repository temporarily for rollback and comparison; it is not the target runtime. Do not delete that rollback code or cut over the public site until the Python deployment has passed authenticated end-to-end tests.
 
-- No missing/null/blank values in the checked required fields: `order_id`, `order_date`, `buyer_id`, `country`, `revenue_inr`, `total_cost_inr`, `profit_inr`.
-- No duplicate order IDs.
-- No negative revenue or negative cost rows.
-- 1,051 rows with negative recorded profit.
-- No rows where revenue minus cost differed from recorded profit by more than ₹0.01.
-- No rows where actual ship date preceded order date or due date preceded order date.
+## Data and formula cautions
 
-Negative profit is a flag for business review, not automatic proof of bad data. These checks cover only the listed fields and rules; they do not guarantee every business rule or source value is correct.
-
-## Local setup
-
-1. Install Node.js LTS.
-2. Copy `.env.example` to `.env` and set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
-3. Run `npm install && npm run dev`.
-4. Run `npm run build` before deployment.
-5. Run the Edge Function regression test with Node.js:
-
-   ```bash
-   node --test supabase/functions/ask-garment-data/benchmark-source-regression.test.mjs
-   ```
-
-Never expose a Supabase `service_role` key in browser code.
-
-## Free Render static site
-
-Repository: `Vignesh-S-V/Analytics`; branch: `main`; build command: `npm install && npm run build`; publish directory: `dist`. Add only the URL and public anon key as frontend build environment variables.
-
-More details: `docs/KPI_CATALOG.md`, `docs/ADDITIONAL_DATA_REQUIREMENTS.md`, `sql/dashboard_views.sql`.
+- Weighted profit margin = `SUM(profit_inr) / SUM(revenue_inr) * 100`.
+- ROAS = attributed order value / marketing spend; it is not profit ROI.
+- Supplier association does not prove supplier causation.
+- The production line summary does not include month/country columns, so those filters cannot be applied to that view.
+- Investment what-if results are based on user-provided assumptions, not an operating forecast.
+- If a source view does not expose a field or period, the application must not invent it.
