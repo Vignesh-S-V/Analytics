@@ -46,6 +46,31 @@ class PythonWebAppTests(unittest.TestCase):
                     self.assertNotIn(b"<script", response.data.lower())
                     self.assertIn(b"ThreadIQ", response.data)
 
+    def test_common_sales_questions_use_fast_local_classifier(self):
+        from web_app import _classify_sales_question
+
+        self.assertEqual(_classify_sales_question("Which country has the highest revenue?"), "country_revenue")
+        self.assertEqual(_classify_sales_question("Which buyer gives the highest profit?"), "buyer_profit")
+        self.assertEqual(_classify_sales_question("Show monthly sales growth"), "monthly_sales")
+        self.assertEqual(_classify_sales_question("Compare 2024 vs 2023 revenue and profit"), "year_compare")
+        self.assertIsNone(_classify_sales_question("Why did profit decrease and what caused it?"))
+
+    def test_fast_sales_answer_runs_one_read_only_query_and_returns_table_metadata(self):
+        from web_app import _fast_sales_result
+
+        sample = [{"country": "USA", "revenue_inr": 1473000000, "profit_inr": 214000000, "order_count": 2047}]
+        with patch("web_app._query", return_value=sample) as query:
+            result = _fast_sales_result("approved-token", "Which country has the highest revenue?", "2024", "")
+
+        self.assertEqual(query.call_count, 1)
+        sql = query.call_args.args[1]
+        self.assertIn("FROM fact_orders", sql)
+        self.assertIn("EXTRACT(YEAR FROM order_date)::int = 2024", sql)
+        self.assertEqual(result["title"], "Top countries by revenue")
+        self.assertEqual(result["source"], "fact_orders")
+        self.assertEqual(result["rows"][0]["country"], "USA")
+        self.assertIn(("revenue_inr", "Revenue", "money"), result["columns"])
+
     def test_unknown_module_is_not_found(self):
         with patch("web_app._current_user", return_value={"token": "x", "user_id": "u"}):
             response = self.client.get("/page/not-a-real-page")
