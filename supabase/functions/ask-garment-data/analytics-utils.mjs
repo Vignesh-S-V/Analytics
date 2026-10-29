@@ -42,7 +42,7 @@ export function splitQuestions(input) {
     .map((part) => part.replace(/^\s*(?:\d+[.)]|[-*])\s*/, "").trim())
     .filter((part) => part.length > 5);
 
-  return parts.map((part) => /[?.!]$/.test(part) ? part : part + "?");
+  return parts.map((part) => part.replace(/[.!?]+$/g, "").trim() + "?");
 }
 
 export function isMultiQuestionPrompt(input) {
