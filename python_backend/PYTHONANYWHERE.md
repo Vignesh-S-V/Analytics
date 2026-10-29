@@ -62,6 +62,8 @@ Set the web app's source directory to the repository clone and configure the WSG
 7. Confirm the provider's outbound network policy and free-tier limits still permit Supabase and Gemini calls.
 8. Only after parity and security checks pass should the public link be switched.
 
-## Known migration limitation
+## Migration status and cutover checklist
 
-This is the first server-rendered Python UI slice, not a claim that every legacy React dashboard feature has been ported. The current UI provides sign-in, a management KPI summary, monthly sales table, year/country filters, and Ask AI. Product economics, sales/buyer detail, production, marketing ROI, procurement and investment-lab screens still require feature-by-feature migration and comparison before the legacy UI can be removed. The existing React app is kept until that work is complete.
+The Python UI includes Overview, Ask AI, Product Economics, Sales & Buyers, Production, Marketing ROI, Procurement and Investment Lab. It uses server-rendered HTML/CSS without browser JavaScript. The old React/Edge Function source is retained temporarily for rollback and comparison; GitHub Pages cannot run Python.
+
+Before sharing the Python host URL or changing the public website, test every page against the real workspace and compare totals with the legacy dashboard. Verify login, email confirmation, revoked membership, SQL permissions, CSRF protection, AI quota rejection, country/year filters, and at least one authenticated AI query. The public GitHub Pages URL has not been switched by this PR because no hosting account was provisioned and no authenticated live test has been run.
