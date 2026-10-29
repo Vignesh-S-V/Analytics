@@ -1,6 +1,6 @@
 # Python-only web app on PythonAnywhere (free-tier candidate)
 
-This WSGI app is a server-rendered Python alternative to the React/Vite UI. It does not execute browser JavaScript or TypeScript. The existing React/Edge Function deployment is intentionally retained as a rollback path until the replacement is deployed and verified.
+This WSGI app is a server-rendered Python alternative to the React/Vite UI. It does not execute browser JavaScript or TypeScript. The previous frontend source has been removed from this branch. The old public Pages artifact and remotely deployed Supabase Edge Function may still exist until the Python deployment is verified and the public URL is changed.
 
 ## Hosting decision
 
@@ -64,6 +64,6 @@ Set the web app's source directory to the repository clone and configure the WSG
 
 ## Migration status and cutover checklist
 
-The Python UI includes Overview, Ask AI, Product Economics, Sales & Buyers, Production, Marketing ROI, Procurement and Investment Lab. It uses server-rendered HTML/CSS without browser JavaScript. The old React/Edge Function source is retained temporarily for rollback and comparison; GitHub Pages cannot run Python.
+The Python UI includes Overview, Ask AI, Product Economics, Sales & Buyers, Production, Marketing ROI, Procurement and Investment Lab. It uses server-rendered HTML/CSS without browser JavaScript. The previous React source is available only in Git history; GitHub Pages cannot run Python. The previously published static artifact can continue to be served, but this branch no longer builds or deploys it.
 
 Before sharing the Python host URL or changing the public website, test every page against the real workspace and compare totals with the legacy dashboard. Verify login, email confirmation, revoked membership, SQL permissions, CSRF protection, AI quota rejection, country/year filters, and at least one authenticated AI query. The public GitHub Pages URL has not been switched by this PR because no hosting account was provisioned and no authenticated live test has been run.
