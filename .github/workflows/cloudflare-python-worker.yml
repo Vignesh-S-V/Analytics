@@ -32,8 +32,6 @@ jobs:
           node-version: "22"
       - name: Install uv
         uses: astral-sh/setup-uv@v6
-      - name: Install Wrangler
-        run: npm install --global wrangler
       - name: Install Python Worker tooling
         run: uv sync
       - name: Deploy to Cloudflare Workers
@@ -49,9 +47,26 @@ jobs:
           UPSTREAM_TIMEOUT_SECONDS: ${{ secrets.UPSTREAM_TIMEOUT_SECONDS }}
           ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
         run: |
+          set -euo pipefail
           test -n "$FLASK_SECRET_KEY"
           test -n "$SUPABASE_URL"
           test -n "$SUPABASE_ANON_KEY"
           test -n "$SUPABASE_SERVICE_ROLE_KEY"
           test -n "$GEMINI_API_KEY"
-          uv run pywrangler deploy
+          secret_file="$(mktemp)"
+          trap 'rm -f "$secret_file"' EXIT
+          python - <<'PY' > "$secret_file"
+          import json, os
+          names = [
+              "FLASK_SECRET_KEY",
+              "SUPABASE_URL",
+              "SUPABASE_ANON_KEY",
+              "SUPABASE_SERVICE_ROLE_KEY",
+              "GEMINI_API_KEY",
+              "GEMINI_MODEL",
+              "UPSTREAM_TIMEOUT_SECONDS",
+              "ALLOWED_ORIGINS",
+          ]
+          print(json.dumps({name: os.environ[name] for name in names if os.environ.get(name)}))
+          PY
+          uv run pywrangler deploy --secrets-file "$secret_file"
