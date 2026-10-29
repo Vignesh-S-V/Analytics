@@ -1,4 +1,4 @@
-name: Build and deploy Vite app to GitHub Pages
+name: Legacy React Pages (manual rollback only)
 
 on:
   push:
