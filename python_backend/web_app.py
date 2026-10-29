@@ -165,7 +165,7 @@ def index():
         year_filter = f" AND EXTRACT(YEAR FROM month)::int = {int(year)}" if year else ""
         country_filter = " AND country = '" + country.replace("'", "''") + "'" if country else ""
         monthly = _run_readonly_sql(token, "SELECT month, SUM(revenue_inr) AS revenue_inr, SUM(profit_inr) AS profit_inr, SUM(order_count) AS order_count FROM vw_sales_monthly_by_country WHERE month IS NOT NULL" + year_filter + country_filter + " GROUP BY month ORDER BY month DESC LIMIT 18")
-        totals = _run_readonly_sql(token, "SELECT SUM(revenue_inr) AS revenue_inr, SUM(profit_inr) AS profit_inr, SUM(order_count) AS order_count FROM vw_management_monthly WHERE month IS NOT NULL" + (f" AND EXTRACT(YEAR FROM month)::int = {int(year)}" if year else "") + " ")
+        totals = _run_readonly_sql(token, "SELECT SUM(revenue_inr) AS revenue_inr, SUM(profit_inr) AS profit_inr, SUM(order_count) AS order_count FROM vw_sales_monthly_by_country WHERE month IS NOT NULL" + year_filter + country_filter)
         countries_rows = _run_readonly_sql(token, "SELECT DISTINCT country FROM vw_sales_by_country WHERE country IS NOT NULL ORDER BY country LIMIT 200")
         years_rows = _run_readonly_sql(token, "SELECT DISTINCT EXTRACT(YEAR FROM month)::int AS year FROM vw_sales_monthly_by_country WHERE month IS NOT NULL ORDER BY year DESC LIMIT 15")
         total = totals[0] if totals else {}
