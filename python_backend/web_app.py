@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import html
 import os
+import re
 import secrets
 from typing import Any
 
