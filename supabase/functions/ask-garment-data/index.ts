@@ -1,5 +1,11 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { aggregateProductGroups, detectProductRankingIntent, isCountryComparisonQuestion } from "./analytics-utils.mjs";
+import {
+  aggregateProductGroups,
+  detectProductRankingIntent,
+  isCountryComparisonQuestion,
+  isMultiQuestionPrompt,
+  splitQuestions,
+} from "./analytics-utils.mjs";
 
 const allowedOrigins = new Set([
   "https://analytics.vigneshw-5416.workers.dev",
@@ -274,23 +280,14 @@ Deno.serve(async (req: Request) => {
 
     // Handle multi-intent prompts before any single-intent deterministic route can return.
     // Supports multiple question marks, newline-separated questions, and sentence-separated requests.
-    const multiQuestionParts = question
-      .split(/(?:\?+\s*|[\n\r]+|(?<=[.!])\s+(?=[A-Z]))/)
-      .map((part) => part.trim())
-      .filter(Boolean);
-    const isMultiQuestionPrompt = (question.match(/\?/g) ?? []).length > 1
-      || question.split(/[\n\r]+/).map((part) => part.trim()).filter(Boolean).length > 1
-      || multiQuestionParts.length >= 3;
-    if (isMultiQuestionPrompt) {
+    const multiQuestionParts = splitQuestions(question);
+    if (isMultiQuestionPrompt(question) && multiQuestionParts.length > 1) {
       const multiQuestionGeminiKey = Deno.env.get("GEMINI_API_KEY");
       if (!multiQuestionGeminiKey) {
         return respond({ error: "Multi-question analysis requires the configured AI service. Please retry later." }, 503, origin);
       }
       try {
-        const questions = multiQuestionParts
-          .map((part) => part.replace(/^[\\s,;]+|[\\s,;]+$/g, "").trim())
-          .filter((part) => part.length > 5)
-          .map((part) => part.endsWith("?") || part.endsWith(".") ? part : part + "?");
+        const questions = multiQuestionParts;
         const answers: string[] = [];
         const allSources = new Map<string, { name: string; records: number; note: string }>();
         const cleanAgentMarkdown = (value: string) => value
