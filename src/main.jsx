@@ -290,7 +290,8 @@ function AskAI({db,range,country}){
    const supabaseUrl=SUPABASE_URL;
    const {data:{session}}=await db.auth.getSession();
    if(!session?.access_token)throw new Error('Please sign in again to ask business questions.');
-   const apiUrl=import.meta.env.DEV?'/functions/v1/ask-garment-data':supabaseUrl.replace(/\/$/,'')+'/functions/v1/ask-garment-data';
+   const configuredAskApiUrl=String(import.meta.env.VITE_ASK_AI_API_URL||'').trim();
+    const apiUrl=configuredAskApiUrl||(import.meta.env.DEV?'/functions/v1/ask-garment-data':supabaseUrl.replace(/\/$/,'')+'/functions/v1/ask-garment-data');
    const response=await fetch(apiUrl,{
     method:'POST',
     headers:{'Content-Type':'application/json','apikey':publicAnon,'Authorization':'Bearer '+session.access_token,'Accept':'application/x-ndjson, application/json'},
