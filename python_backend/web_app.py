@@ -31,6 +31,7 @@ from main import (
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "")
+app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SECURE=True, SESSION_COOKIE_SAMESITE="Lax")
 if not app.secret_key:
     # Fail closed in production rather than using a predictable cookie key.
     raise RuntimeError("FLASK_SECRET_KEY must be set in the hosting environment.")
@@ -82,7 +83,29 @@ def _supabase_request(method: str, path: str, token: str, *, body=None, params=N
 
 def _current_user():
     sid = session.get("sid")
-    return SESSIONS.get(sid) if isinstance(sid, str) else None
+    if not isinstance(sid, str):
+        return None
+    user = SESSIONS.get(sid)
+    if not user:
+        return None
+    # Re-check Supabase session and workspace approval on every request.
+    try:
+        status, profile = _supabase_request("GET", "/auth/v1/user", user["token"])
+        if status >= 400 or not isinstance(profile, dict) or profile.get("id") != user["user_id"] or not profile.get("email_confirmed_at"):
+            SESSIONS.pop(sid, None)
+            session.clear()
+            return None
+        status, membership = _supabase_request(
+            "GET", "/rest/v1/threadiq_workspace_members", user["token"],
+            params={"select": "is_active", "user_id": f"eq.{user['user_id']}", "limit": "1"},
+        )
+        if status >= 400 or not isinstance(membership, list) or not membership or membership[0].get("is_active") is not True:
+            SESSIONS.pop(sid, None)
+            session.clear()
+            return None
+    except (requests.RequestException, RuntimeError, ValueError):
+        return None
+    return user
 
 
 def _render(title: str, body: str, *, signed_in=False, **context):
