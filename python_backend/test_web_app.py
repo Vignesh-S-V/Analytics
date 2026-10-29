@@ -26,7 +26,7 @@ class PythonWebAppTests(unittest.TestCase):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Sign in to your workspace", response.data)
-        self.assertIn(b"Confirm your account email", response.data)
+        self.assertIn(b"Email confirmation and active workspace membership are required.", response.data)
         self.assertNotIn(b"<script", response.data.lower())
 
     def test_signed_cookie_contains_only_opaque_session_identifier(self):
