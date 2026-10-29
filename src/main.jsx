@@ -35,6 +35,60 @@ function rankingTableFromAnswer(answer){
 }
 
 
+function deriveAnswerInsight(question, answer) {
+ const q = String(question || '').toLowerCase();
+ const lines = String(answer || '').split(/\r?\n/).map(line => line.trim()).filter(line => line.startsWith('|') && !/^\|[\s|:-]+\|?$/.test(line));
+ const rows = lines.map(line => line.split('|').slice(1, -1).map(cell => cell.trim())).filter(cells => cells.length > 2 && !cells.every(cell => /^:?-{2,}:?$/.test(cell)));
+ const header = rows[0]?.map(cell => cell.toLowerCase().replace(/\s+/g, ' ')) || [];
+ const data = rows.slice(1);
+ const value = (cells, labels) => { const index = header.findIndex(h => labels.some(label => h.includes(label))); return index >= 0 ? cells[index] : ''; };
+ const amount = raw => { const n = parseFloat(String(raw || '').replace(/[₹,\s]/g, '')); if (!Number.isFinite(n)) return 0; return /cr|crore/i.test(raw) ? n * 1e7 : /lakh|\bl\b/i.test(raw) ? n * 1e5 : n; };
+ const countryTable = header.some(h => h === 'country') && header.some(h => h.includes('revenue'));
+ const buyerTable = header.some(h => h === 'buyer') && header.some(h => h.includes('profit'));
+ const monthlyTable = header.some(h => h === 'month') && header.some(h => h.includes('growth'));
+ if ((/highest|top|rank|most/.test(q)) && /revenue|sales|turnover/.test(q) && (countryTable || buyerTable)) {
+  const byProfit = /profit/.test(q) && !/revenue|sales/.test(q);
+  const metricLabels = byProfit ? ['recorded profit', 'profit'] : ['revenue', 'total revenue', 'sales'];
+  const sorted = [...data].sort((a, b) => amount(value(b, metricLabels)) - amount(value(a, metricLabels)));
+  const best = sorted[0];
+  if (!best) return null;
+  return {
+   title: countryTable ? 'Country ranked highest by ' + (byProfit ? 'profit' : 'revenue') : 'Buyer ranked highest by ' + (byProfit ? 'profit' : 'revenue'),
+   primary: countryTable ? value(best, ['country']) : value(best, ['buyer']),
+   metrics: [
+    { label: byProfit ? 'Recorded profit' : 'Revenue', value: value(best, metricLabels) },
+    { label: 'Orders', value: value(best, ['orders', 'order count']) },
+    { label: 'Profit margin', value: value(best, ['weighted profit margin', 'profit margin']) }
+   ]
+  };
+ }
+ if (monthlyTable && /monthly|month|growth|trend/.test(q)) {
+  const parsed = data.map(cells => ({
+   month: value(cells, ['month']),
+   revenue: value(cells, ['total revenue', 'revenue']),
+   growth: value(cells, ['growth']),
+   revenueNum: amount(value(cells, ['total revenue', 'revenue'])),
+   growthNum: parseFloat(String(value(cells, ['growth'])).replace('%', ''))
+  })).filter(row => row.month && row.revenue);
+  if (!parsed.length) return null;
+  const growthRows = parsed.filter(row => Number.isFinite(row.growthNum));
+  const highestGrowth = growthRows.length ? [...growthRows].sort((a, b) => b.growthNum - a.growthNum)[0] : null;
+  const lowestGrowth = growthRows.length ? [...growthRows].sort((a, b) => a.growthNum - b.growthNum)[0] : null;
+  const highestRevenue = [...parsed].sort((a, b) => b.revenueNum - a.revenueNum)[0];
+  return {
+   title: 'Monthly sales highlights',
+   primary: highestRevenue.month,
+   metrics: [
+    { label: 'Highest revenue', value: highestRevenue.revenue },
+    { label: 'Highest MoM growth', value: highestGrowth ? highestGrowth.month + ' · ' + highestGrowth.growth : 'Not provided' },
+    { label: 'Largest MoM decline', value: lowestGrowth ? lowestGrowth.month + ' · ' + lowestGrowth.growth : 'Not provided' }
+   ]
+  };
+ }
+ return null;
+}
+
+
 // Read every page instead of silently truncating large Supabase tables at a fixed row limit.
 async function fetchAllRowsInPages(buildQuery,pageSize=1000,parallelPages=5){
  const rows=[];
