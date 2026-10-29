@@ -445,6 +445,8 @@ def module_page(page_key: str):
 def _classify_sales_question(question: str) -> str | None:
     q = question.casefold()
     has = lambda *terms: any(term in q for term in terms)
+    if has("highest profit country", "country highest profit", "country-wise profit", "country wise profit", "top country profit"):
+        return "country_profit"
     if has("highest revenue", "top revenue country", "country highest sales", "which country", "country wise revenue", "country-wise revenue", "highest sales country", "highest revenue country"):
         return "country_revenue"
     if has("highest profit buyer", "buyer highest profit", "which buyer", "top buyer profit", "buyer-wise profit", "buyer wise profit", "highest profit customer", "buyer gives the highest profit"):
@@ -470,25 +472,26 @@ def _fast_sales_result(token: str, question: str, year: str, country: str):
         return None
     safe_year = year if re.fullmatch(r"20\d{2}", year or "") else ""
     where = " WHERE 1=1" + _filters_sql(safe_year, country)
-    if intent == "country_revenue":
-        sql = "SELECT country, SUM(revenue_inr) AS revenue_inr, SUM(profit_inr) AS profit_inr, SUM(order_count) AS order_count FROM vw_sales_by_country" + where + " AND country IS NOT NULL GROUP BY country ORDER BY revenue_inr DESC LIMIT 10"
+    if intent in {"country_revenue", "country_profit"}:
+        sort_col = "profit_inr" if intent == "country_profit" else "revenue_inr"
+        sql = "SELECT country, COUNT(DISTINCT order_id) AS order_count, SUM(revenue_inr) AS revenue_inr, SUM(profit_inr) AS profit_inr FROM fact_orders WHERE order_date IS NOT NULL" + _filters_sql(safe_year, country, has_month=False) + " AND country IS NOT NULL GROUP BY country ORDER BY " + sort_col + " DESC LIMIT 10"
         rows = _query(token, sql)
         columns = [("country", "Country", None), ("revenue_inr", "Revenue", "money"), ("profit_inr", "Profit", "money"), ("order_count", "Orders", "int")]
-        title = "Top countries by revenue"
-        source = "vw_sales_by_country"
+        title = "Top countries by " + ("profit" if intent == "country_profit" else "revenue")
+        source = "fact_orders"
     elif intent in {"buyer_profit", "buyer_revenue"}:
         sort_col = "profit_inr" if intent == "buyer_profit" else "revenue_inr"
-        sql = "SELECT buyer_name, country, SUM(revenue_inr) AS revenue_inr, SUM(profit_inr) AS profit_inr, SUM(order_count) AS order_count, CASE WHEN SUM(revenue_inr)=0 THEN NULL ELSE SUM(profit_inr)/SUM(revenue_inr)*100 END AS profit_margin_pct FROM vw_sales_by_buyer" + where + " GROUP BY buyer_name, country ORDER BY " + sort_col + " DESC LIMIT 10"
+        sql = "SELECT buyer_name, country, COUNT(DISTINCT order_id) AS order_count, SUM(revenue_inr) AS revenue_inr, SUM(profit_inr) AS profit_inr, CASE WHEN SUM(revenue_inr)=0 THEN NULL ELSE SUM(profit_inr)/SUM(revenue_inr)*100 END AS profit_margin_pct FROM fact_orders WHERE order_date IS NOT NULL" + _filters_sql(safe_year, country, has_month=False) + " GROUP BY buyer_name, country ORDER BY " + sort_col + " DESC LIMIT 10"
         rows = _query(token, sql)
         columns = [("buyer_name", "Buyer", None), ("country", "Country", None), ("revenue_inr", "Revenue", "money"), ("profit_inr", "Profit", "money"), ("profit_margin_pct", "Margin", "pct"), ("order_count", "Orders", "int")]
         title = "Top buyers by " + ("profit" if intent == "buyer_profit" else "revenue")
-        source = "vw_sales_by_buyer"
+        source = "fact_orders"
     elif intent == "product_revenue":
-        sql = "SELECT product_category, fabric, style_id, SUM(revenue_inr) AS revenue_inr, SUM(profit_inr) AS profit_inr, SUM(order_count) AS order_count FROM vw_sales_by_product" + where + " GROUP BY product_category, fabric, style_id ORDER BY revenue_inr DESC LIMIT 10"
+        sql = "SELECT product_category, fabric, style_id, COUNT(DISTINCT order_id) AS order_count, SUM(revenue_inr) AS revenue_inr, SUM(profit_inr) AS profit_inr FROM fact_orders WHERE order_date IS NOT NULL" + _filters_sql(safe_year, country, has_month=False) + " GROUP BY product_category, fabric, style_id ORDER BY revenue_inr DESC LIMIT 10"
         rows = _query(token, sql)
         columns = [("product_category", "Product", None), ("fabric", "Fabric", None), ("style_id", "Style", None), ("revenue_inr", "Revenue", "money"), ("profit_inr", "Profit", "money"), ("order_count", "Orders", "int")]
         title = "Top products by revenue"
-        source = "vw_sales_by_product"
+        source = "fact_orders"
     elif intent == "monthly_sales":
         sql = "SELECT month, SUM(revenue_inr) AS revenue_inr, SUM(profit_inr) AS profit_inr, SUM(order_count) AS order_count FROM vw_sales_monthly_by_country WHERE month IS NOT NULL" + _filters_sql(safe_year, country) + " GROUP BY month ORDER BY month ASC LIMIT 120"
         rows = _query(token, sql)
