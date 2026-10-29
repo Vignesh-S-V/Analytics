@@ -46,7 +46,7 @@ function deriveAnswerInsight(question, answer) {
  const countryTable = header.some(h => h === 'country') && header.some(h => h.includes('revenue'));
  const buyerTable = header.some(h => h === 'buyer') && header.some(h => h.includes('profit'));
  const monthlyTable = header.some(h => h === 'month') && header.some(h => h.includes('growth'));
- if ((/highest|top|rank|most/.test(q)) && /revenue|sales|turnover/.test(q) && (countryTable || buyerTable)) {
+ if ((/highest|top|rank|most/.test(q)) && (/revenue|sales|turnover|profit/.test(q)) && (countryTable || buyerTable)) {
   const byProfit = /profit/.test(q) && !/revenue|sales/.test(q);
   const metricLabels = byProfit ? ['recorded profit', 'profit'] : ['revenue', 'total revenue', 'sales'];
   const sorted = [...data].sort((a, b) => amount(value(b, metricLabels)) - amount(value(a, metricLabels)));
