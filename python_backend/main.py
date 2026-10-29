@@ -27,10 +27,12 @@ GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
 UPSTREAM_TIMEOUT_SECONDS = float(os.environ.get("UPSTREAM_TIMEOUT_SECONDS", "35"))
 MAX_BODY_BYTES = 16 * 1024
 MAX_SQL_STEPS = 5
+# Comma-separated exact origins for the optional standalone FastAPI endpoint.
+# Keep the production Python UI server-side; never use wildcard origins here.
 ALLOWED_ORIGINS = {
-    "https://vignesh-s-v.github.io",
-    "https://analytics.vigneshw-5416.workers.dev",
-    "https://analytics-threadiq.onrender.com",
+    origin.strip().rstrip("/")
+    for origin in os.environ.get("ALLOWED_ORIGINS", "http://localhost:8000").split(",")
+    if origin.strip()
 }
 ALLOWED_RELATIONS = {
     "vw_sales_monthly_by_country",
