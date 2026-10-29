@@ -438,6 +438,106 @@ def module_page(page_key: str):
         return _render(title, content, signed_in=True, active_href="/page/" + page_key)
 
 
+
+
+# Fast path: common sales questions are classified locally and answered with one
+# fixed, read-only SQL query. No generative model call is made for these intents.
+def _classify_sales_question(question: str) -> str | None:
+    q = question.casefold()
+    has = lambda *terms: any(term in q for term in terms)
+    if has("highest revenue", "top revenue country", "country highest sales", "which country", "country wise revenue", "country-wise revenue", "highest sales country", "highest revenue country"):
+        return "country_revenue"
+    if has("highest profit buyer", "buyer highest profit", "which buyer", "top buyer profit", "buyer-wise profit", "buyer wise profit", "highest profit customer", "buyer gives the highest profit"):
+        return "buyer_profit"
+    if has("top buyer", "buyer ranking", "buyer wise sales", "buyer-wise sales", "buyer revenue", "sales by buyer"):
+        return "buyer_revenue"
+    if has("top product", "product ranking", "product wise sales", "product-wise sales", "sales by product", "highest selling product", "best selling product"):
+        return "product_revenue"
+    if has("monthly growth", "month on month", "month-over-month", "mom growth", "sales growth", "monthly sales", "month wise sales", "month-wise sales", "monthly trend", "month by month"):
+        return "monthly_sales"
+    if has("compare", "year over year", "year-on-year", "yoy", "vs") and re.search(r"\b20\d{2}\b", q):
+        return "year_compare"
+    if has("country wise", "country-wise", "sales by country", "revenue by country", "country ranking", "all countries"):
+        return "country_revenue"
+    if has("total revenue", "overall revenue", "total sales", "overall sales", "sales amount", "total profit", "overall profit", "total orders", "overall summary", "sales summary", "kpi"):
+        return "summary"
+    return None
+
+
+def _fast_sales_result(token: str, question: str, year: str, country: str):
+    intent = _classify_sales_question(question)
+    if not intent:
+        return None
+    safe_year = year if re.fullmatch(r"20\d{2}", year or "") else ""
+    where = " WHERE 1=1" + _filters_sql(safe_year, country)
+    if intent == "country_revenue":
+        sql = "SELECT country, SUM(revenue_inr) AS revenue_inr, SUM(profit_inr) AS profit_inr, SUM(order_count) AS order_count FROM vw_sales_by_country" + where + " AND country IS NOT NULL GROUP BY country ORDER BY revenue_inr DESC LIMIT 10"
+        rows = _query(token, sql)
+        columns = [("country", "Country", None), ("revenue_inr", "Revenue", "money"), ("profit_inr", "Profit", "money"), ("order_count", "Orders", "int")]
+        title = "Top countries by revenue"
+        source = "vw_sales_by_country"
+    elif intent in {"buyer_profit", "buyer_revenue"}:
+        sort_col = "profit_inr" if intent == "buyer_profit" else "revenue_inr"
+        sql = "SELECT buyer_name, country, SUM(revenue_inr) AS revenue_inr, SUM(profit_inr) AS profit_inr, SUM(order_count) AS order_count, CASE WHEN SUM(revenue_inr)=0 THEN NULL ELSE SUM(profit_inr)/SUM(revenue_inr)*100 END AS profit_margin_pct FROM vw_sales_by_buyer" + where + " GROUP BY buyer_name, country ORDER BY " + sort_col + " DESC LIMIT 10"
+        rows = _query(token, sql)
+        columns = [("buyer_name", "Buyer", None), ("country", "Country", None), ("revenue_inr", "Revenue", "money"), ("profit_inr", "Profit", "money"), ("profit_margin_pct", "Margin", "pct"), ("order_count", "Orders", "int")]
+        title = "Top buyers by " + ("profit" if intent == "buyer_profit" else "revenue")
+        source = "vw_sales_by_buyer"
+    elif intent == "product_revenue":
+        sql = "SELECT product_category, fabric, style_id, SUM(revenue_inr) AS revenue_inr, SUM(profit_inr) AS profit_inr, SUM(order_count) AS order_count FROM vw_sales_by_product" + where + " GROUP BY product_category, fabric, style_id ORDER BY revenue_inr DESC LIMIT 10"
+        rows = _query(token, sql)
+        columns = [("product_category", "Product", None), ("fabric", "Fabric", None), ("style_id", "Style", None), ("revenue_inr", "Revenue", "money"), ("profit_inr", "Profit", "money"), ("order_count", "Orders", "int")]
+        title = "Top products by revenue"
+        source = "vw_sales_by_product"
+    elif intent == "monthly_sales":
+        sql = "SELECT month, SUM(revenue_inr) AS revenue_inr, SUM(profit_inr) AS profit_inr, SUM(order_count) AS order_count FROM vw_sales_monthly_by_country WHERE month IS NOT NULL" + _filters_sql(safe_year, country) + " GROUP BY month ORDER BY month ASC LIMIT 120"
+        rows = _query(token, sql)
+        previous = None
+        for row in rows:
+            current = _num(row.get("revenue_inr"))
+            row["growth_pct"] = ((current - previous) / abs(previous) * 100) if previous not in (None, 0) else None
+            previous = current
+        columns = [("month", "Month", None), ("revenue_inr", "Revenue", "money"), ("profit_inr", "Profit", "money"), ("growth_pct", "Revenue growth", "pct"), ("order_count", "Orders", "int")]
+        title = "Monthly sales and growth"
+        source = "vw_sales_monthly_by_country"
+    elif intent == "year_compare":
+        years_found = list(dict.fromkeys(re.findall(r"\b20\d{2}\b", question)))
+        if len(years_found) < 2:
+            intent = "summary"
+        else:
+            first, second = int(years_found[0]), int(years_found[1])
+            sql = "SELECT EXTRACT(YEAR FROM month)::int AS sales_year, SUM(revenue_inr) AS revenue_inr, SUM(profit_inr) AS profit_inr, SUM(order_count) AS order_count FROM vw_sales_monthly_by_country WHERE month IS NOT NULL AND EXTRACT(YEAR FROM month)::int IN (" + str(first) + "," + str(second) + ")"
+            if country:
+                sql += " AND country = '" + country.replace("'", "''") + "'"
+            sql += " GROUP BY EXTRACT(YEAR FROM month)::int ORDER BY sales_year"
+            rows = _query(token, sql)
+            by_year = {int(_num(r.get("sales_year"))): r for r in rows}
+            for y in (first, second):
+                by_year.setdefault(y, {"sales_year": y, "revenue_inr": 0, "profit_inr": 0, "order_count": 0})
+            rows = [by_year[y] for y in (first, second)]
+            columns = [("sales_year", "Year", "int"), ("revenue_inr", "Revenue", "money"), ("profit_inr", "Profit", "money"), ("order_count", "Orders", "int")]
+            title = f"Year comparison: {first} vs {second}"
+            source = "vw_sales_monthly_by_country"
+            return {"title": title, "rows": rows, "columns": columns, "source": source}
+    if intent == "summary":
+        sql = "SELECT SUM(revenue_inr) AS revenue_inr, SUM(total_cost_inr) AS total_cost_inr, SUM(profit_inr) AS profit_inr, SUM(order_count) AS order_count, SUM(delayed_order_count) AS delayed_order_count FROM vw_sales_monthly_by_country WHERE month IS NOT NULL" + _filters_sql(safe_year, country)
+        rows = _query(token, sql)
+        columns = [("revenue_inr", "Revenue", "money"), ("total_cost_inr", "Recorded cost", "money"), ("profit_inr", "Profit", "money"), ("order_count", "Orders", "int"), ("delayed_order_count", "Delayed orders", "int")]
+        title = "Sales KPI summary"
+        source = "vw_sales_monthly_by_country"
+    return {"title": title, "rows": rows, "columns": columns, "source": source}
+
+
+def _fast_answer_html(result: dict[str, Any]) -> str:
+    rows = result["rows"]
+    table = _table(rows, result["columns"], empty="No records were returned for this question and filter selection.")
+    return (
+        '<section class="panel"><h2>' + html.escape(result["title"]) + '</h2>'
+        '<p class="muted">Fast path: local intent classification + one read-only SQL query; no generative-model reasoning.</p>'
+        + table + '<p class="small muted">Source: ' + html.escape(result["source"]) + '</p></section>'
+    )
+
+
 @app.post("/ask")
 def ask():
     user = _current_user()
@@ -449,6 +549,16 @@ def ask():
         return redirect(url_for("module_page", page_key="ask-ai"))
     year = request.form.get("year", "").strip()
     country = request.form.get("country", "").strip()[:100]
+    try:
+        fast_result = _fast_sales_result(user["token"], question, year, country)
+        if fast_result is not None:
+            content = _page_heading("Ask AI", "FAST SALES ANALYTICS", "Common sales questions are classified locally and returned as a table.", year, country)
+            content += _ask_form(year, country, question) + _fast_answer_html(fast_result)
+            return _render("Ask AI", content, signed_in=True, active_href="/page/ask-ai")
+    except (requests.RequestException, RuntimeError, ValueError):
+        content = _page_heading("Ask AI", "FAST SALES ANALYTICS", "A quick sales query could not be completed.", year, country)
+        content += '<div class="error">The sales query could not be loaded from the approved workspace view. Please retry.</div>' + _ask_form(year, country, question)
+        return _render("Ask AI", content, signed_in=True, active_href="/page/ask-ai")
     if not GEMINI_API_KEY or not SUPABASE_SERVICE_ROLE_KEY:
         return _render("Ask AI", '<h1>Ask AI</h1><div class="error">The server-side AI/quota configuration is incomplete.</div>' + _ask_form(year, country, question), signed_in=True, active_href="/page/ask-ai")
     try:
