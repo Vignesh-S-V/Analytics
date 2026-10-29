@@ -14,27 +14,49 @@ permissions:
 
 jobs:
   deploy:
-    if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: python_backend
     steps:
+      - name: Check deployment credentials
+        id: gate
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CF_API_TOKEN" ] || [ -z "$CF_ACCOUNT_ID" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Cloudflare deployment skipped: configure CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Check out repository
+        if: steps.gate.outputs.configured == 'true'
         uses: actions/checkout@v4
+
       - name: Install Python
+        if: steps.gate.outputs.configured == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+
       - name: Install Node.js
+        if: steps.gate.outputs.configured == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+
       - name: Install uv
+        if: steps.gate.outputs.configured == 'true'
         uses: astral-sh/setup-uv@v6
+
       - name: Install Python Worker tooling
+        if: steps.gate.outputs.configured == 'true'
+        working-directory: python_backend
         run: uv sync
+
       - name: Deploy to Cloudflare Workers
+        if: steps.gate.outputs.configured == 'true'
+        working-directory: python_backend
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
