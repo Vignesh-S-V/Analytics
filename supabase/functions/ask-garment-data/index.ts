@@ -878,11 +878,13 @@ Deno.serve(async (req: Request) => {
       return respond({ answer: txt(leader.country) + " has the highest revenue: " + formatINR(num(leader.revenue_inr)) + ". Recorded profit: " + formatINR(num(leader.profit_inr)) + "; orders: " + num(leader.order_count).toLocaleString("en-IN") + ".", sources: [{ name: "vw_sales_by_country", records: 1, note: "single country leader selected by descending total revenue" }], question }, 200, origin);
     }
     if (singleBuyerProfitLeader || tanglishBuyerProfitLeader || singleBuyerRevenueLeader) {
-      const buyerMetric = singleBuyerRevenueLeader ? "revenue_inr" : "profit_inr";\n      const { data, error } = await db.from("vw_sales_by_buyer").select("buyer_name,country,revenue_inr,profit_inr,profit_margin_pct,order_count").order(buyerMetric, { ascending: false, nullsFirst: false }).limit(1);
+      const buyerMetric = singleBuyerRevenueLeader ? "revenue_inr" : "profit_inr";
+      const { data, error } = await db.from("vw_sales_by_buyer").select("buyer_name,country,revenue_inr,profit_inr,profit_margin_pct,order_count").order(buyerMetric, { ascending: false, nullsFirst: false }).limit(1);
       if (error) { console.error("Single buyer leader lookup failed:", error.message); return respond({ error: "Could not identify the highest-performing buyer. Please retry." }, 502, origin); }
       const leader = (data ?? [])[0] as Record<string, unknown> | undefined;
       if (!leader) return respond({ answer: "No buyer performance data is available for this workspace.", sources: [{ name: "vw_sales_by_buyer", records: 0 }], question }, 200, origin);
-      const metricLabel = buyerMetric === "revenue_inr" ? "revenue" : "recorded profit";\n      return respond({ answer: txt(leader.buyer_name) + " (" + txt(leader.country) + ") has the highest " + metricLabel + ": " + formatINR(num(leader[buyerMetric])) + ". Revenue: " + formatINR(num(leader.revenue_inr)) + "; recorded profit: " + formatINR(num(leader.profit_inr)) + "; weighted profit margin: " + num(leader.profit_margin_pct).toFixed(2) + "%; orders: " + num(leader.order_count).toLocaleString("en-IN") + ".", sources: [{ name: "vw_sales_by_buyer", records: 1, note: "single buyer leader selected by descending " + buyerMetric }], question }, 200, origin);
+      const metricLabel = buyerMetric === "revenue_inr" ? "revenue" : "recorded profit";
+      return respond({ answer: txt(leader.buyer_name) + " (" + txt(leader.country) + ") has the highest " + metricLabel + ": " + formatINR(num(leader[buyerMetric])) + ". Revenue: " + formatINR(num(leader.revenue_inr)) + "; recorded profit: " + formatINR(num(leader.profit_inr)) + "; weighted profit margin: " + num(leader.profit_margin_pct).toFixed(2) + "%; orders: " + num(leader.order_count).toLocaleString("en-IN") + ".", sources: [{ name: "vw_sales_by_buyer", records: 1, note: "single buyer leader selected by descending " + buyerMetric }], question }, 200, origin);
     }
     // Deterministic ranking routes must run before generic profit/revenue KPI handlers.
     // This prevents phrases such as "buyer revenue and profit margin" being answered as company totals.
