@@ -160,3 +160,34 @@ test("Top-N buyer ranking applies the requested row limit while list-all remains
   assert.match(source, /requestedTopN\?"Top "\+ranked\.length\+" buyers by "/);
   assert.match(source, /requestedTopN\?"top "\+ranked\.length\+" buyer groups sorted by requested metric":"complete buyer groups sorted by requested metric"/);
 });
+
+
+test("explicit multi-year comparisons calculate both years and year-over-year changes", () => {
+  assert.match(source, /if \(asksComparison && explicitYears\.length >= 2/);
+  assert.match(source, /factRows\.filter\(r => txt\(r\.order_date\)\.slice\(0, 4\) === year\)/);
+  assert.match(source, /recorded profit .*growth\(last\.profit, first\.profit\)/);
+  assert.match(source, /Margin change:/);
+});
+
+test("country Top-N ranking returns only the requested number of countries", () => {
+  assert.match(source, /const topNMatch=normalizedQ\.match\(\/\\\\btop\\\\s\+\(\\\\d\{1,2\}\)\\\\b\/i\)/);
+  assert.match(source, /const displayed=ranked\.slice\(0,requestedTopN\)/);
+  assert.match(source, /showing \+displayed\.length\+" of "\+ranked\.length/);
+});
+
+test("single highest-revenue buyer question returns one buyer instead of a full ranking", () => {
+  assert.match(source, /const singleBuyerRevenueLeader =/);
+  assert.match(source, /if \(singleBuyerProfitLeader \|\| tanglishBuyerProfitLeader \|\| singleBuyerRevenueLeader\)/);
+  assert.match(source, /order\(buyerMetric, \{ ascending: false, nullsFirst: false \}\)\.limit\(1\)/);
+});
+
+test("singular product-group leader question returns a concise single answer", () => {
+  assert.match(source, /const isSingleProductGroupLeader =/);
+  assert.match(source, /if \(isSingleProductGroupLeader\) return respond/);
+});
+
+test("singular production-line question returns one line while Top-N limits table rows", () => {
+  assert.match(source, /const isSingleProductionLeader=/);
+  assert.match(source, /const productionDisplayRows=isSingleProductionLeader\?ranked\.slice\(0,1\)/);
+  assert.match(source, /rows:productionDisplayRows\.map/);
+});
