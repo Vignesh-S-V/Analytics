@@ -100,7 +100,6 @@ class IntentTests(unittest.TestCase):
 class RequestBoundaryTests(unittest.TestCase):
     def setUp(self):
         web_app.app.config.update(TESTING=True)
-        web_app.SESSIONS.clear()
         self.client = web_app.app.test_client()
 
     def test_health_is_public_and_non_sensitive(self):
@@ -116,6 +115,38 @@ class RequestBoundaryTests(unittest.TestCase):
     def test_unknown_module_redirects_anonymous_user(self):
         response = self.client.get("/page/not-a-module")
         self.assertEqual(response.status_code, 302)
+
+
+    def test_authentication_is_read_from_http_only_cookie_not_process_memory(self):
+        self.client.set_cookie(web_app.AUTH_COOKIE_NAME, "signed-supabase-access-token")
+        calls = []
+        def fake_request(method, path, token, *, body=None, params=None):
+            calls.append((method, path, token))
+            if path == "/auth/v1/user":
+                return 200, {"id": "user-123", "email": "person@example.com", "email_confirmed_at": "2026-01-01"}
+            return 200, [{"is_active": True}]
+        original = web_app._supabase_request
+        web_app._supabase_request = fake_request
+        try:
+            user = web_app._current_user()
+        finally:
+            web_app._supabase_request = original
+        self.assertEqual(user["user_id"], "user-123")
+        self.assertEqual(user["token"], "signed-supabase-access-token")
+        self.assertEqual([call[1] for call in calls], ["/auth/v1/user", "/rest/v1/threadiq_workspace_members"])
+
+    def test_inactive_workspace_member_is_rejected(self):
+        self.client.set_cookie(web_app.AUTH_COOKIE_NAME, "signed-supabase-access-token")
+        original = web_app._supabase_request
+        def fake_request(method, path, token, *, body=None, params=None):
+            if path == "/auth/v1/user":
+                return 200, {"id": "user-123", "email_confirmed_at": "2026-01-01"}
+            return 200, [{"is_active": False}]
+        web_app._supabase_request = fake_request
+        try:
+            self.assertIsNone(web_app._current_user())
+        finally:
+            web_app._supabase_request = original
 
     def test_post_without_csrf_is_rejected(self):
         with self.client.session_transaction() as browser_session:
