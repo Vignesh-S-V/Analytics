@@ -54,7 +54,7 @@ main{min-width:0}.topbar{height:66px;background:#fff;border-bottom:1px solid var
 .panel,.kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:0 3px 14px #13223805}.panel{margin-top:16px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:13px;margin-top:17px}.kpi span{display:block;color:var(--muted);font-size:12px}.kpi strong{display:block;font-size:24px;letter-spacing:-.5px;margin-top:7px;overflow-wrap:anywhere}.kpi small{display:block;color:var(--muted);margin-top:5px}
 .filters{display:flex;gap:10px;align-items:end;flex-wrap:wrap}.filters>div{min-width:145px;flex:1}label{display:block;font-size:12px;font-weight:700;margin:8px 0 5px}input,select,textarea{width:100%;padding:10px 11px;border:1px solid #ccd6e2;border-radius:8px;background:white;color:var(--ink);font:inherit}textarea{resize:vertical}
 button,.button{border:0;border-radius:8px;background:var(--accent);color:white;font-weight:750;padding:10px 14px;cursor:pointer;display:inline-block;font:inherit;text-decoration:none}.secondary{background:#eaf2ef;color:#174f43}.plain{background:#edf1f6;color:#27364d}
-table{border-collapse:collapse;width:100%;margin-top:9px}th,td{text-align:left;border-bottom:1px solid var(--line);padding:10px 9px;font-size:12px;vertical-align:top}th{color:var(--muted);background:#f8fafc;font-weight:750;white-space:nowrap}td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.table-wrap{overflow-x:auto}.bar-row{display:grid;grid-template-columns:minmax(100px,180px) minmax(50px,1fr) 100px;gap:10px;align-items:center;margin:10px 0}.bar-track{height:9px;background:#e9eef3;border-radius:8px;overflow:hidden}.bar-fill{height:100%;background:#2e8b70;border-radius:8px}
+table{border-collapse:collapse;width:100%;margin-top:9px}th,td{text-align:left;border-bottom:1px solid var(--line);padding:10px 9px;font-size:12px;vertical-align:top}th{color:var(--muted);background:#f8fafc;font-weight:750;white-space:nowrap}td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.table-wrap{overflow-x:auto}.bar-row{display:grid;grid-template-columns:minmax(100px,180px) minmax(50px,1fr) 100px;gap:10px;align-items:center;margin:10px 0}.bar-track{height:9px;background:#e9eef3;border-radius:8px;overflow:hidden}.bar-fill{height:100%;background:#2e8b70;border-radius:8px}.chart-wrap{margin:12px 0 22px;overflow:hidden}.chart-caption{font-weight:750;margin:4px 0;color:#35435a}.chart-wrap svg{width:100%;height:auto;display:block}.compare-legend{display:flex;gap:18px;font-size:12px;color:var(--muted);margin:14px 0}.compare-legend span:before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}.legend-current:before{background:#176b57}.legend-previous:before{background:#a8b3c2}.compare-row{display:grid;grid-template-columns:40px minmax(100px,1fr) minmax(140px,210px);align-items:center;gap:12px;margin:9px 0}.compare-bars{display:flex;flex-direction:column;gap:3px}.compare-bars span{display:block;height:7px;border-radius:5px}.compare-current{background:#176b57}.compare-previous{background:#a8b3c2}.compare-row small{color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}@media(max-width:650px){.compare-row{grid-template-columns:32px minmax(80px,1fr)}.compare-row small{grid-column:2;text-align:left}}
 .notice{padding:12px 14px;background:#eef6f3;border:1px solid #d5e9e1;border-radius:9px;margin-top:14px}.error{padding:12px 14px;background:#fff1f1;border:1px solid #ffd7d7;color:#9e2525;border-radius:9px;margin-top:12px}.answer{white-space:pre-wrap;overflow-wrap:anywhere;background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:16px;margin-top:12px}.login{max-width:460px;margin:7vh auto}
 @media(max-width:820px){.shell{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid var(--line);padding:12px}.brand{padding-bottom:6px}.nav{display:flex;overflow:auto;gap:5px}.nav a{white-space:nowrap}.nav-label,.side-note{display:none}.content{padding:18px 14px}.topbar{padding:0 14px;height:55px}.kpi strong{font-size:21px}}
 """
@@ -237,6 +237,112 @@ def _bar_list(rows: list[dict[str, Any]], label_key: str, value_key: str, *, mon
     return "".join(chunks)
 
 
+
+def _short_number(value: float) -> str:
+    amount = abs(value)
+    sign = "-" if value < 0 else ""
+    if amount >= 10_000_000:
+        return f"{sign}{amount / 10_000_000:.1f}Cr"
+    if amount >= 100_000:
+        return f"{sign}{amount / 100_000:.1f}L"
+    if amount >= 1_000:
+        return f"{sign}{amount / 1_000:.1f}K"
+    return f"{value:.0f}"
+
+
+def _svg_trend(rows: list[dict[str, Any]], key: str, label: str, *, color: str = "#176b57") -> str:
+    """Accessible, server-rendered SVG trend chart (no browser JS dependency)."""
+    points = [(str(r.get("month", ""))[:7], _num(r.get(key))) for r in rows if r.get("month")]
+    if len(points) < 2:
+        return '<p class="muted">At least two monthly observations are needed for this chart.</p>'
+    width, height, left, right, top, bottom = 760, 230, 58, 18, 18, 42
+    plot_w, plot_h = width - left - right, height - top - bottom
+    low, high = min(v for _, v in points), max(v for _, v in points)
+    if high == low:
+        high = low + abs(low) * .1 or 1
+    coords = []
+    for i, (month, value) in enumerate(points):
+        x = left + plot_w * i / (len(points) - 1)
+        y = top + plot_h * (high - value) / (high - low)
+        coords.append((x, y, month, value))
+    poly = " ".join(f"{x:.1f},{y:.1f}" for x, y, _, _ in coords)
+    grid = []
+    for i in range(5):
+        y = top + plot_h * i / 4
+        val = high - (high - low) * i / 4
+        grid.append(f'<line x1="{left}" y1="{y:.1f}" x2="{width-right}" y2="{y:.1f}" stroke="#e8edf2"/><text x="{left-8}" y="{y+4:.1f}" text-anchor="end" fill="#63728a" font-size="10">{html.escape(_short_number(val))}</text>')
+    labels = []
+    step = max(1, len(coords) // 6)
+    for i, (x, _, month, _) in enumerate(coords):
+        if i % step == 0 or i == len(coords) - 1:
+            labels.append(f'<text x="{x:.1f}" y="{height-14}" text-anchor="middle" fill="#63728a" font-size="10">{html.escape(month)}</text>')
+    dots = "".join(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.5" fill="{color}"><title>{html.escape(month)}: {html.escape(_money(value))}</title></circle>' for x, y, month, value in coords)
+    return (
+        '<div class="chart-wrap"><div class="chart-caption">' + html.escape(label) + '</div>'
+        + f'<svg viewBox="0 0 {width} {height}" role="img" aria-label="{html.escape(label)} monthly trend" xmlns="http://www.w3.org/2000/svg">'
+        + "".join(grid) + f'<polyline points="{poly}" fill="none" stroke="{color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'
+        + dots + "".join(labels) + '</svg></div>'
+    )
+
+
+def _financial_year_comparison(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Compare matching Apr–Mar months for the two latest FYs in returned rows."""
+    by_month: dict[tuple[int, int], dict[str, float]] = {}
+    fiscal_years: set[int] = set()
+    for row in rows:
+        raw = str(row.get("month") or "")
+        try:
+            year, month = int(raw[:4]), int(raw[5:7])
+        except (TypeError, ValueError):
+            continue
+        if month < 1 or month > 12:
+            continue
+        fy = year if month >= 4 else year - 1
+        fiscal_month = (month - 4) % 12
+        fiscal_years.add(fy)
+        item = by_month.setdefault((fy, fiscal_month), {"revenue": 0.0, "qty": 0.0, "profit": 0.0})
+        item["revenue"] += _num(row.get("revenue_inr"))
+        item["qty"] += _num(row.get("shipped_qty"))
+        item["profit"] += _num(row.get("profit_inr"))
+    if len(fiscal_years) < 2:
+        return None
+    current, previous = max(fiscal_years), max(fiscal_years) - 1
+    names = ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"]
+    matched = []
+    for i, name in enumerate(names):
+        a, b = by_month.get((current, i)), by_month.get((previous, i))
+        if a is not None and b is not None:
+            matched.append({"month": name, "current": a["revenue"], "previous": b["revenue"],
+                            "current_qty": a["qty"], "previous_qty": b["qty"]})
+    if not matched:
+        return None
+    rev_now = sum(x["current"] for x in matched)
+    rev_prev = sum(x["previous"] for x in matched)
+    qty_now = sum(x["current_qty"] for x in matched)
+    qty_prev = sum(x["previous_qty"] for x in matched)
+    return {"current_year": current, "previous_year": previous, "months": matched,
+            "revenue_current": rev_now, "revenue_previous": rev_prev,
+            "qty_current": qty_now, "qty_previous": qty_prev,
+            "revenue_growth": (rev_now - rev_prev) / abs(rev_prev) * 100 if rev_prev else None,
+            "qty_growth": (qty_now - qty_prev) / abs(qty_prev) * 100 if qty_prev else None}
+
+
+def _comparison_bars(comparison: dict[str, Any]) -> str:
+    values = comparison["months"]
+    maximum = max([x["current"] for x in values] + [x["previous"] for x in values] + [1])
+    rows = []
+    for item in values:
+        a = max(0, item["current"] / maximum * 100)
+        b = max(0, item["previous"] / maximum * 100)
+        rows.append(
+            '<div class="compare-row"><b>' + html.escape(item["month"]) + '</b><div class="compare-bars">'
+            + f'<span class="compare-current" style="width:{a:.2f}%" title="{html.escape(_money(item["current"]))}"></span>'
+            + f'<span class="compare-previous" style="width:{b:.2f}%" title="{html.escape(_money(item["previous"]))}"></span>'
+            + '</div><small>' + html.escape(_money(item["current"])) + ' / ' + html.escape(_money(item["previous"])) + '</small></div>'
+        )
+    return '<div class="compare-legend"><span class="legend-current">Latest FY</span><span class="legend-previous">Previous FY</span></div>' + "".join(rows)
+
+
 def _filter_context(token: str, year: str, country: str):
     years_rows = _query(token, "SELECT DISTINCT EXTRACT(YEAR FROM month)::int AS year FROM vw_sales_monthly_by_country WHERE month IS NOT NULL ORDER BY year DESC LIMIT 20")
     country_rows = _query(token, "SELECT DISTINCT country FROM vw_sales_by_country WHERE country IS NOT NULL ORDER BY country LIMIT 200")
@@ -290,7 +396,7 @@ def _dashboard(token: str, year: str, country: str, page_key: str, answer: str |
     month_where = " WHERE month IS NOT NULL" + _filters_sql(year, country)
     totals_rows = _query(token, "SELECT SUM(revenue_inr) AS revenue_inr, SUM(total_cost_inr) AS total_cost_inr, SUM(profit_inr) AS profit_inr, SUM(order_count) AS order_count, SUM(delayed_order_count) AS delayed_order_count FROM vw_sales_monthly_by_country" + month_where)
     totals = totals_rows[0] if totals_rows else {}
-    monthly = _query(token, "SELECT month, SUM(revenue_inr) AS revenue_inr, SUM(profit_inr) AS profit_inr, SUM(order_count) AS order_count FROM vw_sales_monthly_by_country" + month_where + " GROUP BY month ORDER BY month DESC LIMIT 24")
+    monthly = _query(token, "SELECT month, SUM(revenue_inr) AS revenue_inr, SUM(profit_inr) AS profit_inr, SUM(shipped_qty) AS shipped_qty, SUM(order_count) AS order_count FROM vw_sales_monthly_by_country" + month_where + " GROUP BY month ORDER BY month ASC LIMIT 36")
     country_rows = _query(token, "SELECT country, SUM(revenue_inr) AS revenue_inr, SUM(profit_inr) AS profit_inr FROM vw_sales_monthly_by_country WHERE month IS NOT NULL" + _filters_sql(year, country) + " AND country IS NOT NULL GROUP BY country ORDER BY revenue_inr DESC LIMIT 10")
     kpis = _kpis([
         ("Total revenue", _money(totals.get("revenue_inr")), "SUM(revenue_inr)"),
