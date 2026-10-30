@@ -8,9 +8,9 @@ export default defineConfig(({ mode }) => {
   ).trim().replace(/\/$/, '');
 
   return {
-    // GitHub Pages serves this project at /Analytics/. Keep root paths for
-    // local development and the existing Cloudflare Workers deployment.
-    base: process.env.GITHUB_ACTIONS === 'true' ? '/Analytics/' : '/',
+    // Cloudflare Workers serves the dashboard from the domain root.
+    // Keep absolute root asset paths in CI and production builds as well.
+    base: '/',
     plugins: [react()],
     server: {
       host: '0.0.0.0',
