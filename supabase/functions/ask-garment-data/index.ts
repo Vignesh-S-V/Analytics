@@ -849,6 +849,26 @@ Deno.serve(async (req: Request) => {
     const qYear = question.match(/20[0-9]{2}/)?.[0] ?? requestedYear;
     const qMonths: Record<string,string> = { january:"01",jan:"01",february:"02",feb:"02",march:"03",mar:"03",april:"04",apr:"04",may:"05",june:"06",jun:"06",july:"07",jul:"07",august:"08",aug:"08",september:"09",sep:"09",sept:"09",october:"10",oct:"10",november:"11",nov:"11",december:"12",dec:"12" };
     const qMonth = Object.entries(qMonths).find(([name]) => (" "+normalizedQ+" ").includes(" "+name+" "))?.[1] ?? "";
+    // Singular leader questions are resolved before ranking-table routes, including on warm-cache requests.
+    const leaderIsMulti = (question.match(/\?/g) ?? []).length > 1 || question.split(/[\n\r]+/).map(part => part.trim()).filter(Boolean).length > 1;
+    const explicitMultiRow = /\b(?:show|list|display|rank|ranking|compare|all|every|top\s+\d+|top\s+(?:buyers|customers|countries)|buyer ranking|country ranking)\b/i.test(normalizedQ);
+    const singleCountryLeader = !leaderIsMulti && !explicitMultiRow && /\b(?:country|countries|market)\b/i.test(normalizedQ) && /\b(?:highest|most|leading|leader|number one|no 1)\b/i.test(normalizedQ) && /\b(?:revenue|sales|turnover)\b/i.test(normalizedQ);
+    const singleBuyerProfitLeader = !leaderIsMulti && !explicitMultiRow && /\b(?:buyer|buyers|customer|customers)\b/i.test(normalizedQ) && /\b(?:highest|most|top|number one|no 1|best)\b/i.test(normalizedQ) && /\b(?:profit|net profit|recorded profit|profitability)\b/i.test(normalizedQ);
+    const tanglishBuyerProfitLeader = !leaderIsMulti && !explicitMultiRow && /\b(?:buyer|customer)\b/i.test(normalizedQ) && /\b(?:highest|most|top)\b/i.test(normalizedQ) && /\b(?:profit|net profit)\b/i.test(normalizedQ) && /(?:kudukkura|kodukkura|tharum|tarum|yaaru|yaru)/i.test(rawQ);
+    if (singleCountryLeader) {
+      const { data, error } = await db.from("vw_sales_by_country").select("country,revenue_inr,profit_inr,order_count").order("revenue_inr", { ascending: false, nullsFirst: false }).limit(1);
+      if (error) { console.error("Single country leader lookup failed:", error.message); return respond({ error: "Could not identify the highest-revenue country. Please retry." }, 502, origin); }
+      const leader = (data ?? [])[0] as Record<string, unknown> | undefined;
+      if (!leader) return respond({ answer: "No country revenue data is available for this workspace.", sources: [{ name: "vw_sales_by_country", records: 0 }], question }, 200, origin);
+      return respond({ answer: txt(leader.country) + " has the highest revenue: " + formatINR(num(leader.revenue_inr)) + ". Recorded profit: " + formatINR(num(leader.profit_inr)) + "; orders: " + num(leader.order_count).toLocaleString("en-IN") + ".", sources: [{ name: "vw_sales_by_country", records: 1, note: "single country leader selected by descending total revenue" }], question }, 200, origin);
+    }
+    if (singleBuyerProfitLeader || tanglishBuyerProfitLeader) {
+      const { data, error } = await db.from("vw_sales_by_buyer").select("buyer_name,country,revenue_inr,profit_inr,profit_margin_pct,order_count").order("profit_inr", { ascending: false, nullsFirst: false }).limit(1);
+      if (error) { console.error("Single buyer profit leader lookup failed:", error.message); return respond({ error: "Could not identify the highest-profit buyer. Please retry." }, 502, origin); }
+      const leader = (data ?? [])[0] as Record<string, unknown> | undefined;
+      if (!leader) return respond({ answer: "No buyer profit data is available for this workspace.", sources: [{ name: "vw_sales_by_buyer", records: 0 }], question }, 200, origin);
+      return respond({ answer: txt(leader.buyer_name) + " (" + txt(leader.country) + ") has the highest recorded profit: " + formatINR(num(leader.profit_inr)) + ". Revenue: " + formatINR(num(leader.revenue_inr)) + "; weighted profit margin: " + num(leader.profit_margin_pct).toFixed(2) + "%; orders: " + num(leader.order_count).toLocaleString("en-IN") + ".", sources: [{ name: "vw_sales_by_buyer", records: 1, note: "single buyer leader selected by descending recorded profit" }], question }, 200, origin);
+    }
     // Deterministic ranking routes must run before generic profit/revenue KPI handlers.
     // This prevents phrases such as "buyer revenue and profit margin" being answered as company totals.
     // Multi-question prompts must continue to the general SQL agent; a deterministic
