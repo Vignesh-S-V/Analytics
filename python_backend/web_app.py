@@ -409,7 +409,19 @@ def _dashboard(token: str, year: str, country: str, page_key: str, answer: str |
     country_chart = _bar_list(country_rows, "country", "revenue_inr", money=True)
     content = _page_heading("Business overview", "GARMENT BUSINESS INTELLIGENCE", "Understand profitability, delivery risk and actions across the export business.", year, country)
     content += filter_form + (('<div class="error">' + html.escape(error) + "</div>") if error else "") + kpis
-    content += '<section class="panel"><h2>Monthly revenue and profit</h2><p class="muted">Latest 24 recorded months; values are aggregated from approved workspace views.</p>' + month_table + '</section>'
+    content += '<section class="panel"><h2>Monthly revenue and profit</h2><p class="muted">Monthly values are aggregated from approved workspace views.</p>' + _svg_trend(monthly, "revenue_inr", "Monthly revenue") + _svg_trend(monthly, "profit_inr", "Monthly recorded profit", color="#6475c7") + month_table + '</section>'
+    comparison = _financial_year_comparison(monthly)
+    if comparison:
+        revenue_growth = f'{comparison["revenue_growth"]:+.2f}%' if comparison["revenue_growth"] is not None else "N/A"
+        qty_growth = f'{comparison["qty_growth"]:+.2f}%' if comparison["qty_growth"] is not None else "N/A"
+        content += '<section class="panel"><h2>Financial-year comparison</h2><p class="muted">Matching April–March months only; partial years are compared only where both years have records.</p>'
+        content += _kpis([
+            ("FY " + str(comparison["current_year"]) + " revenue", _money(comparison["revenue_current"]), "Latest financial year"),
+            ("FY " + str(comparison["previous_year"]) + " revenue", _money(comparison["revenue_previous"]), "Previous financial year"),
+            ("Revenue growth", revenue_growth, str(len(comparison["months"])) + " matched months"),
+            ("Shipped quantity growth", qty_growth, "Shipped quantity"),
+        ])
+        content += _comparison_bars(comparison) + '</section>'
     content += '<section class="panel"><h2>Revenue by country</h2>' + country_chart + '</section>'
     content += _ask_form(year, country)
     if answer:
