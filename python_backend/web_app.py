@@ -14,7 +14,6 @@ from typing import Any
 
 import httpx
 import requests
-from cachetools import TTLCache
 from flask import Flask, abort, redirect, render_template_string, request, session, url_for
 from markupsafe import Markup
 
@@ -41,7 +40,8 @@ if not app.secret_key:
     raise RuntimeError("FLASK_SECRET_KEY must be configured as a server-side secret.")
 
 HTTP_TIMEOUT = min(max(UPSTREAM_TIMEOUT_SECONDS, 5), 45)
-SESSIONS: TTLCache[str, dict[str, Any]] = TTLCache(maxsize=500, ttl=3600)
+AUTH_COOKIE_NAME = "threadiq_access"
+AUTH_COOKIE_MAX_AGE = 3600
 
 STYLE = """
 :root{color-scheme:light;--ink:#152238;--muted:#63728a;--line:#e2e8f0;--accent:#176b57;--bg:#f4f7fa;--soft:#edf5f2}
@@ -113,30 +113,26 @@ def _supabase_request(method: str, path: str, token: str, *, body=None, params=N
 
 
 def _current_user():
-    sid = session.get("sid")
-    if not isinstance(sid, str):
-        return None
-    user = SESSIONS.get(sid)
-    if not user:
-        session.clear()
+    # Cloudflare Workers may route consecutive requests to different isolates.
+    # Keep the short-lived Supabase access token in an HttpOnly cookie instead
+    # of process-local memory, which is not shared between Worker isolates.
+    token = request.cookies.get(AUTH_COOKIE_NAME, "")
+    if not token or len(token) > 8192:
         return None
     try:
-        status, profile = _supabase_request("GET", "/auth/v1/user", user["token"])
-        if status >= 400 or not isinstance(profile, dict) or profile.get("id") != user["user_id"] or not profile.get("email_confirmed_at"):
-            SESSIONS.pop(sid, None)
-            session.clear()
+        status, profile = _supabase_request("GET", "/auth/v1/user", token)
+        if status >= 400 or not isinstance(profile, dict) or not profile.get("id") or not profile.get("email_confirmed_at"):
             return None
+        user_id = str(profile["id"])
         status, membership = _supabase_request(
-            "GET", "/rest/v1/threadiq_workspace_members", user["token"],
-            params={"select": "is_active", "user_id": f"eq.{user['user_id']}", "limit": "1"},
+            "GET", "/rest/v1/threadiq_workspace_members", token,
+            params={"select": "is_active", "user_id": f"eq.{user_id}", "limit": "1"},
         )
         if status >= 400 or not isinstance(membership, list) or not membership or membership[0].get("is_active") is not True:
-            SESSIONS.pop(sid, None)
-            session.clear()
             return None
     except (requests.RequestException, RuntimeError, ValueError):
         return None
-    return user
+    return {"token": token, "user_id": user_id, "email": str(profile.get("email") or "")}
 
 
 def _render(title: str, body: str, *, signed_in=False, active_href="/", **context):
@@ -465,13 +461,15 @@ def index():
                 )
                 if status >= 400 or not isinstance(membership, list) or not membership or membership[0].get("is_active") is not True:
                     return _login("", "This account is not approved for the workspace.")
-                sid = secrets.token_urlsafe(32)
-                SESSIONS[sid] = {"token": token, "user_id": profile["id"], "email": profile.get("email", "")}
                 session.clear()
-                session["sid"] = sid
                 session["csrf_token"] = secrets.token_urlsafe(32)
                 session.permanent = True
-                return redirect(url_for("index"))
+                response = redirect(url_for("index"))
+                response.set_cookie(
+                    AUTH_COOKIE_NAME, token, max_age=AUTH_COOKIE_MAX_AGE, path="/",
+                    secure=True, httponly=True, samesite="Lax",
+                )
+                return response
             except (requests.RequestException, ValueError):
                 return _login("", "Authentication service is temporarily unavailable.")
         return _login("")
@@ -712,11 +710,10 @@ def ask():
 @app.post("/logout")
 def logout():
     _check_csrf()
-    sid = session.pop("sid", None)
-    if sid:
-        SESSIONS.pop(sid, None)
     session.clear()
-    return redirect(url_for("index"))
+    response = redirect(url_for("index"))
+    response.delete_cookie(AUTH_COOKIE_NAME, path="/", secure=True, httponly=True, samesite="Lax")
+    return response
 
 
 @app.errorhandler(400)
