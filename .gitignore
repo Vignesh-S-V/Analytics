@@ -1,15 +1,12 @@
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-venv/
+node_modules/
+dist/
 .env
 .env.*
 !.env.example
 *.local
 *.log
-.coverage
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
+npm-debug.log*
 .DS_Store
+.wrangler/
+.dev.vars
+.coverage/
