@@ -30,7 +30,7 @@ jobs:
           python-version: '3.12'
       - name: Run Python Ask AI security and prompt tests
         run: |
-          python -m pip install -r python_backend/requirements.txt
+          python -m pip install -r python_backend/requirements-test.txt
           cd python_backend
           python -m unittest -v test_main.py
       - name: Scan tracked text files for common secret patterns

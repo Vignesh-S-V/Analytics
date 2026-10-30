@@ -166,6 +166,10 @@ async def lifespan(app: Starlette):
 
 
 
+async def health(request: Request) -> JSONResponse:
+    return JSONResponse({"status": "ok", "service": "threadiq-python-api", "engine": "python"})
+
+
 async def _json_request(
     client: httpx.AsyncClient,
     method: str,
