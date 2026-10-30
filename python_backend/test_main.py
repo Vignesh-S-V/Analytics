@@ -16,9 +16,8 @@ class StarletteAppTests(unittest.TestCase):
         )
 
     def test_ask_route_is_registered_and_post_only(self):
-        with TestClient(app) as client:
-            response = client.get("/ask")
-        self.assertEqual(response.status_code, 405)
+        ask_route = next(route for route in app.routes if getattr(route, "path", None) == "/ask")
+        self.assertEqual(ask_route.methods, {"POST"})
 
 class QuestionPreparationTests(unittest.TestCase):
     def test_multi_question_prompt_keeps_each_question(self):
