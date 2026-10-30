@@ -147,7 +147,7 @@ test("singular leader questions resolve before cached ranking/RAG paths", () => 
 });
 
 test("explicit multi-row ranking and multi-question prompts do not use singular leader response", () => {
-  assert.ok(source.includes("const explicitMultiRow = /\\\\b"));
+  assert.ok(source.includes("const explicitMultiRow = /\\b"));
   assert.match(source, /!leaderIsMulti && !explicitMultiRow/);
 });
 
