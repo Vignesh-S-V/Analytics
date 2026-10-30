@@ -1,7 +1,24 @@
 import unittest
 
-from main import ALLOWED_RELATIONS, _agent_prompt, _prepare_question, validate_sql
+from main import ALLOWED_RELATIONS, _agent_prompt, _prepare_question, app, validate_sql
+from starlette.testclient import TestClient
 
+
+
+class StarletteAppTests(unittest.TestCase):
+    def test_health_route_is_served_by_asgi_app(self):
+        with TestClient(app) as client:
+            response = client.get("/health")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {"status": "ok", "service": "threadiq-python-api", "engine": "python"},
+        )
+
+    def test_ask_route_is_registered_and_post_only(self):
+        with TestClient(app) as client:
+            response = client.get("/ask")
+        self.assertEqual(response.status_code, 405)
 
 class QuestionPreparationTests(unittest.TestCase):
     def test_multi_question_prompt_keeps_each_question(self):
