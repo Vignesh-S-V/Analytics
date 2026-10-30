@@ -20,7 +20,7 @@ The interface is server-rendered and works without client-side JavaScript. Voice
 - Supabase Auth validates credentials server-side over HTTPS.
 - Email confirmation and active `threadiq_workspace_members` membership are required.
 - Membership and the current Supabase session are rechecked on authenticated requests.
-- Browser session cookies are HTTP-only, Secure and SameSite=Lax. They contain an opaque session ID, not the access token.
+- The short-lived Supabase access token is stored only in an HTTP-only, Secure, SameSite=Lax cookie (one-hour lifetime); Flask's separate signed session cookie contains CSRF state only. Every authenticated request revalidates the token and active workspace membership with Supabase. This avoids process-local session storage across Cloudflare Worker isolates.
 - Forms use CSRF tokens; request bodies are size-limited.
 - AI requests consume `threadiq_consume_ai_quota`.
 - AI SQL passes the Python read-only validator and explicit relation allowlist in `python_backend/main.py`.
