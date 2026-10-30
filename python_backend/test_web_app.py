@@ -34,6 +34,37 @@ class FormattingTests(unittest.TestCase):
         self.assertIn("&lt;script&gt;", rendered)
 
 
+class ChartTests(unittest.TestCase):
+    def test_svg_trend_is_server_rendered_and_escapes_labels(self):
+        rows = [
+            {"month": "2024-04-01", "revenue_inr": 1000},
+            {"month": "2024-05-01", "revenue_inr": 1500},
+            {"month": "2024-06-01", "revenue_inr": 1200},
+        ]
+        svg = web_app._svg_trend(rows, "revenue_inr", "Revenue <trend>")
+        self.assertIn("<svg", svg)
+        self.assertIn("Revenue &lt;trend&gt;", svg)
+        self.assertIn("<polyline", svg)
+
+    def test_financial_year_comparison_uses_matching_months(self):
+        rows = [
+            {"month": "2023-04-01", "revenue_inr": 100, "shipped_qty": 10},
+            {"month": "2023-05-01", "revenue_inr": 200, "shipped_qty": 20},
+            {"month": "2024-04-01", "revenue_inr": 150, "shipped_qty": 15},
+            {"month": "2024-05-01", "revenue_inr": 300, "shipped_qty": 30},
+        ]
+        result = web_app._financial_year_comparison(rows)
+        self.assertEqual(result["current_year"], 2024)
+        self.assertEqual(result["previous_year"], 2023)
+        self.assertEqual(len(result["months"]), 2)
+        self.assertAlmostEqual(result["revenue_growth"], 50.0)
+        self.assertAlmostEqual(result["qty_growth"], 50.0)
+
+    def test_financial_year_comparison_requires_two_years(self):
+        rows = [{"month": "2024-04-01", "revenue_inr": 10, "shipped_qty": 1}]
+        self.assertIsNone(web_app._financial_year_comparison(rows))
+
+
 class FilterTests(unittest.TestCase):
     def test_year_and_country_filters_are_constrained_and_escaped(self):
         clause = web_app._filters_sql("2024", "US'A")
