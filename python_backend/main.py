@@ -303,7 +303,10 @@ async def _run_gemini(
 @app.post("/ask")
 async def ask(request: Request):
     origin = request.headers.get("origin")
-    if not origin or origin not in ALLOWED_ORIGINS:
+    request_origin = str(request.base_url).rstrip("/")
+    # Allow the exact same-origin preview/production host plus explicit local
+    # development origins. This keeps preview URLs isolated without wildcards.
+    if not origin or (origin not in ALLOWED_ORIGINS and origin != request_origin):
         return _error("This origin is not allowed.", 403)
     if not request.headers.get("apikey"):
         return _error("Supabase API key header is missing.", 401)
