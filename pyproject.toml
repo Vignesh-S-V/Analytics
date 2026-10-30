@@ -16,3 +16,11 @@ dev = [
     "workers-py",
     "workers-runtime-sdk",
 ]
+
+# The repository is an application workspace, not a distributable Python
+# package. Its importable application modules live under python_backend/.
+# Explicitly disable setuptools flat-layout discovery so pip install .
+# does not mistake unrelated top-level folders (sql/, python_backend/) for
+# multiple packages in Cloudflare's build environment.
+[tool.setuptools]
+packages = []
