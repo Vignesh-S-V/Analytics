@@ -886,7 +886,7 @@ Deno.serve(async (req: Request) => {
       const metric = asksProfitRanking ? "profit_inr" : "revenue_inr";
       // Honor an explicit numeric Top-N request; otherwise return the complete buyer ranking.
       // Keep a defensive cap of 100 rows for unbounded ranking requests.
-      const topNMatch = normalizedQ.match(/\\btop\\s+(\\d{1,3})\\b/i);
+      const topNMatch = normalizedQ.match(/\btop\s+(\d{1,3})\b/i);
       const requestedTopN = topNMatch ? Math.max(1, Math.min(100, Number(topNMatch[1]))) : null;
       const rowLimit = requestedTopN ?? 100;
       const { data, error } = await db.from("vw_sales_by_buyer")
