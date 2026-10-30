@@ -3,14 +3,11 @@ name = "threadiq-analytics"
 version = "1.0.0"
 description = "ThreadIQ Analytics Python API on Cloudflare Workers"
 requires-python = ">=3.13"
-dependencies = [
-    "workers-runtime-sdk==1.9.5",
-]
+dependencies = []
 
 [dependency-groups]
 dev = [
     "workers-py==1.17.9",
-    "workers-runtime-sdk==1.9.5",
 ]
 
 [tool.setuptools]
