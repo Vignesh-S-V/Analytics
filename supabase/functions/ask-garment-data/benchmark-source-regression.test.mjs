@@ -150,3 +150,13 @@ test("explicit multi-row ranking and multi-question prompts do not use singular 
   assert.ok(source.includes("const explicitMultiRow = /\\\\b"));
   assert.match(source, /!leaderIsMulti && !explicitMultiRow/);
 });
+
+test("Top-N buyer ranking applies the requested row limit while list-all remains complete", () => {
+  assert.match(source, /const topNMatch = normalizedQ\.match\(\/\\\\btop\\\\s\+\\\\d\{1,3\}\\\\b\/i\)/);
+  assert.match(source, /const requestedTopN = topNMatch \? Math\.max\(1, Math\.min\(100, Number\(topNMatch\[1\]\)\)\) : null/);
+  assert.match(source, /const rowLimit = requestedTopN \?\? 100/);
+  assert.match(source, /\.order\(metric, \{ ascending: false, nullsFirst: false \}\)\.limit\(rowLimit\)/);
+  assert.match(source, /\.slice\(0, requestedTopN \?\? rows\.length\)/);
+  assert.match(source, /requestedTopN\?"Top "\+ranked\.length\+" buyers by "/);
+  assert.match(source, /requestedTopN\?"top "\+ranked\.length\+" buyer groups sorted by requested metric":"complete buyer groups sorted by requested metric"/);
+});
