@@ -1,12 +1,15 @@
-node_modules/
-dist/
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
 .env
 .env.*
 !.env.example
 *.local
 *.log
-npm-debug.log*
+.coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .DS_Store
-.wrangler/
-.dev.vars
-.coverage/
