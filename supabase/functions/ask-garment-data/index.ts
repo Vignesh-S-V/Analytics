@@ -949,6 +949,8 @@ Deno.serve(async (req: Request) => {
         const revenueLeader = [...rankedGroups].sort((a,b)=>b.revenue_inr-a.revenue_inr)[0];
         const profitLeader = [...rankedGroups].sort((a,b)=>b.profit_inr-a.profit_inr)[0];
         const sameLeader = revenueLeader.product_category === profitLeader.product_category;
+        const isSingleProductGroupLeader = /\b(?:which|what)\b/i.test(normalizedQ) && /\b(?:highest|most|top|best)\b/i.test(normalizedQ) && !explicitMultiRow;
+        if (isSingleProductGroupLeader) return respond({ answer: "Highest " + metricLabel + " product group: " + top.product_category + ". Revenue: " + formatINR(top.revenue_inr) + "; recorded profit: " + formatINR(top.profit_inr) + "; weighted profit margin: " + top.profit_margin_pct.toFixed(2) + "%; styles included: " + top.style_count + ".", sources: [{ name: "vw_sales_by_product", records: rows.length, note: "all styles aggregated by product group; sorted by total " + metricLabel }], question }, 200, origin);
         const answer = "Highest " + metricLabel + " product group: " + top.product_category + ". Combined revenue: " + formatINR(top.revenue_inr)
           + "; combined recorded profit: " + formatINR(top.profit_inr) + "; weighted profit margin: " + top.profit_margin_pct.toFixed(2)
           + "%; styles included: " + top.style_count + ". It ranks first because the sum of the included styles' " + metricLabel
@@ -1087,10 +1089,16 @@ Deno.serve(async (req: Request) => {
        const grouped=new Map<string,Record<string,unknown>>();
       for(const row of rows){const m=monthOf(row);if(qYear&&!m.startsWith(qYear))continue;if(qMonth&&!m.endsWith("-"+qMonth))continue;const country=txt(row.country)||"Unknown";const cur=grouped.get(country)??{country,revenue_inr:0,profit_inr:0,order_count:0};cur.revenue_inr=num(cur.revenue_inr)+num(row.revenue_inr);cur.profit_inr=num(cur.profit_inr)+num(row.profit_inr);cur.order_count=num(cur.order_count)+num(row.order_count);grouped.set(country,cur);}
       const metric=/\bby\s+(?:recorded\s+)?(?:profit|net profit|np)\b/.test(normalizedQ)&&!/\bby\s+(?:total\s+)?(?:revenue|sales)\b/.test(normalizedQ)?"profit_inr":"revenue_inr";
-      const ranked=[...grouped.values()].sort((a,b)=>num(b[metric])-num(a[metric]));
-      if(!ranked.length)return respond({answer:"No country ranking rows are available for the selected scope.",sources:[{name:"vw_sales_monthly_by_country",records:rows.length}],question},200,origin);
-      const marginPct=(r:Record<string,unknown>)=>num(r.revenue_inr)!==0?num(r.profit_inr)/num(r.revenue_inr)*100:0;
-      return respond({answer:"Countries ranked by "+(metric==="profit_inr"?"recorded profit":"revenue")+" (highest to lowest); "+ranked.length+" countries. Each row includes revenue, recorded profit, orders, and weighted margin = total profit / total revenue × 100.",rankingTable:{title:"Country sales ranking",subtitle:"Sorted by "+(metric==="profit_inr"?"recorded profit":"revenue")+" · "+ranked.length+" countries",columns:[{key:"rank",label:"Rank",type:"number"},{key:"country",label:"Country"},{key:"revenue_inr",label:"Revenue",type:"currency"},{key:"profit_inr",label:"Recorded Profit",type:"currency"},{key:"order_count",label:"Orders",type:"number"},{key:"profit_margin_pct",label:"Weighted Profit Margin",type:"percent"}],rows:ranked.map((r,i)=>({rank:i+1,country:txt(r.country),revenue_inr:num(r.revenue_inr),profit_inr:num(r.profit_inr),order_count:num(r.order_count),profit_margin_pct:marginPct(r)}))},sources:[{name:"vw_sales_monthly_by_country",records:rows.length,note:"monthly country rows aggregated by country before ranking; margin recalculated from total profit / total revenue"}],question},200,origin);
+       const ranked=[...grouped.values()].sort((a,b)=>num(b[metric])-num(a[metric]));
+       if(!ranked.length)return respond({answer:"No country ranking rows are available for the selected scope.",sources:[{name:"vw_sales_monthly_by_country",records:rows.length}],question},200,origin);
+       const topNMatch=normalizedQ.match(/\btop\s+(\d{1,2})\b/i);
+       const wantsAllCountries=/\b(?:all|every)\s+countries\b|\brank all\b/.test(normalizedQ);
+       const requestedTopN=topNMatch?Math.max(1,Math.min(20,Number(topNMatch[1]))):(wantsAllCountries?ranked.length:1);
+       const displayed=ranked.slice(0,requestedTopN);
+       const marginPct=(r:Record<string,unknown>)=>num(r.revenue_inr)!==0?num(r.profit_inr)/num(r.revenue_inr)*100:0;
+       const label=metric==="profit_inr"?"recorded profit":"revenue";
+       const answer=displayed.length===1?"Highest "+label+" country: "+txt(displayed[0].country)+". "+(metric==="profit_inr"?"Recorded profit: ":"Revenue: ")+formatINR(num(displayed[0][metric]))+"; orders: "+num(displayed[0].order_count).toLocaleString("en-IN")+".":"Top "+displayed.length+" countries ranked by "+label+" (highest to lowest).";
+       return respond({answer,rankingTable:displayed.length>1?{title:"Country sales ranking",subtitle:"Sorted by "+label+" · showing "+displayed.length+" of "+ranked.length+" countries",columns:[{key:"rank",label:"Rank",type:"number"},{key:"country",label:"Country"},{key:"revenue_inr",label:"Revenue",type:"currency"},{key:"profit_inr",label:"Recorded Profit",type:"currency"},{key:"order_count",label:"Orders",type:"number"},{key:"profit_margin_pct",label:"Weighted Profit Margin",type:"percent"}],rows:displayed.map((r,i)=>({rank:i+1,country:txt(r.country),revenue_inr:num(r.revenue_inr),profit_inr:num(r.profit_inr),order_count:num(r.order_count),profit_margin_pct:marginPct(r)}))}:null,sources:[{name:"vw_sales_monthly_by_country",records:rows.length,note:"monthly country rows aggregated by country before ranking; margin recalculated from total profit / total revenue"}],question},200,origin);
     }
 
     const asksProductionRankingEarly = /\b(production lines?|production line performance|manufacturing lines?)\b/.test(normalizedQ)
