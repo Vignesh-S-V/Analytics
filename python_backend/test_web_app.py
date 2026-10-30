@@ -118,7 +118,6 @@ class RequestBoundaryTests(unittest.TestCase):
 
 
     def test_authentication_is_read_from_http_only_cookie_not_process_memory(self):
-        self.client.set_cookie(web_app.AUTH_COOKIE_NAME, "signed-supabase-access-token")
         calls = []
         def fake_request(method, path, token, *, body=None, params=None):
             calls.append((method, path, token))
@@ -128,7 +127,11 @@ class RequestBoundaryTests(unittest.TestCase):
         original = web_app._supabase_request
         web_app._supabase_request = fake_request
         try:
-            user = web_app._current_user()
+            with web_app.app.test_request_context(
+                "/", base_url="https://localhost",
+                headers={"Cookie": f"{web_app.AUTH_COOKIE_NAME}=signed-supabase-access-token"},
+            ):
+                user = web_app._current_user()
         finally:
             web_app._supabase_request = original
         self.assertEqual(user["user_id"], "user-123")
@@ -136,7 +139,6 @@ class RequestBoundaryTests(unittest.TestCase):
         self.assertEqual([call[1] for call in calls], ["/auth/v1/user", "/rest/v1/threadiq_workspace_members"])
 
     def test_inactive_workspace_member_is_rejected(self):
-        self.client.set_cookie(web_app.AUTH_COOKIE_NAME, "signed-supabase-access-token")
         original = web_app._supabase_request
         def fake_request(method, path, token, *, body=None, params=None):
             if path == "/auth/v1/user":
@@ -144,7 +146,11 @@ class RequestBoundaryTests(unittest.TestCase):
             return 200, [{"is_active": False}]
         web_app._supabase_request = fake_request
         try:
-            self.assertIsNone(web_app._current_user())
+            with web_app.app.test_request_context(
+                "/", base_url="https://localhost",
+                headers={"Cookie": f"{web_app.AUTH_COOKIE_NAME}=signed-supabase-access-token"},
+            ):
+                self.assertIsNone(web_app._current_user())
         finally:
             web_app._supabase_request = original
 
