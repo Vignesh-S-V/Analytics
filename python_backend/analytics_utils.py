@@ -19,9 +19,17 @@ PRODUCT_WORDS = re.compile(
 
 
 def normalize_query(value: Any) -> str:
-    text = unicodedata.normalize("NFKD", str(value or ""))
-    text = "".join(ch for ch in text if not unicodedata.combining(ch))
-    text = text.lower()
+    source = str(value or "")
+    # Preserve Tamil vowel signs and combining marks; stripping them changes
+    # the actual Tamil word. Latin accents are normalized for matching.
+    normalized = []
+    for char in source:
+        if 0x0B80 <= ord(char) <= 0x0BFF:
+            normalized.append(char)
+        else:
+            decomposed = unicodedata.normalize("NFKD", char)
+            normalized.extend(ch for ch in decomposed if not unicodedata.combining(ch))
+    text = "".join(normalized).lower()
     text = re.sub(r"[^a-z0-9\u0B80-\u0BFF ]+", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 
