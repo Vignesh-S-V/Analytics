@@ -412,8 +412,8 @@ async def ask(request: Request):
 # API routes above take precedence; all other paths are served as static assets.
 @app.get("/", include_in_schema=False)
 @app.get("/{asset_path:path}", include_in_schema=False)
-async def serve_frontend(asset_path: str = "", request: Request = None):
-    env = request.scope.get("env") if request is not None else None
+async def serve_frontend(request: Request, asset_path: str = ""):
+    env = request.scope.get("env")
     assets = getattr(env, "ASSETS", None) if env is not None else None
     if assets is None:
         return _error("Frontend assets are not configured on this Worker.", 503)
