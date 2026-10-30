@@ -170,7 +170,7 @@ test("explicit multi-year comparisons calculate both years and year-over-year ch
 });
 
 test("country Top-N ranking returns only the requested number of countries", () => {
-  assert.match(source, /const topNMatch=normalizedQ\.match\(\/\\\\btop\\\\s\+\(\\\\d\{1,2\}\)\\\\b\/i\)/);
+  assert.ok(source.includes("const topNMatch=normalizedQ.match(/\\\\btop\\\\s+(\\\\d{1,2})\\\\b/i);"));
   assert.match(source, /const displayed=ranked\.slice\(0,requestedTopN\)/);
   assert.match(source, /showing \+displayed\.length\+" of "\+ranked\.length/);
 });
