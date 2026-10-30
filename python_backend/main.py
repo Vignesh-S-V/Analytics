@@ -19,7 +19,28 @@ import httpx
 from analytics_utils import detect_product_ranking_intent, is_multi_question_prompt, split_questions
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response as FastAPIResponse
+
+# Cloudflare Worker secrets are exposed through the Python Workers env binding.
+# Keep local development compatible when the Workers SDK is not installed.
+try:
+    from workers import env as worker_env
+except ImportError:
+    worker_env = None
+
+if worker_env is not None:
+    for _key in (
+        "SUPABASE_URL",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "GEMINI_API_KEY",
+        "GEMINI_MODEL",
+        "ALLOWED_ORIGINS",
+        "UPSTREAM_TIMEOUT_SECONDS",
+    ):
+        _value = getattr(worker_env, _key, None)
+        if _value is not None:
+            os.environ[_key] = str(_value)
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().rstrip("/")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "").strip()
@@ -33,7 +54,7 @@ MAX_SQL_STEPS = 5
 # Keep the production Python UI server-side; never use wildcard origins here.
 ALLOWED_ORIGINS = {
     origin.strip().rstrip("/")
-    for origin in os.environ.get("ALLOWED_ORIGINS", "http://localhost:8000").split(",")
+    for origin in os.environ.get("ALLOWED_ORIGINS", "https://analytics.vigneshw-5416.workers.dev,http://localhost:8000,http://localhost:5173").split(",")
     if origin.strip()
 }
 ALLOWED_RELATIONS = {
@@ -386,3 +407,27 @@ async def ask(request: Request):
     except Exception:
         # Never return raw upstream errors, SQL, JWTs, or secret values to the client.
         return _error("The AI request could not be completed. Please retry.", 500)
+ 
+# Serve the existing Vite-built JavaScript application from the same Worker.
+# API routes above take precedence; all other paths are served as static assets.
+@app.get("/", include_in_schema=False)
+@app.get("/{asset_path:path}", include_in_schema=False)
+async def serve_frontend(asset_path: str = "", request: Request = None):
+    env = request.scope.get("env") if request is not None else None
+    assets = getattr(env, "ASSETS", None) if env is not None else None
+    if assets is None:
+        return _error("Frontend assets are not configured on this Worker.", 503)
+    asset_path = asset_path or "index.html"
+    asset_response = await assets.fetch(f"https://assets.local/{asset_path}")
+    body = await asset_response.bytes()
+    return FastAPIResponse(
+        content=body,
+        status_code=asset_response.status,
+        headers=dict(asset_response.headers),
+    )
+
+
+# Cloudflare Python Workers ASGI entrypoint.
+from workers import asgi
+
+Default = asgi.entrypoint(app)
