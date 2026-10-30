@@ -3,7 +3,9 @@
   "name": "analytics",
   "main": "python_backend/main.py",
   "compatibility_date": "2026-10-30",
-  "compatibility_flags": ["python_workers"],
+  "compatibility_flags": [
+    "python_workers"
+  ],
   "workers_dev": true,
   "assets": {
     "directory": "./dist",
@@ -18,5 +20,6 @@
       "SUPABASE_SERVICE_ROLE_KEY",
       "GEMINI_API_KEY"
     ]
-  }
+  },
+  "previews": {}
 }
