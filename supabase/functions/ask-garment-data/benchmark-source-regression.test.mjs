@@ -121,3 +121,16 @@ test('buyer ranking honors highest-profit intent and does not hijack multi-quest
   assert.ok(source.includes('const metric = asksProfitRanking ? "profit_inr" : "revenue_inr"'));
   assert.ok(source.includes('!isMultiQuestionPrompt'));
 });
+
+
+test("single-answer country revenue question returns only the highest-revenue country", () => {
+  assert.match(source, /if \(\/which country\.\*highest revenue/);
+  assert.match(source, /from\("vw_sales_by_country"\)[\s\S]{0,220}\.order\("revenue_inr", \{ ascending: false \}\)\.limit\(1\)/);
+  assert.match(source, /single highest-revenue country selected by descending revenue_inr/);
+});
+
+test("single-answer buyer profit question returns only the highest-profit buyer", () => {
+  assert.match(source, /if \(\/which buyer\.\*highest profit/);
+  assert.match(source, /from\("vw_sales_by_buyer"\)[\s\S]{0,260}\.order\("profit_inr", \{ ascending: false \}\)\.limit\(1\)/);
+  assert.match(source, /single highest recorded-profit buyer selected by descending profit_inr/);
+});
