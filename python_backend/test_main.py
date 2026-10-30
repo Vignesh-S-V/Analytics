@@ -1,23 +1,100 @@
+import asyncio
+import json
 import unittest
 
 from main import ALLOWED_RELATIONS, _agent_prompt, _prepare_question, app, validate_sql
-from starlette.testclient import TestClient
 
 
+def call_asgi(path="/", method="GET", headers=None, body=b""):
+    messages = []
+    sent_request = False
+    request_headers = [
+        (key.lower().encode("latin-1"), value.encode("latin-1"))
+        for key, value in (headers or {}).items()
+    ]
 
-class StarletteAppTests(unittest.TestCase):
-    def test_health_route_is_served_by_asgi_app(self):
-        with TestClient(app) as client:
-            response = client.get("/health")
-        self.assertEqual(response.status_code, 200)
+    async def receive():
+        nonlocal sent_request
+        if sent_request:
+            return {"type": "http.disconnect"}
+        sent_request = True
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    async def send(message):
+        messages.append(message)
+
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": method,
+        "scheme": "https",
+        "path": path,
+        "raw_path": path.encode("utf-8"),
+        "query_string": b"",
+        "headers": request_headers,
+        "server": ("analytics.example.workers.dev", 443),
+        "client": ("127.0.0.1", 12345),
+    }
+    asyncio.run(app(scope, receive, send))
+    start = next(item for item in messages if item["type"] == "http.response.start")
+    response_body = b"".join(
+        item.get("body", b"")
+        for item in messages
+        if item["type"] == "http.response.body"
+    )
+    response_headers = {
+        key.decode("latin-1").lower(): value.decode("latin-1")
+        for key, value in start.get("headers", [])
+    }
+    return start["status"], response_headers, response_body
+
+
+class ASGIRouteTests(unittest.TestCase):
+    def test_health_route_is_served(self):
+        status, headers, body = call_asgi("/health")
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["content-type"], "application/json")
         self.assertEqual(
-            response.json(),
+            json.loads(body),
             {"status": "ok", "service": "threadiq-python-api", "engine": "python"},
         )
 
-    def test_ask_route_is_registered_and_post_only(self):
-        ask_route = next(route for route in app.routes if getattr(route, "path", None) == "/ask")
-        self.assertEqual(ask_route.methods, {"POST"})
+    def test_ask_route_rejects_non_post_method(self):
+        status, headers, body = call_asgi("/ask", method="GET")
+        self.assertEqual(status, 405)
+        self.assertEqual(headers["allow"], "POST")
+        self.assertIn(b"Method not allowed", body)
+
+    def test_ask_requires_a_signed_in_session(self):
+        status, _, body = call_asgi(
+            "/ask",
+            method="POST",
+            headers={
+                "origin": "https://analytics.example.workers.dev",
+                "host": "analytics.example.workers.dev",
+                "apikey": "test-key",
+                "content-type": "application/json",
+            },
+            body=b'{"question":"Which country has highest revenue?"}',
+        )
+        self.assertEqual(status, 401)
+        self.assertIn(b"signed-in workspace session", body)
+
+    def test_health_route_includes_exact_same_origin_cors(self):
+        status, headers, _ = call_asgi(
+            "/health",
+            headers={
+                "origin": "https://analytics.example.workers.dev",
+                "host": "analytics.example.workers.dev",
+            },
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            headers["access-control-allow-origin"],
+            "https://analytics.example.workers.dev",
+        )
+
 
 class QuestionPreparationTests(unittest.TestCase):
     def test_multi_question_prompt_keeps_each_question(self):
