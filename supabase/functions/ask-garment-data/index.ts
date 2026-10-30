@@ -519,7 +519,21 @@ Deno.serve(async (req: Request) => {
         const revenue = sum(rows, "revenue_inr"), cost = sum(rows, "total_cost_inr"), profit = sum(rows, "profit_inr");
         return { revenue, cost, profit, orders: orderIds.size, margin: revenue !== 0 ? profit / revenue * 100 : null, averageOrderRevenue: orderIds.size ? revenue / orderIds.size : null, reconciliation: revenue - cost - profit };
       };
-      const explicitYears = [...normalizedKpiQ.matchAll(/\b(20\d{2})\b/g)].map(m => m[1]);
+      const explicitYears = [...new Set([...normalizedKpiQ.matchAll(/\b(20\d{2})\b/g)].map(m => m[1]))];
+      // Resolve explicit year comparisons before choosing a single-year KPI scope.
+      if (asksComparison && explicitYears.length >= 2 && /\b(revenue|sales|profit|cost)\b/.test(normalizedKpiQ)) {
+        const yearSummaries = explicitYears.map(year => {
+          const yearRows = factRows.filter(r => txt(r.order_date).slice(0, 4) === year);
+          return { year, ...aggregate(yearRows), rows: yearRows.length };
+        });
+        const missingYears = yearSummaries.filter(item => item.rows === 0).map(item => item.year);
+        if (missingYears.length) return respond({ answer: "No order records were found for " + missingYears.join(", ") + ". Available years: " + [...new Set(factRows.map(r => txt(r.order_date).slice(0, 4)).filter(Boolean))].sort().join(", ") + ".", unavailable: true, sources: [{ name: "fact_orders", records: factRows.length }], question }, 200, origin);
+        const first = yearSummaries[0], last = yearSummaries[yearSummaries.length - 1];
+        const growth = (current: number, previous: number) => previous === 0 ? "N/A (base year is zero)" : ((current - previous) / Math.abs(previous) * 100).toFixed(2) + "%";
+        const lines = yearSummaries.map(item => item.year + ": " + item.rows.toLocaleString("en-IN") + " rows; revenue " + formatINR(item.revenue) + "; recorded profit " + formatINR(item.profit) + "; cost " + formatINR(item.cost) + "; distinct orders " + item.orders.toLocaleString("en-IN") + "; weighted margin " + (item.margin === null ? "N/A" : item.margin.toFixed(2) + "%"));
+        const answer = "Year-over-year comparison from " + factRows.length.toLocaleString("en-IN") + " fact_orders rows:\n" + lines.join("\n") + "\nChange from " + first.year + " to " + last.year + ": revenue " + growth(last.revenue, first.revenue) + "; recorded profit " + growth(last.profit, first.profit) + "; cost " + growth(last.cost, first.cost) + ". Margin change: " + (first.margin === null || last.margin === null ? "N/A" : (last.margin - first.margin).toFixed(2) + " percentage points") + ".";
+        return respond({ answer, yearComparison: yearSummaries.map(item => ({ year: item.year, revenue_inr: item.revenue, recorded_profit_inr: item.profit, cost_inr: item.cost, distinct_order_count: item.orders, weighted_profit_margin_pct: item.margin, source_rows: item.rows })), sources: [{ name: "fact_orders", records: factRows.length, note: "all pages read; grouped by order_date year; weighted margin = SUM(profit) / SUM(revenue)" }], question }, 200, origin);
+      }
       const currentYear = new Date().getUTCFullYear();
       const asksAllTime = /\b(all time|overall|entire history|all years|lifetime|full dataset)\b/.test(normalizedKpiQ) || /முழு காலம்|எல்லா ஆண்டுகளும்/.test(question);
       let scopeYear = explicitYears.length ? explicitYears[explicitYears.length - 1] : requestedYear;
@@ -851,9 +865,9 @@ Deno.serve(async (req: Request) => {
     const qMonth = Object.entries(qMonths).find(([name]) => (" "+normalizedQ+" ").includes(" "+name+" "))?.[1] ?? "";
     // Singular leader questions are resolved before ranking-table routes, including on warm-cache requests.
     const leaderIsMulti = (question.match(/\?/g) ?? []).length > 1 || question.split(/[\n\r]+/).map(part => part.trim()).filter(Boolean).length > 1;
-    const explicitMultiRow = /\b(?:show|list|display|rank|ranking|compare|all|every|top\s+\d+|top\s+(?:buyers|customers|countries)|buyer ranking|country ranking)\b/i.test(normalizedQ);
+    const explicitMultiRow = /\b(?:show|list|display|rank|ranking|compare|all\s+(?:buyers|customers|countries|suppliers|products|product groups|production lines|lines)|every|top\s+\d+|top\s+(?:buyers|customers|countries)|buyer ranking|country ranking)\b/i.test(normalizedQ);
     const singleCountryLeader = !leaderIsMulti && !explicitMultiRow && /\b(?:country|countries|market)\b/i.test(normalizedQ) && /\b(?:highest|most|leading|leader|number one|no 1)\b/i.test(normalizedQ) && /\b(?:revenue|sales|turnover)\b/i.test(normalizedQ);
-    const singleBuyerProfitLeader = !leaderIsMulti && !explicitMultiRow && /\b(?:buyer|buyers|customer|customers)\b/i.test(normalizedQ) && /\b(?:highest|most|top|number one|no 1|best)\b/i.test(normalizedQ) && /\b(?:profit|net profit|recorded profit|profitability)\b/i.test(normalizedQ);
+    const singleBuyerProfitLeader = !leaderIsMulti && !explicitMultiRow && /\b(?:buyer|buyers|customer|customers)\b/i.test(normalizedQ) && /\b(?:highest|most|top|number one|no 1|best)\b/i.test(normalizedQ) && /\b(?:profit|net profit|recorded profit|profitability)\b/i.test(normalizedQ);\n    const singleBuyerRevenueLeader = !leaderIsMulti && !explicitMultiRow && /\b(?:which|what)\b/i.test(normalizedQ) && /\b(?:buyer|buyers|customer|customers)\b/i.test(normalizedQ) && /\b(?:highest|most|top|number one|no 1|best)\b/i.test(normalizedQ) && /\b(?:revenue|sales|turnover)\b/i.test(normalizedQ);
     const tanglishBuyerProfitLeader = !leaderIsMulti && !explicitMultiRow && /\b(?:buyer|customer)\b/i.test(normalizedQ) && /\b(?:highest|most|top)\b/i.test(normalizedQ) && /\b(?:profit|net profit)\b/i.test(normalizedQ) && /(?:kudukkura|kodukkura|tharum|tarum|yaaru|yaru)/i.test(rawQ);
     if (singleCountryLeader) {
       const { data, error } = await db.from("vw_sales_by_country").select("country,revenue_inr,profit_inr,order_count").order("revenue_inr", { ascending: false, nullsFirst: false }).limit(1);
@@ -862,12 +876,12 @@ Deno.serve(async (req: Request) => {
       if (!leader) return respond({ answer: "No country revenue data is available for this workspace.", sources: [{ name: "vw_sales_by_country", records: 0 }], question }, 200, origin);
       return respond({ answer: txt(leader.country) + " has the highest revenue: " + formatINR(num(leader.revenue_inr)) + ". Recorded profit: " + formatINR(num(leader.profit_inr)) + "; orders: " + num(leader.order_count).toLocaleString("en-IN") + ".", sources: [{ name: "vw_sales_by_country", records: 1, note: "single country leader selected by descending total revenue" }], question }, 200, origin);
     }
-    if (singleBuyerProfitLeader || tanglishBuyerProfitLeader) {
-      const { data, error } = await db.from("vw_sales_by_buyer").select("buyer_name,country,revenue_inr,profit_inr,profit_margin_pct,order_count").order("profit_inr", { ascending: false, nullsFirst: false }).limit(1);
-      if (error) { console.error("Single buyer profit leader lookup failed:", error.message); return respond({ error: "Could not identify the highest-profit buyer. Please retry." }, 502, origin); }
+    if (singleBuyerProfitLeader || tanglishBuyerProfitLeader || singleBuyerRevenueLeader) {
+      const buyerMetric = singleBuyerRevenueLeader ? "revenue_inr" : "profit_inr";\n      const { data, error } = await db.from("vw_sales_by_buyer").select("buyer_name,country,revenue_inr,profit_inr,profit_margin_pct,order_count").order(buyerMetric, { ascending: false, nullsFirst: false }).limit(1);
+      if (error) { console.error("Single buyer leader lookup failed:", error.message); return respond({ error: "Could not identify the highest-performing buyer. Please retry." }, 502, origin); }
       const leader = (data ?? [])[0] as Record<string, unknown> | undefined;
-      if (!leader) return respond({ answer: "No buyer profit data is available for this workspace.", sources: [{ name: "vw_sales_by_buyer", records: 0 }], question }, 200, origin);
-      return respond({ answer: txt(leader.buyer_name) + " (" + txt(leader.country) + ") has the highest recorded profit: " + formatINR(num(leader.profit_inr)) + ". Revenue: " + formatINR(num(leader.revenue_inr)) + "; weighted profit margin: " + num(leader.profit_margin_pct).toFixed(2) + "%; orders: " + num(leader.order_count).toLocaleString("en-IN") + ".", sources: [{ name: "vw_sales_by_buyer", records: 1, note: "single buyer leader selected by descending recorded profit" }], question }, 200, origin);
+      if (!leader) return respond({ answer: "No buyer performance data is available for this workspace.", sources: [{ name: "vw_sales_by_buyer", records: 0 }], question }, 200, origin);
+      const metricLabel = buyerMetric === "revenue_inr" ? "revenue" : "recorded profit";\n      return respond({ answer: txt(leader.buyer_name) + " (" + txt(leader.country) + ") has the highest " + metricLabel + ": " + formatINR(num(leader[buyerMetric])) + ". Revenue: " + formatINR(num(leader.revenue_inr)) + "; recorded profit: " + formatINR(num(leader.profit_inr)) + "; weighted profit margin: " + num(leader.profit_margin_pct).toFixed(2) + "%; orders: " + num(leader.order_count).toLocaleString("en-IN") + ".", sources: [{ name: "vw_sales_by_buyer", records: 1, note: "single buyer leader selected by descending " + buyerMetric }], question }, 200, origin);
     }
     // Deterministic ranking routes must run before generic profit/revenue KPI handlers.
     // This prevents phrases such as "buyer revenue and profit margin" being answered as company totals.
