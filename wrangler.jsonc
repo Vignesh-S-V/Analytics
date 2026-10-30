@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "analytics-python-preview",
+  "name": "analytics",
   "main": "python_backend/cloudflare_worker.py",
   "compatibility_date": "2026-10-29",
   "compatibility_flags": ["python_workers"],
