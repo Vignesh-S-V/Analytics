@@ -54,6 +54,9 @@ for (const line of historyPatch.split('\n')) {
   if (line.startsWith('commit ')) historyCommit = line.slice(7, 19);
   if (line.startsWith('+++ b/')) historyFile = line.slice(6).trim();
   if (!line.startsWith('+') || line.startsWith('+++')) continue;
+  // .env.example is a documentation template containing intentionally fake sample values.
+  // It is excluded from current-tree scanning above; apply the same rule to its historical revisions.
+  if (historyFile === '.env.example') continue;
   scanText(line.slice(1), historyFile + ' (commit ' + historyCommit + ')', true);
 }
 
