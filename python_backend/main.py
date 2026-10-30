@@ -428,6 +428,10 @@ async def serve_frontend(request: Request, asset_path: str = ""):
 
 
 # Cloudflare Python Workers ASGI entrypoint.
-from workers import asgi
+try:
+    from workers import asgi
 
-Default = asgi.entrypoint(app)
+    Default = asgi.entrypoint(app)
+except ImportError:
+    # Allows the FastAPI app and unit tests to run outside Cloudflare Workers.
+    Default = None
