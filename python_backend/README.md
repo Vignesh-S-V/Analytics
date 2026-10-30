@@ -50,5 +50,6 @@ The server-rendered Flask UI currently calls the same Python Gemini/SQL engine d
 - Never put service-role or Gemini keys in HTML, browser code, public environment files or Git.
 - Do not expose the FastAPI API to untrusted origins; configure its origin allowlist for the actual deployment.
 - Authenticated SQL uses the user's bearer token and the approved `threadiq_run_readonly_query` RPC.
+- The one-hour Supabase access token is stored in a Secure, HttpOnly, SameSite=Lax cookie; the Flask session cookie contains CSRF state only. Each request revalidates the token and active workspace membership, so login does not depend on process-local memory or Cloudflare Worker isolate affinity.
 - Never replace read-only SQL validation with unrestricted model-generated SQL.
 - Test against an approved account before switching public traffic.
