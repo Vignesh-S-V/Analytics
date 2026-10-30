@@ -134,3 +134,19 @@ test("single-answer buyer profit question returns only the highest-profit buyer"
   assert.match(source, /from\("vw_sales_by_buyer"\)[\s\S]{0,260}\.order\("profit_inr", \{ ascending: false \}\)\.limit\(1\)/);
   assert.match(source, /single highest recorded-profit buyer selected by descending profit_inr/);
 });
+
+
+test("singular leader questions resolve before cached ranking/RAG paths", () => {
+  assert.match(source, /const leaderIsMulti =/);
+  assert.match(source, /const explicitMultiRow =/);
+  assert.match(source, /singleCountryLeader/);
+  assert.match(source, /singleBuyerProfitLeader/);
+  assert.match(source, /tanglishBuyerProfitLeader/);
+  assert.match(source, /\.order\("revenue_inr", \{ ascending: false, nullsFirst: false \}\)\.limit\(1\)/);
+  assert.match(source, /\.order\("profit_inr", \{ ascending: false, nullsFirst: false \}\)\.limit\(1\)/);
+});
+
+test("explicit multi-row ranking and multi-question prompts do not use singular leader response", () => {
+  assert.match(source, /const explicitMultiRow = \/\\\\b\(\?:show\|list\|display\|rank\|ranking\|compare\|all\|every\|top/);
+  assert.match(source, /!leaderIsMulti && !explicitMultiRow/);
+});
