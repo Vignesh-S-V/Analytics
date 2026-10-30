@@ -884,14 +884,21 @@ Deno.serve(async (req: Request) => {
         && (/\b(highest|lowest|top|bottom|most|least|rank|ranking|ranked|sort|list)\b/.test(normalizedQ)
           || /\bby\s+(?:total\s+)?(?:recorded\s+)?profit\b/.test(normalizedQ));
       const metric = asksProfitRanking ? "profit_inr" : "revenue_inr";
+      // Honor an explicit numeric Top-N request; otherwise return the complete buyer ranking.
+      // Keep a defensive cap of 100 rows for unbounded ranking requests.
+      const topNMatch = normalizedQ.match(/\\btop\\s+(\\d{1,3})\\b/i);
+      const requestedTopN = topNMatch ? Math.max(1, Math.min(100, Number(topNMatch[1]))) : null;
+      const rowLimit = requestedTopN ?? 100;
       const { data, error } = await db.from("vw_sales_by_buyer")
         .select("buyer_id,buyer_name,country,order_count,revenue_inr,profit_inr,profit_margin_pct")
-        .order(metric, { ascending: false, nullsFirst: false }).limit(100);
+        .order(metric, { ascending: false, nullsFirst: false }).limit(rowLimit);
       if (error) { console.error("Buyer ranking failed:", error.message); return respond({error:"Could not calculate buyer rankings. Please retry."},502,origin); }
       const rows = (data ?? []) as Record<string,unknown>[];
-      const ranked = [...rows].sort((a,b)=>num(b[metric])-num(a[metric])).slice(0, Math.min(100, rows.length));
+      const ranked = [...rows].sort((a,b)=>num(b[metric])-num(a[metric])).slice(0, requestedTopN ?? rows.length);
       if (!ranked.length) return respond({answer:"No buyer ranking rows are available.",sources:[{name:"vw_sales_by_buyer",records:0}],question},200,origin);
-      return respond({answer:"All "+ranked.length+" buyers ranked by "+(metric==="profit_inr"?"recorded profit":"revenue")+" (highest to lowest).",rankingTable:{title:"Buyer ranking",subtitle:"Sorted by "+(metric==="profit_inr"?"recorded profit":"revenue")+" · "+ranked.length+" buyers",columns:[{key:"rank",label:"Rank",type:"number"},{key:"buyer_name",label:"Buyer"},{key:"country",label:"Country"},{key:"revenue_inr",label:"Revenue",type:"currency"},{key:"profit_inr",label:"Recorded Profit",type:"currency"},{key:"order_count",label:"Orders",type:"number"},{key:"profit_margin_pct",label:"Profit Margin",type:"percent"}],rows:ranked.map((r,i)=>({rank:i+1,buyer_name:txt(r.buyer_name),country:txt(r.country),revenue_inr:num(r.revenue_inr),profit_inr:num(r.profit_inr),order_count:num(r.order_count),profit_margin_pct:num(r.profit_margin_pct)}))},sources:[{name:"vw_sales_by_buyer",records:rows.length,note:"complete buyer groups sorted by requested metric"}],question},200,origin);
+      const rankingLabel = metric==="profit_inr" ? "recorded profit" : "revenue";
+      const rankingScope = requestedTopN ? "Top "+ranked.length+" buyers" : "All "+ranked.length+" buyers";
+      return respond({answer:rankingScope+" ranked by "+rankingLabel+" (highest to lowest).",rankingTable:{title:requestedTopN?"Top "+ranked.length+" buyers by "+rankingLabel:"Buyer ranking",subtitle:"Sorted by "+rankingLabel+" · "+(requestedTopN?"Top "+ranked.length+" of ":"")+ranked.length+(requestedTopN && ranked.length===requestedTopN ? " requested buyers" : " buyers"),columns:[{key:"rank",label:"Rank",type:"number"},{key:"buyer_name",label:"Buyer"},{key:"country",label:"Country"},{key:"revenue_inr",label:"Revenue",type:"currency"},{key:"profit_inr",label:"Recorded Profit",type:"currency"},{key:"order_count",label:"Orders",type:"number"},{key:"profit_margin_pct",label:"Profit Margin",type:"percent"}],rows:ranked.map((r,i)=>({rank:i+1,buyer_name:txt(r.buyer_name),country:txt(r.country),revenue_inr:num(r.revenue_inr),profit_inr:num(r.profit_inr),order_count:num(r.order_count),profit_margin_pct:num(r.profit_margin_pct)}))},sources:[{name:"vw_sales_by_buyer",records:ranked.length,note:requestedTopN?"top "+ranked.length+" buyer groups sorted by requested metric":"complete buyer groups sorted by requested metric"}],question},200,origin);
     }
 
     const productIntent = detectProductRankingIntent(normalizedQ);
