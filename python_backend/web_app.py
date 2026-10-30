@@ -16,6 +16,7 @@ import httpx
 import requests
 from cachetools import TTLCache
 from flask import Flask, abort, redirect, render_template_string, request, session, url_for
+from markupsafe import Markup
 
 from main import (
     GEMINI_API_KEY,
@@ -140,9 +141,8 @@ def _current_user():
 
 def _render(title: str, body: str, *, signed_in=False, active_href="/", **context):
     context.setdefault("csrf_token", _csrf_token())
-    inner = render_template_string(body, **context)
     return render_template_string(
-        LAYOUT, title=title, body=inner, css=STYLE, signed_in=signed_in,
+        LAYOUT, title=title, body=Markup(body), css=STYLE, signed_in=signed_in,
         nav=NAV, active_href=active_href,
     )
 
