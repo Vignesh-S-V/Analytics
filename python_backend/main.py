@@ -249,14 +249,22 @@ async def _run_gemini(
                     "systemInstruction": {"parts": [{"text": _agent_prompt(year, country)}]},
                     "contents": contents,
                     "tools": tools,
-                    "generationConfig": {"maxOutputTokens": 1800, "temperature": 0.1},
+                    "generationConfig": {"maxOutputTokens": 1800},
                 }, separators=(",", ":")),
                 "redirect": "manual",
             },
         )
         raw = await response.text()
         if int(response.status) >= 400:
-            raise RuntimeError("AI provider request failed (" + str(response.status) + ").")
+            provider_message = ""
+            try:
+                error_payload = json.loads(str(raw))
+                provider_error = error_payload.get("error", {}) if isinstance(error_payload, dict) else {}
+                provider_message = str(provider_error.get("message") or "")[:300]
+            except (TypeError, ValueError):
+                provider_message = ""
+            detail = (": " + provider_message) if provider_message else ""
+            raise RuntimeError("AI provider request failed (" + str(response.status) + ")" + detail)
         try:
             payload = json.loads(str(raw))
         except (TypeError, ValueError) as exc:
