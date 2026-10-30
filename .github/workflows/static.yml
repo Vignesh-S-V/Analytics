@@ -30,6 +30,8 @@ jobs:
       - name: Run regression tests
         run: npm test
       - name: Build Vite production assets
+        env:
+          VITE_BASE_PATH: "/Analytics/"
         run: npm run build
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
