@@ -14,5 +14,13 @@
     "run_worker_first": true,
     "not_found_handling": "single-page-application"
   },
+  "secrets": {
+    "required": [
+      "SUPABASE_URL",
+      "SUPABASE_ANON_KEY",
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "GEMINI_API_KEY"
+    ]
+  },
   "previews": {}
 }
