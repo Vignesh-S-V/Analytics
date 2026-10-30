@@ -8,9 +8,8 @@ export default defineConfig(({ mode }) => {
   ).trim().replace(/\/$/, '');
 
   return {
-    // Cloudflare Workers serves the dashboard from the domain root.
-    // Keep absolute root asset paths in CI and production builds as well.
-    base: '/',
+    // Set the base path per hosting target: Cloudflare uses /, GitHub Pages uses /Analytics/.
+    base: process.env.VITE_BASE_PATH || '/',
     plugins: [react()],
     server: {
       host: '0.0.0.0',
