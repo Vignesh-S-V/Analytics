@@ -4,10 +4,10 @@ version = "0.1.0"
 description = "ThreadIQ Analytics server-rendered Flask application on Cloudflare Workers"
 requires-python = ">=3.13"
 dependencies = [
-    "Flask==3.1.0",
+    "Flask==3.1.3",
     "fastapi==0.115.12",
     "httpx==0.28.1",
-    "requests==2.32.3",
+    "requests==2.33.0",
 ]
 
 [dependency-groups]
