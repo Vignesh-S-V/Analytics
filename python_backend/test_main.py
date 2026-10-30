@@ -1,6 +1,19 @@
 import unittest
 
-from main import ALLOWED_RELATIONS, _agent_prompt, validate_sql
+from main import ALLOWED_RELATIONS, _agent_prompt, _prepare_question, validate_sql
+
+
+class QuestionPreparationTests(unittest.TestCase):
+    def test_multi_question_prompt_keeps_each_question(self):
+        prepared = _prepare_question("Which country has highest revenue? Show monthly growth?")
+        self.assertIn("Address every distinct sub-question separately", prepared)
+        self.assertIn("1. Which country has highest revenue?", prepared)
+        self.assertIn("2. Show monthly growth?", prepared)
+
+    def test_product_ranking_metric_is_explicit(self):
+        prepared = _prepare_question("Rank product groups by profit and show revenue")
+        self.assertIn("profit_inr", prepared)
+        self.assertIn("aggregate all styles into product groups", prepared)
 
 
 class SqlGuardTests(unittest.TestCase):
