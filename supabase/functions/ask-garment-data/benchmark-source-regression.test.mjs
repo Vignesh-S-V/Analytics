@@ -99,7 +99,7 @@ test("Ask AI SQL guidance covers buyer-profit rankings, monthly growth, and evid
 });
 
 test("deterministic core KPI route respects explicit periods and selected country/year filters", () => {
-  assert.match(source, /const explicitYears = \[\.\.\.normalizedKpiQ\.matchAll/);
+  assert.match(source, /const explicitYears = \[\.\.\.new Set\(\[\.\.\.normalizedKpiQ\.matchAll/);
   assert.match(source, /requestedYear/);
   assert.match(source, /const scopeCountry = asksAllTime \? "" : \(explicitCountry \|\| requestedCountry\)/);
   assert.match(source, /No matching order records were found/);
@@ -143,7 +143,7 @@ test("singular leader questions resolve before cached ranking/RAG paths", () => 
   assert.match(source, /singleBuyerProfitLeader/);
   assert.match(source, /tanglishBuyerProfitLeader/);
   assert.match(source, /\.order\("revenue_inr", \{ ascending: false, nullsFirst: false \}\)\.limit\(1\)/);
-  assert.match(source, /\.order\("profit_inr", \{ ascending: false, nullsFirst: false \}\)\.limit\(1\)/);
+  assert.match(source, /\.order\(buyerMetric, \{ ascending: false, nullsFirst: false \}\)\.limit\(1\)/);
 });
 
 test("explicit multi-row ranking and multi-question prompts do not use singular leader response", () => {
