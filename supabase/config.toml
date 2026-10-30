@@ -1,0 +1,4 @@
+project_id = "rzsgdfpwnxhseyxtrrlx"
+
+[functions.ask-garment-data]
+verify_jwt = true
