@@ -1,4 +1,4 @@
-"""ThreadIQ Ask AI API implemented in Python/FastAPI.
+"""ThreadIQ Ask AI API implemented in Python with Starlette.
 
 This service owns request validation, Supabase session/workspace/quota checks,
 read-only SQL tool validation, Gemini tool-calling, and answer/source formatting.
@@ -17,9 +17,11 @@ from urllib.parse import quote
 import httpx
 
 from analytics_utils import detect_product_ranking_intent, is_multi_question_prompt, split_questions
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response as FastAPIResponse
+from starlette.applications import Starlette
+from starlette.middleware.cors import CORSMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
+from starlette.routing import Route
 
 # Cloudflare Worker secrets are exposed through the Python Workers env binding.
 # Keep local development compatible when the Workers SDK is not installed.
@@ -50,7 +52,7 @@ GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
 UPSTREAM_TIMEOUT_SECONDS = float(os.environ.get("UPSTREAM_TIMEOUT_SECONDS", "35"))
 MAX_BODY_BYTES = 16 * 1024
 MAX_SQL_STEPS = 5
-# Comma-separated exact origins for the optional standalone FastAPI endpoint.
+# Comma-separated exact origins for the API endpoint.
 # Keep the production Python UI server-side; never use wildcard origins here.
 ALLOWED_ORIGINS = {
     origin.strip().rstrip("/")
@@ -153,7 +155,7 @@ def _agent_prompt(year: str, country: str) -> str:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: Starlette):
     app.state.http = httpx.AsyncClient(
         timeout=httpx.Timeout(UPSTREAM_TIMEOUT_SECONDS, connect=8),
         follow_redirects=False,
@@ -162,28 +164,6 @@ async def lifespan(app: FastAPI):
     await app.state.http.aclose()
 
 
-app = FastAPI(
-    title="ThreadIQ Analytics API",
-    version="1.0.0",
-    docs_url=None,
-    redoc_url=None,
-    openapi_url=None,
-    lifespan=lifespan,
-)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=sorted(ALLOWED_ORIGINS),
-    allow_credentials=False,
-    allow_methods=["POST", "GET", "OPTIONS"],
-    allow_headers=["authorization", "apikey", "content-type", "accept"],
-    expose_headers=["content-type", "cache-control"],
-    max_age=600,
-)
-
-
-@app.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok", "service": "threadiq-python-api", "engine": "python"}
 
 
 async def _json_request(
@@ -300,7 +280,6 @@ async def _run_gemini(
     raise RuntimeError("The AI needed more database steps than allowed. Please narrow the question and retry.")
 
 
-@app.post("/ask")
 async def ask(request: Request):
     origin = request.headers.get("origin")
     request_origin = str(request.base_url).rstrip("/")
@@ -413,8 +392,6 @@ async def ask(request: Request):
  
 # Serve the existing Vite-built JavaScript application from the same Worker.
 # API routes above take precedence; all other paths are served as static assets.
-@app.get("/", include_in_schema=False)
-@app.get("/{asset_path:path}", include_in_schema=False)
 async def serve_frontend(request: Request, asset_path: str = ""):
     env = request.scope.get("env")
     assets = getattr(env, "ASSETS", None) if env is not None else None
@@ -423,11 +400,34 @@ async def serve_frontend(request: Request, asset_path: str = ""):
     asset_path = asset_path or "index.html"
     asset_response = await assets.fetch(f"https://assets.local/{asset_path}")
     body = await asset_response.bytes()
-    return FastAPIResponse(
+    return Response(
         content=body,
         status_code=asset_response.status,
         headers=dict(asset_response.headers),
     )
+
+
+# Starlette keeps the ASGI surface lightweight and avoids FastAPI's pydantic-core
+# native extension, which is unavailable in the Cloudflare Pyodide Worker build.
+app = Starlette(
+    debug=False,
+    routes=[
+        Route("/health", health, methods=["GET"]),
+        Route("/ask", ask, methods=["POST"]),
+        Route("/", serve_frontend, methods=["GET"]),
+        Route("/{asset_path:path}", serve_frontend, methods=["GET"]),
+    ],
+    lifespan=lifespan,
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=sorted(ALLOWED_ORIGINS),
+    allow_credentials=False,
+    allow_methods=["POST", "GET", "OPTIONS"],
+    allow_headers=["authorization", "apikey", "content-type", "accept"],
+    expose_headers=["content-type", "cache-control"],
+    max_age=600,
+)
 
 
 # Cloudflare Python Workers ASGI entrypoint.
@@ -436,5 +436,5 @@ try:
 
     Default = asgi.entrypoint(app)
 except ImportError:
-    # Allows the FastAPI app and unit tests to run outside Cloudflare Workers.
+    # Allows the Starlette app and unit tests to run outside Cloudflare Workers.
     Default = None
