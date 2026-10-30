@@ -539,10 +539,13 @@ class ThreadIQASGI:
 
 app = ThreadIQASGI()
 
-# Cloudflare Python Workers ASGI entrypoint.
-try:
-    from workers import asgi
+# Cloudflare's built-in runtime injects the ASGI adapter as top-level `asgi`,
+# not as `workers.asgi`. Do not swallow import errors: an absent Default handler
+# makes Wrangler reject the Worker with error 10068 (no registered event handlers).
+if js_fetch is not None:
+    import asgi
 
     Default = asgi.entrypoint(app)
-except ImportError:
+else:
+    # Local CPython test environment; Cloudflare provides this module at runtime.
     Default = None
