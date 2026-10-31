@@ -99,6 +99,49 @@ def detect_product_ranking_intent(value: Any) -> dict[str, Any] | None:
     return {"metric": "profit_inr" if rank_by_profit else "revenue_inr", "asks_group_total": asks_group_total}
 
 
+def detect_ranking_cardinality(value: Any) -> dict[str, Any] | None:
+    """Return a strict row limit for explicit singular/top-N country or buyer rankings.
+
+    Explicit all/every/list-all requests are deliberately never capped.
+    """
+    query = normalize_query(value)
+    if re.search(r"\\b(list|show|display)\\s+all\\b", query) or re.search(
+        r"\\b(all|every|entire|complete)\\b.*\\b(countries|buyers)\\b", query
+    ):
+        return None
+
+    entity = None
+    if re.search(r"\\b(country|countries|market)\\b", query):
+        entity = "country"
+    elif re.search(r"\\b(buyer|buyers|customer|customers)\\b", query):
+        entity = "buyer"
+    if entity is None:
+        return None
+
+    metric = None
+    if re.search(r"\\b(profit|profitable|net profit|np|லாபம்)\\b", query):
+        metric = "profit_inr"
+    elif re.search(r"\\b(revenue|sales|turnover|வருவாய்|விற்பனை)\\b", query):
+        metric = "revenue_inr"
+    if metric is None:
+        return None
+
+    top_match = re.search(r"\\btop\\s+(\\d{1,3})\\b", query)
+    if top_match:
+        requested = int(top_match.group(1))
+        if requested > 0:
+            return {"entity": entity, "metric": metric, "limit": min(requested, 500)}
+
+    asks_single_leader = bool(
+        re.search(r"\\b(highest|lowest|largest|smallest|most|least|maximum|minimum)\\b", query)
+        or re.search(r"\\b(which|who)\\b", query)
+        or re.search(r"\\b(எந்த|யார்|அதிக|குறைந்த)\\b", query)
+    )
+    if asks_single_leader:
+        return {"entity": entity, "metric": metric, "limit": 1}
+    return None
+
+
 def aggregate_product_groups(rows: Any, metric: str) -> list[dict[str, Any]]:
     if metric not in {"profit_inr", "revenue_inr"}:
         raise TypeError("metric must be profit_inr or revenue_inr")
