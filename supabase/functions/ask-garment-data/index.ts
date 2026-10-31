@@ -905,7 +905,7 @@ Deno.serve(async (req: Request) => {
       // Keep a defensive cap of 100 rows for unbounded ranking requests.
       const topNMatch = normalizedQ.match(/\btop\s+(\d{1,3})\b/i);
       const requestedTopN = topNMatch ? Math.max(1, Math.min(100, Number(topNMatch[1]))) : null;
-      const rowLimit = requestedTopN ?? 100;
+      const singleBuyerLeader = !requestedTopN && !explicitMultiRow && /\\b(?:highest|most|top|number one|no 1|best)\\b/i.test(normalizedQ) && !/\\b(?:buyers|customers)\\b/i.test(normalizedQ.replace(/\\b(?:which|what)\\s+(?:is\\s+)?(?:the\\s+)?(?:highest|most|top|best)\\s+(?:revenue|profit)\\s+/i, ""));\n      const rowLimit = requestedTopN ?? (singleBuyerLeader ? 1 : 100);
       const { data, error } = await db.from("vw_sales_by_buyer")
         .select("buyer_id,buyer_name,country,order_count,revenue_inr,profit_inr,profit_margin_pct")
         .order(metric, { ascending: false, nullsFirst: false }).limit(rowLimit);
