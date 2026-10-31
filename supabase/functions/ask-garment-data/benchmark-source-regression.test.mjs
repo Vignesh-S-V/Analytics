@@ -191,3 +191,18 @@ test("singular production-line question returns one line while Top-N limits tabl
   assert.match(source, /const productionDisplayRows=isSingleProductionLeader\?ranked\.slice\(0,1\)/);
   assert.match(source, /rows:productionDisplayRows\.map/);
 });
+
+
+test("short highest-revenue buyer prompts return exactly one row", () => {
+  assert.match(source, /const singleBuyerLeader = !requestedTopN && !explicitMultiRow/);
+  assert.match(source, /const rowLimit = requestedTopN \?\? \(singleBuyerLeader \? 1 : 100\)/);
+});
+
+test("short highest-profit product-group prompts return one group", () => {
+  assert.match(source, /const isSingleProductGroupLeader = \/\//);
+  assert.match(source, /const isSingleProductGroupLeader = \/\b\(\?:highest\|most\|top\|best\)/);
+});
+
+test("short highest rework-cost production-line prompts return one line", () => {
+  assert.match(source, /const isSingleProductionLeader=\/\\b\(\?:highest\|lowest\|most\|least\|best\|worst\)/);
+});
