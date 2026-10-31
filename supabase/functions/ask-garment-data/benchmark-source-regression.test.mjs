@@ -211,3 +211,15 @@ test("country Top-N answer formats raw rupees with the shared INR formatter", ()
   assert.match(source, /formatINR\(num\(r\.revenue_inr\)\)/);
   assert.match(source, /formatINR\(num\(r\.profit_inr\)\)/);
 });
+
+test("multi-question agent preserves exact requested ranking cardinality", () => {
+  assert.match(source, /Match the requested answer cardinality exactly/);
+  assert.match(source, /means return exactly ONE winning entity/);
+  assert.match(source, /means exactly N rows/);
+  assert.match(source, /For a bundled question list, preserve the user's headings/);
+});
+
+test("multi-question agent aggregates product groups and ranks production leaders correctly", () => {
+  assert.match(source, /aggregate all style\/product rows by product_category/);
+  assert.match(source, /If the user asks for highest rework cost AND highest rejection rate/);
+});
