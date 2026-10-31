@@ -520,13 +520,13 @@ Deno.serve(async (req: Request) => {
                 if (page.length < pageSize) break;
               }
               const metric = productIntent.metric;
-              const grouped = productIntent.asksGroupTotal
+              const grouped: { product_category: string; revenue_inr: number; profit_inr: number; profit_margin_pct: number; style_count: number }[] = productIntent.asksGroupTotal
                 ? aggregateProductGroups(productRows, metric)
                 : productRows.map((row) => ({
                     product_category: txt(row.product_category) + " / " + txt(row.style_id),
                     revenue_inr: num(row.revenue_inr), profit_inr: num(row.profit_inr),
                     profit_margin_pct: num(row.profit_margin_pct), style_count: 1
-                  })).sort((a,b) => b[metric] - a[metric]);
+                  })).sort((a,b) => metric === "profit_inr" ? b.profit_inr - a.profit_inr : b.revenue_inr - a.revenue_inr);
               if (grouped.length) {
                 const shown = grouped.slice(0, rankLimit);
                 const metricLabel = metric === "profit_inr" ? "recorded profit" : "revenue";
