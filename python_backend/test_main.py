@@ -2,7 +2,7 @@ import asyncio
 import json
 import unittest
 
-from main import ALLOWED_RELATIONS, _agent_prompt, _prepare_question, app, validate_sql
+from main import ALLOWED_RELATIONS, _agent_prompt, _apply_ranking_limit, _prepare_question, app, validate_sql
 
 
 def call_asgi(path="/", method="GET", headers=None, body=b""):
@@ -107,6 +107,26 @@ class QuestionPreparationTests(unittest.TestCase):
         prepared = _prepare_question("Rank product groups by profit and show revenue")
         self.assertIn("profit_inr", prepared)
         self.assertIn("aggregate all styles into product groups", prepared)
+
+    def test_country_leader_prompt_requires_exactly_one(self):
+        prepared = _prepare_question("Which country has the highest revenue?")
+        self.assertIn("exactly one winning country", prepared)
+        self.assertIn("LIMIT 1", prepared)
+
+    def test_top_five_buyer_prompt_requires_five(self):
+        prepared = _prepare_question("Top 5 buyers by profit")
+        self.assertIn("exactly 5 buyer rows", prepared)
+        self.assertIn("LIMIT 5", prepared)
+
+    def test_multi_question_prompt_is_not_globally_capped(self):
+        prepared = _prepare_question("Which country has highest revenue? Show monthly growth?")
+        self.assertNotIn("STRICT RANKING OUTPUT", prepared)
+
+    def test_sql_limit_is_enforced_and_existing_limit_replaced(self):
+        sql = "SELECT country, SUM(revenue_inr) AS revenue FROM vw_sales_by_country GROUP BY country ORDER BY revenue DESC LIMIT 12"
+        self.assertTrue(_apply_ranking_limit(sql, 1).endswith("LIMIT 1"))
+        self.assertEqual(_apply_ranking_limit("SELECT * FROM vw_sales_by_buyer ORDER BY profit_inr DESC", 5),
+                         "SELECT * FROM vw_sales_by_buyer ORDER BY profit_inr DESC LIMIT 5")
 
 
 class SqlGuardTests(unittest.TestCase):
