@@ -445,17 +445,17 @@ Deno.serve(async (req: Request) => {
             }
             // Deterministic multi-question ranking routes: enforce the user's requested row count in code.
             // This prevents the SQL agent from turning "highest" into Top 5 or "Top 5" into a full list.
-            const requestedRankCount = normalizedSubQuestion.match(/\\btop\\s+(\\d{1,3})\\b/i);
-            const wantsAllRankRows = /\\b(?:all|every|complete|full)\\b/.test(normalizedSubQuestion);
+            const requestedRankCount = normalizedSubQuestion.match(/\btop\s+(\d{1,3})\b/i);
+            const wantsAllRankRows = /\b(?:all|every|complete|full)\b/.test(normalizedSubQuestion);
             const rankLimit = requestedRankCount
               ? Math.max(1, Math.min(100, Number(requestedRankCount[1])))
               : wantsAllRankRows ? 100 : 1;
             const rankLabel = requestedRankCount ? "Top " + rankLimit : wantsAllRankRows ? "Complete ranking (up to 100 rows)" : "Highest-ranked result";
 
-            if (/\\b(?:country|countries|market|markets)\\b/.test(normalizedSubQuestion)
-              && /\\b(?:revenue|sales|profit|margin|orders)\\b/.test(normalizedSubQuestion)
-              && /\\b(?:top\\s+\\d+|all|every|complete|full|rank|ranking|highest|lowest|leader)\\b/.test(normalizedSubQuestion)) {
-              const metric = /\\b(?:profit|net profit|recorded profit)\\b/.test(normalizedSubQuestion) ? "profit_inr" : "revenue_inr";
+            if (/\b(?:country|countries|market|markets)\b/.test(normalizedSubQuestion)
+              && /\b(?:revenue|sales|profit|margin|orders)\b/.test(normalizedSubQuestion)
+              && /\b(?:top\s+\d+|all|every|complete|full|rank|ranking|highest|lowest|leader)\b/.test(normalizedSubQuestion)) {
+              const metric = /\b(?:profit|net profit|recorded profit)\b/.test(normalizedSubQuestion) ? "profit_inr" : "revenue_inr";
               const { data, error } = await db.from("vw_sales_by_country")
                 .select("country,revenue_inr,profit_inr,order_count")
                 .order(metric, { ascending: false, nullsFirst: false });
@@ -467,17 +467,17 @@ Deno.serve(async (req: Request) => {
                 const answer = shown.map((row, i) => (i + 1) + ". " + txt(row.country)
                   + " — Revenue: " + formatINR(num(row.revenue_inr))
                   + "; profit: " + formatINR(num(row.profit_inr))
-                  + "; orders: " + num(row.order_count).toLocaleString("en-IN")).join("\\n");
-                answers.push((index + 1) + ". " + subQuestion + "\\n" + rankLabel + " countries by " + metricLabel + ":\\n" + answer);
+                  + "; orders: " + num(row.order_count).toLocaleString("en-IN")).join("\n");
+                answers.push((index + 1) + ". " + subQuestion + "\n" + rankLabel + " countries by " + metricLabel + ":\n" + answer);
                 allSources.set("vw_sales_by_country", { name: "vw_sales_by_country", records: rows.length, note: "complete country summary ordered by requested metric; displayed row count follows user intent" });
                 continue;
               }
             }
 
-            if (/\\b(?:buyer|buyers|customer|customers)\\b/.test(normalizedSubQuestion)
-              && /\\b(?:revenue|sales|profit|margin|orders)\\b/.test(normalizedSubQuestion)
-              && /\\b(?:top\\s+\\d+|all|every|complete|full|rank|ranking|highest|lowest|leader)\\b/.test(normalizedSubQuestion)) {
-              const metric = /\\b(?:profit|net profit|recorded profit)\\b/.test(normalizedSubQuestion) ? "profit_inr" : "revenue_inr";
+            if (/\b(?:buyer|buyers|customer|customers)\b/.test(normalizedSubQuestion)
+              && /\b(?:revenue|sales|profit|margin|orders)\b/.test(normalizedSubQuestion)
+              && /\b(?:top\s+\d+|all|every|complete|full|rank|ranking|highest|lowest|leader)\b/.test(normalizedSubQuestion)) {
+              const metric = /\b(?:profit|net profit|recorded profit)\b/.test(normalizedSubQuestion) ? "profit_inr" : "revenue_inr";
               const { data, error } = await db.from("vw_sales_by_buyer")
                 .select("buyer_name,country,revenue_inr,profit_inr,profit_margin_pct,order_count")
                 .order(metric, { ascending: false, nullsFirst: false });
@@ -491,8 +491,8 @@ Deno.serve(async (req: Request) => {
                   + "; revenue: " + formatINR(num(row.revenue_inr))
                   + "; profit: " + formatINR(num(row.profit_inr))
                   + "; margin: " + num(row.profit_margin_pct).toFixed(2) + "%"
-                  + "; orders: " + num(row.order_count).toLocaleString("en-IN")).join("\\n");
-                answers.push((index + 1) + ". " + subQuestion + "\\n" + rankLabel + " buyers by " + metricLabel + ":\\n" + answer);
+                  + "; orders: " + num(row.order_count).toLocaleString("en-IN")).join("\n");
+                answers.push((index + 1) + ". " + subQuestion + "\n" + rankLabel + " buyers by " + metricLabel + ":\n" + answer);
                 allSources.set("vw_sales_by_buyer", { name: "vw_sales_by_buyer", records: rows.length, note: "buyer summary ordered by requested metric; displayed row count follows user intent" });
                 continue;
               }
@@ -526,24 +526,24 @@ Deno.serve(async (req: Request) => {
                 const answer = shown.map((row, i) => (i + 1) + ". " + row.product_category
                   + " — Revenue: " + formatINR(row.revenue_inr)
                   + "; profit: " + formatINR(row.profit_inr)
-                  + "; weighted margin: " + row.profit_margin_pct.toFixed(2) + "%").join("\\n");
-                answers.push((index + 1) + ". " + subQuestion + "\\n" + rankLabel + (productIntent.asksGroupTotal ? " product groups" : " products/styles") + " by " + metricLabel + ":\\n" + answer);
+                  + "; weighted margin: " + row.profit_margin_pct.toFixed(2) + "%").join("\n");
+                answers.push((index + 1) + ". " + subQuestion + "\n" + rankLabel + (productIntent.asksGroupTotal ? " product groups" : " products/styles") + " by " + metricLabel + ":\n" + answer);
                 allSources.set("vw_sales_by_product", { name: "vw_sales_by_product", records: productRows.length, note: productIntent.asksGroupTotal ? "all style rows aggregated to product groups before ranking" : "all product/style rows ranked by requested metric" });
                 continue;
               }
             }
 
-            if (/\\b(?:production line|production lines|manufacturing line|manufacturing lines)\\b/.test(normalizedSubQuestion)
-              && /\\b(?:rework|rejection|reject|overtime|efficiency|performance)\\b/.test(normalizedSubQuestion)) {
+            if (/\b(?:production line|production lines|manufacturing line|manufacturing lines)\b/.test(normalizedSubQuestion)
+              && /\b(?:rework|rejection|reject|overtime|efficiency|performance)\b/.test(normalizedSubQuestion)) {
               const { data, error } = await db.from("vw_production_by_line")
                 .select("line_id,unit,specialisation,order_count,rejection_qty,rejection_rate_pct,avg_actual_efficiency_pct,overtime_hours,rework_cost_inr")
                 .limit(100);
               if (error) throw new Error("Production-line query failed: " + error.message);
               const rows = (data ?? []) as Record<string, unknown>[];
-              const metric = /\\b(?:rework)\\b/.test(normalizedSubQuestion) ? "rework_cost_inr"
-                : /\\b(?:rejection|reject)\\b/.test(normalizedSubQuestion) ? "rejection_rate_pct"
-                : /\\b(?:overtime)\\b/.test(normalizedSubQuestion) ? "overtime_hours" : "avg_actual_efficiency_pct";
-              const ascending = /\\b(?:lowest|least|minimum)\\b/.test(normalizedSubQuestion);
+              const metric = /\b(?:rework)\b/.test(normalizedSubQuestion) ? "rework_cost_inr"
+                : /\b(?:rejection|reject)\b/.test(normalizedSubQuestion) ? "rejection_rate_pct"
+                : /\b(?:overtime)\b/.test(normalizedSubQuestion) ? "overtime_hours" : "avg_actual_efficiency_pct";
+              const ascending = /\b(?:lowest|least|minimum)\b/.test(normalizedSubQuestion);
               const ranked = [...rows].sort((a,b) => (ascending ? 1 : -1) * (num(a[metric]) - num(b[metric])));
               if (ranked.length) {
                 const shown = ranked.slice(0, rankLimit);
@@ -552,8 +552,8 @@ Deno.serve(async (req: Request) => {
                   + " — " + metricLabel + ": " + (metric === "rework_cost_inr" ? formatINR(num(row[metric])) : metric === "overtime_hours" ? num(row[metric]).toLocaleString("en-IN") + " hours" : num(row[metric]).toFixed(2) + "%")
                   + "; rework: " + formatINR(num(row.rework_cost_inr))
                   + "; rejection rate: " + num(row.rejection_rate_pct).toFixed(2) + "%"
-                  + "; orders: " + num(row.order_count).toLocaleString("en-IN")).join("\\n");
-                answers.push((index + 1) + ". " + subQuestion + "\\n" + rankLabel + " production lines by " + metricLabel + ":\\n" + answer);
+                  + "; orders: " + num(row.order_count).toLocaleString("en-IN")).join("\n");
+                answers.push((index + 1) + ". " + subQuestion + "\n" + rankLabel + " production lines by " + metricLabel + ":\n" + answer);
                 allSources.set("vw_production_by_line", { name: "vw_production_by_line", records: rows.length, note: "production lines ranked by requested metric; displayed row count follows user intent" });
                 continue;
               }
