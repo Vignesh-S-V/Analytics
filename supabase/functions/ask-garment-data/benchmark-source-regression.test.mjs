@@ -205,3 +205,9 @@ test("short highest-profit product-group prompts return one group", () => {
 test("short highest rework-cost production-line prompts return one line", () => {
   assert.ok(source.includes('const isSingleProductionLeader=/\\b(?:highest|lowest|most|least|best|worst)\\b/.test(normalizedQ)&&!explicitMultiRow;'));
 });
+
+test("country Top-N answer formats raw rupees with the shared INR formatter", () => {
+  assert.match(source, /const answer=displayed\.map\(\(r,i\)=>/);
+  assert.match(source, /formatINR\(num\(r\.revenue_inr\)\)/);
+  assert.match(source, /formatINR\(num\(r\.profit_inr\)\)/);
+});
