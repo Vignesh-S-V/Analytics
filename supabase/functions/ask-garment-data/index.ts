@@ -905,7 +905,8 @@ Deno.serve(async (req: Request) => {
       // Keep a defensive cap of 100 rows for unbounded ranking requests.
       const topNMatch = normalizedQ.match(/\btop\s+(\d{1,3})\b/i);
       const requestedTopN = topNMatch ? Math.max(1, Math.min(100, Number(topNMatch[1]))) : null;
-      const singleBuyerLeader = !requestedTopN && !explicitMultiRow && /\\b(?:highest|most|top|number one|no 1|best)\\b/i.test(normalizedQ) && !/\\b(?:buyers|customers)\\b/i.test(normalizedQ.replace(/\\b(?:which|what)\\s+(?:is\\s+)?(?:the\\s+)?(?:highest|most|top|best)\\s+(?:revenue|profit)\\s+/i, ""));\n      const rowLimit = requestedTopN ?? (singleBuyerLeader ? 1 : 100);
+      const singleBuyerLeader = !requestedTopN && !explicitMultiRow && /\b(?:highest|most|top|number one|no 1|best)\b/i.test(normalizedQ) && /\b(?:buyer|customer)\b/i.test(normalizedQ);
+      const rowLimit = requestedTopN ?? (singleBuyerLeader ? 1 : 100);
       const { data, error } = await db.from("vw_sales_by_buyer")
         .select("buyer_id,buyer_name,country,order_count,revenue_inr,profit_inr,profit_margin_pct")
         .order(metric, { ascending: false, nullsFirst: false }).limit(rowLimit);
@@ -952,7 +953,7 @@ Deno.serve(async (req: Request) => {
         const revenueLeader = [...rankedGroups].sort((a,b)=>b.revenue_inr-a.revenue_inr)[0];
         const profitLeader = [...rankedGroups].sort((a,b)=>b.profit_inr-a.profit_inr)[0];
         const sameLeader = revenueLeader.product_category === profitLeader.product_category;
-        const isSingleProductGroupLeader = /\b(?:which|what)\b/i.test(normalizedQ) && /\b(?:highest|most|top|best)\b/i.test(normalizedQ) && !explicitMultiRow;
+        const isSingleProductGroupLeader = /\b(?:highest|most|top|best)\b/i.test(normalizedQ) && !explicitMultiRow;
         if (isSingleProductGroupLeader) return respond({ answer: "Highest " + metricLabel + " product group: " + top.product_category + ". Revenue: " + formatINR(top.revenue_inr) + "; recorded profit: " + formatINR(top.profit_inr) + "; weighted profit margin: " + top.profit_margin_pct.toFixed(2) + "%; styles included: " + top.style_count + ".", sources: [{ name: "vw_sales_by_product", records: rows.length, note: "all styles aggregated by product group; sorted by total " + metricLabel }], question }, 200, origin);
         const answer = "Highest " + metricLabel + " product group: " + top.product_category + ". Combined revenue: " + formatINR(top.revenue_inr)
           + "; combined recorded profit: " + formatINR(top.profit_inr) + "; weighted profit margin: " + top.profit_margin_pct.toFixed(2)
@@ -1120,7 +1121,7 @@ Deno.serve(async (req: Request) => {
       const ranked=[...rows].sort((a,b)=>(ascending?1:-1)*(num(a[metric])-num(b[metric])));
       if(!ranked.length)return respond({answer:"No production-line rows are available.",sources:[{name:"vw_production_by_line",records:0}],question},200,origin);
       const productionTopNMatch=normalizedQ.match(/\btop\s+(\d{1,2})\b/i);
-      const isSingleProductionLeader=/\b(?:which|what)\b/.test(normalizedQ)&&/\b(?:highest|lowest|most|least|best|worst)\b/.test(normalizedQ)&&!explicitMultiRow;
+      const isSingleProductionLeader=/\b(?:highest|lowest|most|least|best|worst)\b/.test(normalizedQ)&&!explicitMultiRow;
       const productionDisplayRows=isSingleProductionLeader?ranked.slice(0,1):productionTopNMatch?ranked.slice(0,Math.max(1,Math.min(20,Number(productionTopNMatch[1])))):ranked;
       if(isSingleProductionLeader){const r=productionDisplayRows[0];return respond({answer:"Production line "+txt(r.line_id)+" ("+txt(r.unit)+", "+txt(r.specialisation)+") has the "+(ascending?"lowest ":"highest ")+metric.replaceAll("_"," ")+": "+(metric==="rework_cost_inr"?formatINR(num(r.rework_cost_inr)):metric==="rejection_rate_pct"?num(r.rejection_rate_pct).toFixed(2)+"%":metric==="overtime_hours"?num(r.overtime_hours).toLocaleString("en-IN")+" hours":num(r.avg_actual_efficiency_pct).toFixed(2)+"%")+". Rework cost: "+formatINR(num(r.rework_cost_inr))+"; rejection rate: "+num(r.rejection_rate_pct).toFixed(2)+"%; orders: "+num(r.order_count).toLocaleString("en-IN")+".",sources:[{name:"vw_production_by_line",records:rows.length,note:"all lines ranked by requested metric; only the leading line is displayed"}],question},200,origin);}
       const missingShipmentNote = /\b(delayed shipments?|shipment delays?)\b/.test(normalizedQ) ? " Delayed-shipment counts are unavailable in vw_production_by_line: this view has no shipment-delay or due-date field, so no delayed-shipment value is inferred." : "";
