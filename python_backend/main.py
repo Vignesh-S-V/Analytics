@@ -11,7 +11,7 @@ import re
 from typing import Any
 from urllib.parse import quote, urlencode
 
-from analytics_utils import detect_product_ranking_intent, is_multi_question_prompt, split_questions
+from analytics_utils import detect_product_ranking_intent, detect_ranking_cardinality, is_multi_question_prompt, split_questions
 
 try:
     from js import AbortSignal, Object, fetch as js_fetch
@@ -87,6 +87,8 @@ Rules:
 - Never query unlisted relations, auth, storage, system catalogs, or database metadata.
 - For "which country has highest revenue", group by country and order by SUM(revenue_inr) DESC.
 - For "which buyer gives highest profit", group by buyer_name and order by SUM(profit_inr) DESC, not revenue.
+- Match requested ranking cardinality exactly: a singular highest/lowest/which/who question returns exactly ONE winning entity; "Top N" returns exactly N rows; "all", "every", or "list all" returns the full available ranking. Never turn a singular question into a full ranking, and never return more than the requested N.
+- For country/buyer leader or Top-N requests, include the correct ORDER BY metric and enforce the requested SQL LIMIT. Do not apply a limit to explicit all/list-all requests.
 - For monthly growth, aggregate by month chronologically and calculate (current - prior) / ABS(prior) * 100; use N/A when baseline is zero or missing.
 - Weighted profit margin is SUM(profit_inr) / NULLIF(SUM(revenue_inr), 0) * 100. Never average row-level percentages.
 - month is a date; financial year runs April–March. Use like-for-like date ranges and disclose partial periods.
@@ -105,7 +107,8 @@ class UpstreamRequestError(RuntimeError):
 def _prepare_question(question: str) -> str:
     prepared = str(question or "").strip()
     parts = split_questions(prepared)
-    if is_multi_question_prompt(prepared) and len(parts) > 1:
+    multi_question = is_multi_question_prompt(prepared) and len(parts) > 1
+    if multi_question:
         numbered = "\n".join(f"{index + 1}. {part}" for index, part in enumerate(parts))
         prepared += "\n\nAddress every distinct sub-question separately, in order:\n" + numbered
     ranking = detect_product_ranking_intent(prepared)
@@ -117,7 +120,24 @@ def _prepare_question(question: str) -> str:
             + metric + " as the primary sort metric and " + level
             + ". Do not substitute the other metric for the requested ranking."
         )
+    cardinality = None if multi_question else detect_ranking_cardinality(prepared)
+    if cardinality:
+        limit = cardinality["limit"]
+        count = "exactly one winning " + cardinality["entity"] if limit == 1 else f"exactly {limit} " + cardinality["entity"] + " rows"
+        prepared += (
+            "\n\nSTRICT RANKING OUTPUT: Return " + count + " only. "
+            + "Sort by SUM(" + cardinality["metric"] + ") DESC and add LIMIT " + str(limit)
+            + " to the SQL query. Do not show any additional ranked entities."
+        )
     return prepared
+
+
+def _apply_ranking_limit(sql: str, limit: int) -> str:
+    """Enforce singular / Top-N row counts in the database query, not only prose."""
+    query = str(sql or "").strip().rstrip(";").rstrip()
+    query = re.sub(r"\s+LIMIT\s+\d+\s*$", "", query, flags=re.I)
+    query = re.sub(r"\s+FETCH\s+FIRST\s+\d+\s+ROWS?\s+ONLY\s*$", "", query, flags=re.I)
+    return f"{query} LIMIT {int(limit)}"
 
 
 def validate_sql(sql: str) -> tuple[bool, list[str], str]:
@@ -393,7 +413,14 @@ async def _ask(
         if quota is not True:
             return 429, _error("Request burst limit reached (60 per minute per approved account). Please retry shortly."), response_headers
 
+        ranking_cardinality = (
+            None if is_multi_question_prompt(question)
+            else detect_ranking_cardinality(question)
+        )
+
         async def sql_runner(sql: str):
+            if ranking_cardinality:
+                sql = _apply_ranking_limit(sql, ranking_cardinality["limit"])
             return await _execute_sql(SUPABASE_URL, SUPABASE_ANON_KEY, token, sql)
 
         answer, sources = await _run_gemini(
