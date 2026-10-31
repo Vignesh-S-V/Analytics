@@ -199,10 +199,9 @@ test("short highest-revenue buyer prompts return exactly one row", () => {
 });
 
 test("short highest-profit product-group prompts return one group", () => {
-  assert.match(source, /const isSingleProductGroupLeader = \/\//);
-  assert.match(source, /const isSingleProductGroupLeader = \/\b\(\?:highest\|most\|top\|best\)/);
+  assert.ok(source.includes(String.raw\`const isSingleProductGroupLeader = /\\b(?:highest|most|top|best)\\b/i.test(normalizedQ) && !explicitMultiRow;\`));
 });
 
 test("short highest rework-cost production-line prompts return one line", () => {
-  assert.match(source, /const isSingleProductionLeader=\/\\b\(\?:highest\|lowest\|most\|least\|best\|worst\)/);
+  assert.ok(source.includes(String.raw\`const isSingleProductionLeader=/\\b(?:highest|lowest|most|least|best|worst)\\b/.test(normalizedQ)&&!explicitMultiRow;\`));
 });
