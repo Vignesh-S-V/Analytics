@@ -448,9 +448,9 @@ Deno.serve(async (req: Request) => {
             const requestedRankCount = normalizedSubQuestion.match(/\btop\s+(\d{1,3})\b/i);
             const wantsAllRankRows = /\b(?:all|every|complete|full)\b/.test(normalizedSubQuestion);
             const rankLimit = requestedRankCount
-              ? Math.max(1, Math.min(100, Number(requestedRankCount[1])))
-              : wantsAllRankRows ? 100 : 1;
-            const rankLabel = requestedRankCount ? "Top " + rankLimit : wantsAllRankRows ? "Complete ranking (up to 100 rows)" : "Highest-ranked result";
+              ? Math.max(1, Math.min(500, Number(requestedRankCount[1])))
+              : wantsAllRankRows ? Number.POSITIVE_INFINITY : 1;
+            const rankLabel = requestedRankCount ? "Top " + rankLimit : wantsAllRankRows ? "Complete available ranking" : "Highest-ranked result";
 
             if (/\b(?:country|countries|market|markets)\b/.test(normalizedSubQuestion)
               && /\b(?:revenue|sales|profit|margin|orders)\b/.test(normalizedSubQuestion)
@@ -478,11 +478,18 @@ Deno.serve(async (req: Request) => {
               && /\b(?:revenue|sales|profit|margin|orders)\b/.test(normalizedSubQuestion)
               && /\b(?:top\s+\d+|all|every|complete|full|rank|ranking|highest|lowest|leader)\b/.test(normalizedSubQuestion)) {
               const metric = /\b(?:profit|net profit|recorded profit)\b/.test(normalizedSubQuestion) ? "profit_inr" : "revenue_inr";
-              const { data, error } = await db.from("vw_sales_by_buyer")
-                .select("buyer_name,country,revenue_inr,profit_inr,profit_margin_pct,order_count")
-                .order(metric, { ascending: false, nullsFirst: false });
-              if (error) throw new Error("Buyer ranking query failed: " + error.message);
-              const rows = (data ?? []) as Record<string, unknown>[];
+              const rows: Record<string, unknown>[] = [];
+              const pageSize = 1000;
+              for (let offset = 0; ; offset += pageSize) {
+                const { data, error } = await db.from("vw_sales_by_buyer")
+                  .select("buyer_name,country,revenue_inr,profit_inr,profit_margin_pct,order_count")
+                  .order(metric, { ascending: false, nullsFirst: false })
+                  .range(offset, offset + pageSize - 1);
+                if (error) throw new Error("Buyer ranking query failed: " + error.message);
+                const page = (data ?? []) as Record<string, unknown>[];
+                rows.push(...page);
+                if (page.length < pageSize) break;
+              }
               if (rows.length) {
                 const shown = rows.slice(0, rankLimit);
                 const metricLabel = metric === "profit_inr" ? "recorded profit" : "revenue";
