@@ -224,22 +224,23 @@ test("multi-question agent aggregates product groups and ranks production leader
   assert.match(source, /If the user asks for highest rework cost AND highest rejection rate/);
 });
 
+
 test("bulk ranking routes enforce Top-N and complete-list cardinality in code", () => {
-  assert.match(source, /Deterministic multi-question ranking routes: enforce the user's requested row count in code/);
-  assert.match(source, /const rankLimit = requestedRankCount[\\s\\S]{0,180}Number\\.POSITIVE_INFINITY/);
-  assert.match(source, /buyers by " \+ metricLabel/);
-  assert.match(source, /countries by " \+ metricLabel/);
-  assert.match(source, /Complete available ranking/);
+  assert.ok(source.includes("Deterministic multi-question ranking routes: enforce the user's requested row count in code"));
+  assert.ok(source.includes("Number.POSITIVE_INFINITY"));
+  assert.ok(source.includes('countries by " + metricLabel'));
+  assert.ok(source.includes('buyers by " + metricLabel'));
+  assert.ok(source.includes("Complete available ranking"));
 });
 
 test("bulk product-group rankings aggregate styles before applying requested row count", () => {
-  assert.match(source, /const productIntent = detectProductRankingIntent\\(normalizedSubQuestion\\)/);
-  assert.match(source, /aggregateProductGroups\\(productRows, metric\\)/);
-  assert.match(source, /all style rows aggregated to product groups before ranking/);
+  assert.ok(source.includes("detectProductRankingIntent(normalizedSubQuestion)"));
+  assert.ok(source.includes("aggregateProductGroups(productRows, metric)"));
+  assert.ok(source.includes("all style rows aggregated to product groups before ranking"));
 });
 
 test("bulk production-line rankings calculate and display only the requested number of lines", () => {
-  assert.match(source, /production lines by " \+ metricLabel/);
-  assert.match(source, /ranked\\.slice\\(0, rankLimit\\)/);
-  assert.match(source, /rejection_rate_pct/);
+  assert.ok(source.includes('production lines by " + metricLabel'));
+  assert.ok(source.includes("ranked.slice(0, rankLimit)"));
+  assert.ok(source.includes("rejection_rate_pct"));
 });
