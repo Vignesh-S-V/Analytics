@@ -3,6 +3,7 @@ import unittest
 from analytics_utils import (
     aggregate_product_groups,
     detect_product_ranking_intent,
+    detect_ranking_cardinality,
     is_country_comparison_question,
     is_multi_question_prompt,
     normalize_query,
@@ -33,6 +34,27 @@ class RankingIntentTests(unittest.TestCase):
     def test_revenue_metric_is_detected(self):
         result = detect_product_ranking_intent("Top product groups by revenue")
         self.assertEqual(result, {"metric": "revenue_inr", "asks_group_total": True})
+
+    def test_singular_country_leader_returns_one(self):
+        self.assertEqual(
+            detect_ranking_cardinality("Which country has the highest revenue?"),
+            {"entity": "country", "metric": "revenue_inr", "limit": 1},
+        )
+
+    def test_singular_buyer_profit_leader_returns_one(self):
+        self.assertEqual(
+            detect_ranking_cardinality("Which buyer gives the highest profit?"),
+            {"entity": "buyer", "metric": "profit_inr", "limit": 1},
+        )
+
+    def test_top_five_buyer_profit_returns_five(self):
+        self.assertEqual(
+            detect_ranking_cardinality("Top 5 buyers by profit"),
+            {"entity": "buyer", "metric": "profit_inr", "limit": 5},
+        )
+
+    def test_list_all_countries_is_not_capped(self):
+        self.assertIsNone(detect_ranking_cardinality("List all countries"))
 
     def test_unsupported_prompt_falls_through(self):
         self.assertIsNone(detect_product_ranking_intent("Explain the production process"))
