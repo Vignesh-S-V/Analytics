@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "supabase/functions/ask-garment-data/**"
+      - "supabase/functions/ask-garment-data/benchmark-source-regression.test.mjs"
       - "supabase/config.toml"
       - ".github/workflows/deploy-ask-ai.yml"
   workflow_dispatch:
