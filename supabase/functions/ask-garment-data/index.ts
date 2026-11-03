@@ -328,106 +328,122 @@ Deno.serve(async (req: Request) => {
     }
     if (quotaAllowed !== true) return respond({ error: "Request burst limit reached (60 per minute per approved account). Please retry shortly." }, 429, origin);
 
-    // Resolve explicit product/fabric requests against the full original question BEFORE
-    // multi-intent splitting or company-wide KPI routes. Tolerate common voice/typing misspellings.
+    // Resolve explicit product-category OR fabric requests against the full original question
+    // before multi-intent splitting or company-wide KPI routes. Product categories (e.g. Polo T-Shirt)
+    // and fabric variants (e.g. Pique 200 GSM) are separate dimensions and must never be conflated.
     const fullQuestionNormalized = question.toLowerCase().normalize("NFKD")
-      .replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
-    const hasRequestedBusinessMetrics = /\b(revenue|sales|turnover|orders?|cost|expenses|spend|gp|gross profit|np|net profit|profit)\b/.test(fullQuestionNormalized);
-    if (hasRequestedBusinessMetrics) {
-      const fabricOptions: Record<string, unknown>[] = [];
-      let fabricOptionsError: { message: string } | null = null;
-      const fabricPageSize = 1000;
-      for (let offset = 0; ; offset += fabricPageSize) {
-        const page = await db.from("fact_orders").select("order_id,fabric")
-          .not("fabric", "is", null).order("order_id", { ascending: true })
-          .range(offset, offset + fabricPageSize - 1);
-        if (page.error) { fabricOptionsError = page.error; break; }
+      .replace(/[\\u0300-\\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").replace(/\\s+/g, " ").trim();
+    const hasRequestedBusinessMetrics = /\\b(revenue|sales|turnover|orders?|cost|expenses|spend|gp|gross profit|np|net profit|profit)\\b/.test(fullQuestionNormalized);
+    const mentionsProductEntity = /\\b(?:product|products|polo|t[ -]?shirt|shirt|hoodie|sweatshirt|jogger|track pant|brief|vest|tank top|innerwear|fabric|gsm|category)\\b/.test(fullQuestionNormalized);
+    if (hasRequestedBusinessMetrics && mentionsProductEntity) {
+      const productOptions: Record<string, unknown>[] = [];
+      let productOptionsError: { message: string } | null = null;
+      const optionsPageSize = 1000;
+      for (let offset = 0; ; offset += optionsPageSize) {
+        const page = await db.from("fact_orders").select("order_id,product_category,fabric")
+          .order("order_id", { ascending: true })
+          .range(offset, offset + optionsPageSize - 1);
+        if (page.error) { productOptionsError = page.error; break; }
         const batch = (page.data ?? []) as Record<string, unknown>[];
-        fabricOptions.push(...batch);
-        if (batch.length < fabricPageSize) break;
+        productOptions.push(...batch);
+        if (batch.length < optionsPageSize) break;
       }
-      if (fabricOptionsError) {
-        console.error("Product fabric lookup failed:", fabricOptionsError.message);
-        if (/\b\d{2,3}\s*gsm\b/i.test(question)) {
-          return respond({ error: "Could not verify the requested product specification. Please retry; company-wide figures were not substituted." }, 502, origin);
-        }
-      } else {
-        const fabrics = [...new Set(fabricOptions.map((row: any) => txt(row.fabric).trim()).filter(Boolean))];
-        const fabricMatch = matchFabricFromQuestion(question, fabrics);
-        if (fabricMatch.fabric) {
-          const selectedFabric = fabricMatch.fabric;
-          const rows: Record<string, unknown>[] = [];
-          const pageSize = 1000;
-          for (let offset = 0; ; offset += pageSize) {
-            const page = await db.from("fact_orders")
-              .select("order_id,order_date,country,fabric,revenue_inr,total_cost_inr,profit_inr,fabric_cost_per_pc_inr,trims_cost_per_pc_inr,cmt_cost_per_pc_inr,shipped_qty,order_qty")
-              .ilike("fabric", selectedFabric)
-              .order("order_id", { ascending: true })
-              .range(offset, offset + pageSize - 1);
-            if (page.error) {
-              console.error("Product-specific KPI query failed:", page.error.message);
-              return respond({ error: "Could not calculate metrics for the selected product. Please retry." }, 502, origin);
-            }
-            const batch = (page.data ?? []) as Record<string, unknown>[];
-            rows.push(...batch);
-            if (batch.length < pageSize) break;
-          }
-          const periodFilter = resolveFiscalPeriod(question, requestedYear);
-          const selectedRows = rows.filter((row) => {
-            const date = txt(row.order_date).slice(0, 10);
-            const periodMatch = !periodFilter.startDate
-              || (date >= periodFilter.startDate && date < String(periodFilter.endDateExclusive));
-            const countryFilter = !requestedCountry || requestedCountry === "All countries"
-              || txt(row.country).trim().toLowerCase() === requestedCountry.toLowerCase();
-            return periodMatch && countryFilter;
-          });
-          if (!selectedRows.length) {
-            const availableYears = [...new Set(rows.map((row) => txt(row.order_date).slice(0, 4)).filter((year) => /^20\d{2}$/.test(year)))].sort();
-            const periodMessage = periodFilter.kind !== "all"
-              ? "No sales were recorded for " + selectedFabric + " in " + periodFilter.label + ". Available data years: " + (availableYears.join(", ") || "none") + "."
-              : "No matching records were found for " + selectedFabric + " under the selected filters.";
-            return respond({ answer: periodMessage, unavailable: true, question }, 200, origin);
-          }
-          const revenue = sum(selectedRows, "revenue_inr");
-          const totalCost = sum(selectedRows, "total_cost_inr");
-          const netProfit = sum(selectedRows, "profit_inr");
-          const directCost = selectedRows.reduce((total, row) => {
-            const quantity = num(row.shipped_qty) > 0 ? num(row.shipped_qty) : num(row.order_qty);
-            return total + (num(row.fabric_cost_per_pc_inr) + num(row.trims_cost_per_pc_inr) + num(row.cmt_cost_per_pc_inr)) * quantity;
-          }, 0);
-          const grossProfit = revenue - directCost;
-          const orderCount = new Set(selectedRows.map((row) => txt(row.order_id).trim()).filter(Boolean)).size;
-          const gpPct = revenue ? grossProfit / revenue * 100 : null;
-          const npPct = revenue ? netProfit / revenue * 100 : null;
-          const asksRevenue = /\b(revenue|sales|turnover)\b/.test(fullQuestionNormalized);
-          const asksDirectCost = /\bdirect cost\b/.test(fullQuestionNormalized);
-          const asksTotalCost = !asksDirectCost && /\b(total cost|cost total|overall cost|cost|expenses|spend)\b/.test(fullQuestionNormalized);
-          const asksOrders = /\b(orders?|order count)\b/.test(fullQuestionNormalized);
-          const asksGP = /\b(gp|gross profit|gross profitability)\b/.test(fullQuestionNormalized);
-          const asksNP = /\b(np|net profit|recorded profit)\b/.test(fullQuestionNormalized);
-          const metrics: string[] = [];
-          if (asksRevenue) metrics.push("Total revenue / sales: " + formatINR(revenue));
-          if (asksTotalCost) metrics.push("Total cost: " + formatINR(totalCost));
-          if (asksDirectCost) metrics.push("Direct cost (fabric + trims + CMT): " + formatINR(directCost));
-          if (asksOrders) metrics.push("Total orders: " + orderCount.toLocaleString("en-IN"));
-          if (asksGP) metrics.push("Gross profit (GP): " + formatINR(grossProfit) + "; GP%: " + (gpPct === null ? "N/A" : gpPct.toFixed(2) + "%"));
-          if (asksNP) metrics.push("Net profit (NP): " + formatINR(netProfit) + "; NP%: " + (npPct === null ? "N/A" : npPct.toFixed(2) + "%"));
-          if (!metrics.length) metrics.push("Total revenue / sales: " + formatINR(revenue), "Total cost: " + formatINR(totalCost), "Total orders: " + orderCount.toLocaleString("en-IN"),
-            "Gross profit (GP): " + formatINR(grossProfit) + "; GP%: " + (gpPct === null ? "N/A" : gpPct.toFixed(2) + "%"),
-            "Net profit (NP): " + formatINR(netProfit) + "; NP%: " + (npPct === null ? "N/A" : npPct.toFixed(2) + "%"));
-          const period = periodFilter.label;
-          return respond({
-            answer: selectedFabric + " · " + period + "\n" + metrics.join("\n"),
-            sources: [{ name: "workspace data", records: selectedRows.length, note: "Exact fabric match after typo-tolerant product resolution; requested metrics calculated from matching orders." }],
-            question
-          }, 200, origin);
-        } else if (/\b\d{2,3}\s*gsm\b/i.test(question)) {
-          const message = fabricMatch.ambiguous
-            ? "The product name is ambiguous. Please choose the exact fabric variant: " + (fabricMatch.candidates ?? []).join(", ") + "."
-            : "I could not match the requested fabric and GSM to workspace products. Please check the spelling and specification. I have not substituted company-wide figures.";
-          return respond({ answer: message, unavailable: true, question }, 200, origin);
-        }
+      if (productOptionsError) {
+        console.error("Product lookup failed:", productOptionsError.message);
+        return respond({ error: "Could not verify the requested product against workspace data. Please retry; company-wide figures were not substituted." }, 502, origin);
       }
+
+      const productCategories = [...new Set(productOptions.map((row: any) => txt(row.product_category).trim()).filter(Boolean))];
+      const fabrics = [...new Set(productOptions.map((row: any) => txt(row.fabric).trim()).filter(Boolean))];
+      const categoryMatch = matchFabricFromQuestion(question, productCategories);
+      const fabricMatch = matchFabricFromQuestion(question, fabrics);
+      // Prefer an explicit product category when both dimensions appear in the question.
+      const matchDimension = categoryMatch.category ? "product_category" : fabricMatch.fabric ? "fabric" : null;
+      const selectedProduct = categoryMatch.category ?? fabricMatch.fabric ?? null;
+
+      if (selectedProduct && matchDimension) {
+        const rows: Record<string, unknown>[] = [];
+        const pageSize = 1000;
+        for (let offset = 0; ; offset += pageSize) {
+          let query = db.from("fact_orders")
+            .select("order_id,order_date,country,product_category,fabric,revenue_inr,total_cost_inr,profit_inr,fabric_cost_per_pc_inr,trims_cost_per_pc_inr,cmt_cost_per_pc_inr,shipped_qty,order_qty")
+            .order("order_id", { ascending: true })
+            .range(offset, offset + pageSize - 1);
+          query = matchDimension === "product_category"
+            ? query.ilike("product_category", selectedProduct)
+            : query.ilike("fabric", selectedProduct);
+          const page = await query;
+          if (page.error) {
+            console.error("Product-specific KPI query failed:", page.error.message);
+            return respond({ error: "Could not calculate metrics for the selected product. Please retry; company-wide figures were not substituted." }, 502, origin);
+          }
+          const batch = (page.data ?? []) as Record<string, unknown>[];
+          rows.push(...batch);
+          if (batch.length < pageSize) break;
+        }
+        const periodFilter = resolveFiscalPeriod(question, requestedYear);
+        const selectedRows = rows.filter((row) => {
+          const date = txt(row.order_date).slice(0, 10);
+          const periodMatch = !periodFilter.startDate
+            || (date >= periodFilter.startDate && date < String(periodFilter.endDateExclusive));
+          const countryFilter = !requestedCountry || requestedCountry === "All countries"
+            || txt(row.country).trim().toLowerCase() === requestedCountry.toLowerCase();
+          return periodMatch && countryFilter;
+        });
+        if (!selectedRows.length) {
+          const availableYears = [...new Set(rows.map((row) => txt(row.order_date).slice(0, 4)).filter((year) => /^20\\d{2}$/.test(year)))].sort();
+          const periodMessage = periodFilter.kind !== "all"
+            ? "No sales were recorded for " + selectedProduct + " in " + periodFilter.label + ". Available data years: " + (availableYears.join(", ") || "none") + "."
+            : "No matching records were found for " + selectedProduct + " under the selected filters.";
+          return respond({ answer: periodMessage, unavailable: true, question }, 200, origin);
+        }
+        const revenue = sum(selectedRows, "revenue_inr");
+        const totalCost = sum(selectedRows, "total_cost_inr");
+        const netProfit = sum(selectedRows, "profit_inr");
+        const directCost = selectedRows.reduce((total, row) => {
+          const quantity = num(row.shipped_qty) > 0 ? num(row.shipped_qty) : num(row.order_qty);
+          return total + (num(row.fabric_cost_per_pc_inr) + num(row.trims_cost_per_pc_inr) + num(row.cmt_cost_per_pc_inr)) * quantity;
+        }, 0);
+        const grossProfit = revenue - directCost;
+        const orderCount = new Set(selectedRows.map((row) => txt(row.order_id).trim()).filter(Boolean)).size;
+        const gpPct = revenue ? grossProfit / revenue * 100 : null;
+        const npPct = revenue ? netProfit / revenue * 100 : null;
+        const asksRevenue = /\\b(revenue|sales|turnover)\\b/.test(fullQuestionNormalized);
+        const asksDirectCost = /\\bdirect cost\\b/.test(fullQuestionNormalized);
+        const asksTotalCost = !asksDirectCost && /\\b(total cost|cost total|overall cost|cost|expenses|spend)\\b/.test(fullQuestionNormalized);
+        const asksOrders = /\\b(orders?|order count)\\b/.test(fullQuestionNormalized);
+        const asksGP = /\\b(gp|gross profit|gross profitability)\\b/.test(fullQuestionNormalized);
+        const asksNP = /\\b(np|net profit|recorded profit)\\b/.test(fullQuestionNormalized);
+        const metrics: string[] = [];
+        if (asksRevenue) metrics.push("Revenue: " + formatINR(revenue));
+        if (asksTotalCost) metrics.push("Total cost: " + formatINR(totalCost));
+        if (asksDirectCost) metrics.push("Direct cost (fabric + trims + CMT): " + formatINR(directCost));
+        if (asksOrders) metrics.push("Orders: " + orderCount.toLocaleString("en-IN"));
+        if (asksGP) metrics.push("Gross profit (GP): " + formatINR(grossProfit) + "; GP%: " + (gpPct === null ? "N/A" : gpPct.toFixed(2) + "%"));
+        if (asksNP) metrics.push("Net profit (NP): " + formatINR(netProfit) + "; NP%: " + (npPct === null ? "N/A" : npPct.toFixed(2) + "%"));
+        if (!metrics.length) metrics.push(
+          "Revenue: " + formatINR(revenue),
+          "Total cost: " + formatINR(totalCost),
+          "Orders: " + orderCount.toLocaleString("en-IN"),
+          "Gross profit (GP): " + formatINR(grossProfit) + "; GP%: " + (gpPct === null ? "N/A" : gpPct.toFixed(2) + "%"),
+          "Net profit (NP): " + formatINR(netProfit) + "; NP%: " + (npPct === null ? "N/A" : npPct.toFixed(2) + "%")
+        );
+        return respond({
+          answer: selectedProduct + " (" + matchDimension + ") · " + periodFilter.label + "\\n" + metrics.join("\\n"),
+          sources: [{ name: "workspace data", records: selectedRows.length, note: "Exact product-category or fabric match with requested filters; metrics calculated from matching orders." }],
+          question
+        }, 200, origin);
+      }
+
+      // If the user explicitly named a product-like entity but it cannot be resolved,
+      // fail closed instead of falling through to company-wide KPI figures.
+      const productCandidates = [...new Set([...productCategories, ...fabrics])];
+      const candidateText = productCandidates.slice(0, 12).join(", ");
+      return respond({
+        answer: "I could not match that product or fabric to workspace data. Available product categories include: " + productCategories.join(", ") + ". Please use an exact product name; I have not substituted company-wide figures.",
+        unavailable: true,
+        question
+      }, 200, origin);
     }
 
     // Handle multi-intent prompts before any single-intent deterministic route can return.
