@@ -218,8 +218,11 @@ export function resolveFiscalPeriod(question, selectedPeriod = "", now = new Dat
       : startYear + 1;
     kind = "fiscal";
   } else if (/\b(this year|current year|year to date|ytd)\b/.test(normalized)) {
-    const year = now.getUTCFullYear();
-    const month = now.getUTCMonth() + 1;
+    const dateParts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Kolkata", year: "numeric", month: "numeric",
+    }).formatToParts(now);
+    const year = Number(dateParts.find((part) => part.type === "year")?.value);
+    const month = Number(dateParts.find((part) => part.type === "month")?.value);
     startYear = month >= 4 ? year : year - 1;
     endYear = startYear + 1;
     kind = "fiscal";
