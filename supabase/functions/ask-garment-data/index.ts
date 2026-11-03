@@ -339,14 +339,15 @@ Deno.serve(async (req: Request) => {
       const productOptions: Record<string, unknown>[] = [];
       let productOptionsError: { message: string } | null = null;
       const optionsPageSize = 1000;
+      const fabricPageSize = optionsPageSize;
       for (let offset = 0; ; offset += optionsPageSize) {
         const page = await db.from("fact_orders").select("order_id,product_category,fabric")
           .order("order_id", { ascending: true })
-          .range(offset, offset + optionsPageSize - 1);
+          .range(offset, offset + fabricPageSize - 1);
         if (page.error) { productOptionsError = page.error; break; }
         const batch = (page.data ?? []) as Record<string, unknown>[];
         productOptions.push(...batch);
-        if (batch.length < optionsPageSize) break;
+        if (batch.length < fabricPageSize) break;
       }
       if (productOptionsError) {
         console.error("Product lookup failed:", productOptionsError.message);
@@ -358,8 +359,8 @@ Deno.serve(async (req: Request) => {
       const categoryMatch = matchFabricFromQuestion(question, productCategories);
       const fabricMatch = matchFabricFromQuestion(question, fabrics);
       // Prefer an explicit product category when both dimensions appear in the question.
-      const matchDimension = categoryMatch.category ? "product_category" : fabricMatch.fabric ? "fabric" : null;
-      const selectedProduct = categoryMatch.category ?? fabricMatch.fabric ?? null;
+      const matchDimension = categoryMatch.fabric ? "product_category" : fabricMatch.fabric ? "fabric" : null;
+      const selectedProduct = categoryMatch.fabric ?? fabricMatch.fabric ?? null;
 
       if (selectedProduct && matchDimension) {
         const rows: Record<string, unknown>[] = [];
@@ -440,7 +441,7 @@ Deno.serve(async (req: Request) => {
       const productCandidates = [...new Set([...productCategories, ...fabrics])];
       const candidateText = productCandidates.slice(0, 12).join(", ");
       return respond({
-        answer: "I could not match that product or fabric to workspace data. Available product categories include: " + productCategories.join(", ") + ". Please use an exact product name; I have not substituted company-wide figures.",
+        answer: "I could not match that product or fabric to workspace data. I have not substituted company-wide figures. Available product categories include: " + productCategories.join(", ") + ". Please use an exact product name; I have not substituted company-wide figures.",
         unavailable: true,
         question
       }, 200, origin);
