@@ -75,3 +75,27 @@ test("multi-question lowest country ranking uses ascending order and a lowest la
   assert.match(edge, /\.order\(metric, \{ ascending: wantsLowestRank, nullsFirst: false \}\)/);
   assert.match(edge, /wantsLowestRank \? "Lowest-ranked result"/);
 });
+
+
+test("legacy GSM KPI handler is removed; one canonical product route owns variant metrics", () => {
+  assert.equal(edge.split("Resolve explicit product/fabric requests").length - 1, 1);
+  assert.doesNotMatch(edge, /Product-variant KPI route|asksVariantMetrics/);
+});
+
+test("general GP and NP calculations paginate and respect fiscal/dashboard filters", () => {
+  const start = edge.indexOf("const asksGrossMetric");
+  const end = edge.indexOf("// Exact entity-specific answers must run BEFORE generic KPI intents.", start);
+  const route = edge.slice(start, end);
+  assert.match(route, /resolveFiscalPeriod\(question, requestedYear\)/);
+  assert.match(route, /\.range\(offset, offset \+ pageSize - 1\)/);
+  assert.doesNotMatch(route, /\.limit\(1000\)/);
+});
+
+test("country rankings apply the same fiscal period and selected country filters", () => {
+  const start = edge.indexOf("const asksCountryRankingEarly");
+  const end = edge.indexOf("const asksProductionRankingEarly", start);
+  const route = edge.slice(start, end);
+  assert.match(route, /resolveFiscalPeriod\(question, requestedYear\)/);
+  assert.match(route, /requestedCountry/);
+  assert.match(route, /ascending: isLowest/);
+});
