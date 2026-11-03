@@ -328,7 +328,7 @@ Deno.serve(async (req: Request) => {
     }
     if (quotaAllowed !== true) return respond({ error: "Request burst limit reached (60 per minute per approved account). Please retry shortly." }, 429, origin);
 
-    // Resolve explicit product-category OR fabric requests against the full original question
+    // Resolve explicit product/fabric requests: product-category OR fabric against the full original question
     // before multi-intent splitting or company-wide KPI routes. Product categories (e.g. Polo T-Shirt)
     // and fabric variants (e.g. Pique 200 GSM) are separate dimensions and must never be conflated.
     const fullQuestionNormalized = question.toLowerCase().normalize("NFKD")
