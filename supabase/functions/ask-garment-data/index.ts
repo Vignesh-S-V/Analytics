@@ -356,8 +356,14 @@ Deno.serve(async (req: Request) => {
 
       const productCategories = [...new Set(productOptions.map((row: any) => txt(row.product_category).trim()).filter(Boolean))];
       const fabrics = [...new Set(productOptions.map((row: any) => txt(row.fabric).trim()).filter(Boolean))];
-      const categoryMatch = matchFabricFromQuestion(question, productCategories);
-      const fabricMatch = matchFabricFromQuestion(question, fabrics);
+      const normalizeEntity = (value: string) => value.toLowerCase().normalize("NFKD")
+        .replace(/[\\u0300-\\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").replace(/\\s+/g, " ").trim();
+      // Exact phrase matching is needed for names such as "Polo T-Shirt": fuzzy
+      // token matching intentionally ignores one-letter tokens such as "T".
+      const exactCategory = productCategories.find((value) => fullQuestionNormalized.includes(normalizeEntity(value)));
+      const exactFabric = fabrics.find((value) => fullQuestionNormalized.includes(normalizeEntity(value)));
+      const categoryMatch = { fabric: exactCategory ?? matchFabricFromQuestion(question, productCategories).fabric };
+      const fabricMatch = { fabric: exactFabric ?? matchFabricFromQuestion(question, fabrics).fabric };
       // Prefer an explicit product category when both dimensions appear in the question.
       const matchDimension = categoryMatch.fabric ? "product_category" : fabricMatch.fabric ? "fabric" : null;
       const selectedProduct = categoryMatch.fabric ?? fabricMatch.fabric ?? null;
@@ -439,9 +445,8 @@ Deno.serve(async (req: Request) => {
       // If the user explicitly named a product-like entity but it cannot be resolved,
       // fail closed instead of falling through to company-wide KPI figures.
       const productCandidates = [...new Set([...productCategories, ...fabrics])];
-      const candidateText = productCandidates.slice(0, 12).join(", ");
       return respond({
-        answer: "I could not match that product or fabric to workspace data. I have not substituted company-wide figures. Available product categories include: " + productCategories.join(", ") + ". Please use an exact product name; I have not substituted company-wide figures.",
+        answer: "I could not match that product or fabric to workspace data. I have not substituted company-wide figures. Available product categories include: " + productCategories.join(", ") + ". Please use an exact product name.",
         unavailable: true,
         question
       }, 200, origin);
