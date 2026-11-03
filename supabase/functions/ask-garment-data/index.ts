@@ -66,15 +66,12 @@ function hideInternalNames(value: unknown): unknown {
   if (typeof value !== "string") return value;
   let result = value;
   for (const name of INTERNAL_DATA_OBJECTS) {
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\function respond(body: Record<string, unknown>, status: number, origin: string | null) {
-  return new Response(JSON.stringify(body), { status, headers: corsHeaders(origin) });
-}");
-    result = result.replace(new RegExp("\\b" + escaped + "\\b", "gi"), "workspace data");
+    result = result.replace(new RegExp("\\b" + name + "\\b", "gi"), "workspace data");
   }
   result = result
-    .replace(/\\b(?:source|table|view|relation)\\s*:\\s*workspace data\\b/gi, "workspace data")
-    .replace(/\\bworkspace data rows\\b/gi, "matching business records")
-    .replace(/\\b(?:from|using)\\s+workspace data\\s+rows\\b/gi, "using matching business records");
+    .replace(/\b(?:source|table|view|relation)\s*:\s*workspace data\b/gi, "workspace data")
+    .replace(/\bworkspace data rows\b/gi, "matching business records")
+    .replace(/\b(?:from|using)\s+workspace data\s+rows\b/gi, "using matching business records");
   return result;
 }
 function respond(body: Record<string, unknown>, status: number, origin: string | null) {
