@@ -30,8 +30,8 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Run Ask AI regression tests
-        run: node --test supabase/functions/ask-garment-data/benchmark-source-regression.test.mjs
+      - name: Run all Ask AI regression tests
+        run: node --test supabase/functions/ask-garment-data/*.test.mjs
 
       - name: Set up pinned Supabase CLI
         run: npx --yes supabase@2.39.2 --version
