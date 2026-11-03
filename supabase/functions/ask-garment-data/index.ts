@@ -445,6 +445,9 @@ Deno.serve(async (req: Request) => {
       // If the user explicitly named a product-like entity but it cannot be resolved,
       // fail closed instead of falling through to company-wide KPI figures.
       const productCandidates = [...new Set([...productCategories, ...fabrics])];
+      if (/\\b\\d{2,3}\\s*gsm\\b/i.test(question)) {
+        return respond({ answer: "I could not match the requested GSM specification to workspace data. I have not substituted company-wide figures.", unavailable: true, question }, 200, origin);
+      }
       return respond({
         answer: "I could not match that product or fabric to workspace data. I have not substituted company-wide figures. Available product categories include: " + productCategories.join(", ") + ". Please use an exact product name.",
         unavailable: true,
