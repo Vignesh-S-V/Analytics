@@ -325,8 +325,8 @@ Deno.serve(async (req: Request) => {
     // Resolve explicit product/fabric requests against the full original question BEFORE
     // multi-intent splitting or company-wide KPI routes. Tolerate common voice/typing misspellings.
     const fullQuestionNormalized = question.toLowerCase().normalize("NFKD")
-      .replace(/[\\u0300-\\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").replace(/\\s+/g, " ").trim();
-    const hasRequestedBusinessMetrics = /\\b(revenue|sales|turnover|orders?|gp|gross profit|np|net profit|profit)\\b/.test(fullQuestionNormalized);
+      .replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+    const hasRequestedBusinessMetrics = /\b(revenue|sales|turnover|orders?|gp|gross profit|np|net profit|profit)\b/.test(fullQuestionNormalized);
     const editDistance = (a: string, b: string) => {
       const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
       for (let i = 1; i <= a.length; i++) {
@@ -354,7 +354,7 @@ Deno.serve(async (req: Request) => {
         const scoredFabrics = fabrics.map((fabric) => {
           const fabricTokens = fabric.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, " ").split(" ").filter(Boolean);
           const tokenScores = fabricTokens.map((target) => Math.max(0, ...queryTokens.map((token) => tokenSimilarity(token, target))));
-          const numericTokens = fabricTokens.filter((token) => /^\\d+$/.test(token));
+          const numericTokens = fabricTokens.filter((token) => /^\d+$/.test(token));
           const numericMatch = numericTokens.every((token) => queryTokens.includes(token));
           const score = tokenScores.length ? tokenScores.reduce((a, b) => a + b, 0) / tokenScores.length : 0;
           return { fabric, score, numericMatch, tokenScores };
@@ -378,7 +378,7 @@ Deno.serve(async (req: Request) => {
             rows.push(...batch);
             if (batch.length < pageSize) break;
           }
-          const explicitYears = [...new Set([...fullQuestionNormalized.matchAll(/\\b(20\\d{2})\\b/g)].map((m) => m[1]))];
+          const explicitYears = [...new Set([...fullQuestionNormalized.matchAll(/\b(20\d{2})\b/g)].map((m) => m[1]))];
           const selectedRows = rows.filter((row) => {
             const date = txt(row.order_date).slice(0, 10);
             const yearFilter = explicitYears.length
@@ -401,10 +401,10 @@ Deno.serve(async (req: Request) => {
           const orderCount = new Set(selectedRows.map((row) => txt(row.order_id).trim()).filter(Boolean)).size;
           const gpPct = revenue ? grossProfit / revenue * 100 : null;
           const npPct = revenue ? netProfit / revenue * 100 : null;
-          const asksRevenue = /\\b(revenue|sales|turnover)\\b/.test(fullQuestionNormalized);
-          const asksOrders = /\\b(orders?|order count)\\b/.test(fullQuestionNormalized);
-          const asksGP = /\\b(gp|gross profit|gross profitability)\\b/.test(fullQuestionNormalized);
-          const asksNP = /\\b(np|net profit|recorded profit)\\b/.test(fullQuestionNormalized);
+          const asksRevenue = /\b(revenue|sales|turnover)\b/.test(fullQuestionNormalized);
+          const asksOrders = /\b(orders?|order count)\b/.test(fullQuestionNormalized);
+          const asksGP = /\b(gp|gross profit|gross profitability)\b/.test(fullQuestionNormalized);
+          const asksNP = /\b(np|net profit|recorded profit)\b/.test(fullQuestionNormalized);
           const metrics: string[] = [];
           if (asksRevenue) metrics.push("Revenue / Sales: " + formatINR(revenue));
           if (asksOrders) metrics.push("Total orders: " + orderCount.toLocaleString("en-IN"));
@@ -415,7 +415,7 @@ Deno.serve(async (req: Request) => {
             "Net profit (NP): " + formatINR(netProfit) + "; NP%: " + (npPct === null ? "N/A" : npPct.toFixed(2) + "%"));
           const period = explicitYears.length ? explicitYears[explicitYears.length - 1] : requestedYear || "All available years";
           return respond({
-            answer: selectedFabric + " · " + period + "\\n" + metrics.join("\\n"),
+            answer: selectedFabric + " · " + period + "\n" + metrics.join("\n"),
             sources: [{ name: "workspace data", records: selectedRows.length, note: "Exact fabric match after typo-tolerant product resolution; requested metrics calculated from matching orders." }],
             question
           }, 200, origin);
