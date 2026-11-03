@@ -954,3 +954,9 @@ html{background:#f7f8fa;scroll-behavior:smooth}body{min-width:320px;background:#
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 
 /* Orange-white responsive redesign validated against the synchronized Framer Motion lockfile. */
+
+/* Global click-to-sort affordance for all dashboard tables */
+#root table thead th{cursor:pointer;user-select:none}
+#root table thead th:hover{color:#d9652b!important;background:#fff7f1}
+#root table thead th[aria-sort="ascending"],#root table thead th[aria-sort="descending"]{color:#d9652b!important}
+.global-sort-indicator{display:inline-block;margin-left:5px;color:#e87535;font-size:11px;font-weight:800;white-space:nowrap}
