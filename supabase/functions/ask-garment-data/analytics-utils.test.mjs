@@ -137,6 +137,13 @@ test("matches common Single Jersey spelling mistakes while preserving exact GSM"
   assert.equal(result.ambiguous, false);
 });
 
+test("matches both common single and jersey voice transcription errors", () => {
+  const result = matchFabricFromQuestion("sigle jersy 150 gsm revenue", [
+    "Single Jersey 150 GSM", "Single Jersey 160 GSM",
+  ]);
+  assert.equal(result.fabric, "Single Jersey 150 GSM");
+});
+
 test("does not match a different GSM when the requested numeric specification differs", () => {
   const result = matchFabricFromQuestion("single jersey 150 gsm revenue", [
     "Single Jersey 140 GSM", "Single Jersey 160 GSM",
