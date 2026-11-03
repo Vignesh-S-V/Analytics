@@ -49,7 +49,7 @@ test("product-specific KPI route runs before multi-intent and company-wide KPI f
   assert.ok(product > 0 && product < multiIntent && product < companyKpi);
   assert.match(edge, /matchFabricFromQuestion\(question, fabrics\)/);
   assert.match(edge, /resolveFiscalPeriod\(question, requestedYear\)/);
-  assert.match(edge, /\d\{2,3\}\\s\*gsm/);
+  assert.ok(edge.includes("/\\b\\d{2,3}\\s*gsm\\b/i.test(question)"));
 });
 
 test("product specification mismatch returns a clarification instead of company totals", () => {
