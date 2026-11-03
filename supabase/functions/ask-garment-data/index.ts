@@ -372,7 +372,7 @@ Deno.serve(async (req: Request) => {
           const numericMatch = numericTokens.every((token) => queryTokens.includes(token));
           const score = tokenScores.length ? tokenScores.reduce((a, b) => a + b, 0) / tokenScores.length : 0;
           return { fabric, score, numericMatch, tokenScores };
-        }).filter((item) => item.numericMatch && item.score >= 0.78 && item.tokenScores.every((score) => score >= 0.72))
+        }).filter((item) => item.numericMatch && item.score >= 0.78 && item.tokenScores.every((score) => score >= 0.60))
           .sort((a, b) => b.score - a.score);
         if (scoredFabrics.length && (!scoredFabrics[1] || scoredFabrics[0].score - scoredFabrics[1].score >= 0.04 || scoredFabrics[0].fabric === scoredFabrics[1].fabric)) {
           const selectedFabric = scoredFabrics[0].fabric;
@@ -436,6 +436,8 @@ Deno.serve(async (req: Request) => {
             sources: [{ name: "workspace data", records: selectedRows.length, note: "Exact fabric match after typo-tolerant product resolution; requested metrics calculated from matching orders." }],
             question
           }, 200, origin);
+        } else if (/\\bsingle\\b/.test(fullQuestionNormalized) && /\\b\\d{2,3}\\b/.test(fullQuestionNormalized) && /\\bgsm\\b/.test(fullQuestionNormalized)) {
+          return respond({ answer: "I could not confidently match that product specification. Please check the fabric name and GSM. I have not substituted company-wide figures.", unavailable: true, question }, 200, origin);
         }
       }
     }
