@@ -641,6 +641,10 @@ Deno.serve(async (req: Request) => {
                 const right = metric === "profit_margin_pct" ? marginPct(b) : num(b[metric]);
                 return (wantsLowestRank ? 1 : -1) * (left - right);
               });
+              if (!rows.length && (periodFilter.kind !== "all" || (requestedCountry && requestedCountry !== "All countries"))) {
+                answers.push((index + 1) + ". " + subQuestion + "\\nNo country records were found for " + periodFilter.label + " and the selected country filter.");
+                continue;
+              }
               if (rows.length) {
                 const shown = rows.slice(0, rankLimit);
                 const metricLabel = metric === "profit_inr" ? "recorded profit" : metric === "profit_margin_pct" ? "weighted profit margin" : "revenue";
@@ -650,7 +654,7 @@ Deno.serve(async (req: Request) => {
                   + "; recorded profit: " + formatINR(num(row.profit_inr))
                   + "; orders: " + num(row.order_count).toLocaleString("en-IN")).join("\n");
                 answers.push((index + 1) + ". " + subQuestion + "\n" + rankLabel + " countries by " + metricLabel + ":\n" + answer);
-                allSources.set("vw_sales_by_country", { name: "vw_sales_by_country", records: rows.length, note: "complete country summary ordered by requested metric; displayed row count follows user intent" });
+                allSources.set("vw_sales_monthly_by_country", { name: "vw_sales_monthly_by_country", records: monthlyRows.length, note: "complete monthly country rows aggregated within the requested financial-year and country filters" });
                 continue;
               }
             }
