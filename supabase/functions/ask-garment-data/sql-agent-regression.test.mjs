@@ -120,9 +120,9 @@ test("product-category KPI requests resolve product_category separately from fab
   const route = edge.slice(start, end);
   assert.match(route, /select\("order_id,product_category,fabric"\)/);
   assert.match(route, /const categoryMatches = productCategories\.filter/);
-  assert.match(route, /categoryMatch\.fabric \? "product_category"/);
-  assert.match(route, /query\.ilike\("product_category", selectedProduct\)/);
-  assert.match(route, /query\.ilike\("fabric", selectedProduct\)/);
+  assert.match(route, /categoryMatches\.length\s*\?/);
+  assert.match(route, /query\.ilike\("product_category", entity\.value\)/);
+  assert.match(route, /query\.ilike\("fabric", entity\.value\)/);
   assert.match(route, /I have not substituted company-wide figures/);
   assert.match(route, /const grossProfit = revenue - directCost/);
 });
