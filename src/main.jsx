@@ -22,8 +22,8 @@ function normalizeAskAnswer(value){
 const INTERNAL_ASK_AI_NAMES=['vw_sales_monthly_by_country','vw_sales_by_country','vw_sales_by_buyer','vw_sales_by_product','vw_marketing_channel_performance','vw_production_by_line','vw_supplier_scorecard','vw_market_monthly','vw_management_monthly','vw_sales_profitability_by_month_country','fact_orders','fact_marketing','dim_suppliers','dim_market','threadiq_workspace_members'];
 function safeAskAnswer(value){
  let result=normalizeAskAnswer(value);
- for(const name of INTERNAL_ASK_AI_NAMES)result=result.replace(new RegExp('\\\\b'+name+'\\\\b','gi'),'workspace data');
- return result.replace(/\\b(?:source|table|view|relation)\\s*:\\s*workspace data\\b/gi,'workspace data').replace(/\\bworkspace data rows\\b/gi,'matching business records');
+ for(const name of INTERNAL_ASK_AI_NAMES)result=result.replace(new RegExp('\\b'+name+'\\b','gi'),'workspace data');
+ return result.replace(/\b(?:source|table|view|relation)\s*:\s*workspace data\b/gi,'workspace data').replace(/\bworkspace data rows\b/gi,'matching business records');
 }
 function rankingTableFromAnswer(answer){
  const text=String(answer||'');
