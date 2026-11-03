@@ -66,3 +66,10 @@ test("product specification mismatch returns a clarification instead of company 
 test("product-specific period filter uses inclusive start and exclusive end dates", () => {
   assert.match(edge, /date >= periodFilter\.startDate && date < String\(periodFilter\.endDateExclusive\)/);
 });
+
+
+test("multi-question lowest country ranking uses ascending order and a lowest label", () => {
+  assert.match(edge, /const wantsLowestRank = .*lowest\|worst\|least/);
+  assert.match(edge, /\.order\(metric, \{ ascending: wantsLowestRank, nullsFirst: false \}\)/);
+  assert.match(edge, /wantsLowestRank \? "Lowest-ranked result"/);
+});
