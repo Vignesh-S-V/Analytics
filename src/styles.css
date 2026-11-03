@@ -891,3 +891,41 @@ html,body,#root{background:#f5f7fb!important;color:#172b4d!important}body{backgr
 .ask-supplier-table .ask-supplier-revenue{font-weight:800;color:#0966dc}
 .ask-supplier-ranking+.ask-source-wrap{margin-top:16px}
 @media(max-width:700px){.ask-supplier-ranking-heading strong{font-size:14px}.ask-supplier-table thead th{padding:10px;font-size:10px}.ask-supplier-table tbody td{padding:9px 10px;font-size:11px}}
+
+
+/* ThreadIQ navigation: click-origin violet/cyan ripple fill */
+.nav-item{
+  position:relative!important;
+  isolation:isolate;
+  overflow:hidden;
+  transform:translateZ(0);
+  transition:background-color .36s ease,color .28s ease,border-color .36s ease,box-shadow .36s ease!important;
+}
+.nav-item>*:not(.nav-ripple){position:relative;z-index:2}
+.nav-item .nav-item-label{z-index:2}
+.nav-item.active{
+  background:linear-gradient(112deg,rgba(124,58,237,.13),rgba(34,211,238,.13))!important;
+  border-color:rgba(99,102,241,.20)!important;
+  box-shadow:inset 3px 0 #6366f1!important;
+  color:#3157dc!important;
+}
+.nav-item.active svg{color:#5965e8!important}
+.nav-ripple{
+  position:absolute;
+  z-index:1;
+  pointer-events:none;
+  border-radius:50%;
+  transform:translate(-50%,-50%) scale(0);
+  transform-origin:center;
+  background:radial-gradient(circle at 35% 35%,rgba(139,92,246,.88) 0%,rgba(124,58,237,.76) 34%,rgba(34,211,238,.72) 76%,rgba(34,211,238,.22) 100%);
+  animation:threadiq-nav-ripple .82s cubic-bezier(.16,.72,.24,1) forwards;
+}
+@keyframes threadiq-nav-ripple{
+  0%{transform:translate(-50%,-50%) scale(0);opacity:.9}
+  68%{transform:translate(-50%,-50%) scale(1);opacity:.52}
+  100%{transform:translate(-50%,-50%) scale(1.08);opacity:0}
+}
+@media(prefers-reduced-motion:reduce){
+  .nav-item{transition:none!important}
+  .nav-ripple{animation-duration:.01ms}
+}
