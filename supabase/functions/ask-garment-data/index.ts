@@ -1427,8 +1427,8 @@ Deno.serve(async (req: Request) => {
       return respond({answer:"Production lines ranked by "+metric.replaceAll("_"," ")+" ("+(ascending?"lowest to highest":"highest to lowest")+"); "+ranked.length+" lines."+missingShipmentNote,rankingTable:{title:"Production line performance",subtitle:"Sorted by "+metric.replaceAll("_"," ")+" · "+rows.length+" lines",columns:[{key:"rank",label:"Rank",type:"number"},{key:"line_id",label:"Line"},{key:"unit",label:"Unit"},{key:"specialisation",label:"Specialisation"},{key:"order_count",label:"Orders",type:"number"},{key:"rework_cost_inr",label:"Rework Cost",type:"currency"},{key:"rejection_rate_pct",label:"Rejection Rate",type:"percent"},{key:"avg_actual_efficiency_pct",label:"Actual Efficiency",type:"percent"},{key:"avg_target_efficiency_pct",label:"Target Efficiency",type:"percent"},{key:"overtime_hours",label:"Overtime Hours",type:"decimal"}],rows:productionDisplayRows.map((r,i)=>({rank:i+1,line_id:txt(r.line_id),unit:txt(r.unit),specialisation:txt(r.specialisation),order_count:num(r.order_count),rework_cost_inr:num(r.rework_cost_inr),rejection_rate_pct:num(r.rejection_rate_pct),avg_actual_efficiency_pct:num(r.avg_actual_efficiency_pct)*100,avg_target_efficiency_pct:num(r.avg_target_efficiency_pct)*100,overtime_hours:num(r.overtime_hours)}))},sources:[{name:"vw_production_by_line",records:rows.length,note:"all production-line groups sorted by requested metric"}],question},200,origin);
     }
 
-    const asksGrossMetric = /\\bgp\\b|\\bgpm\\b|gross profit|gross margin|gp\\s*%/i.test(rawQ);
-    const asksNetMargin = /\\bnp\\b|\\bnpm\\b|net profit margin|net margin|profit margin|np\\s*%/i.test(rawQ);
+    const asksGrossMetric = /\bgp\b|\bgpm\b|gross profit|gross margin|gp\s*%/i.test(rawQ);
+    const asksNetMargin = /\bnp\b|\bnpm\b|net profit margin|net margin|profit margin|np\s*%/i.test(rawQ);
     if (asksGrossMetric || asksNetMargin) {
       const pageSize = 1000;
       const allProfitRows: Record<string, unknown>[] = [];
@@ -1476,7 +1476,6 @@ Deno.serve(async (req: Request) => {
         return respond({ answer: "No complete profitability records were found for " + periodFilter.label + " and the selected country filter.", unavailable: true, sources: [], question }, 200, origin);
       }
       const revenue = sum(relevantProfitRows, "revenue_inr");
-      const directCost = sum(relevantProfitRows, "direct_cost_inr");
       const grossProfit = sum(relevantProfitRows, "gross_profit_inr");
       const netProfit = sum(relevantProfitRows, "net_profit_inr");
       const gpPct = revenue ? grossProfit / revenue * 100 : 0;
