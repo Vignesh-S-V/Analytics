@@ -1432,7 +1432,6 @@ Deno.serve(async (req: Request) => {
     if (asksGrossMetric || asksNetMargin) {
       const pageSize = 1000;
       const allProfitRows: Record<string, unknown>[] = [];
-      const allSalesRows: Record<string, unknown>[] = [];
       for (let offset = 0; ; offset += pageSize) {
         const page = await db.from("vw_sales_profitability_by_month_country")
           .select("month,country,order_count,revenue_inr,direct_cost_inr,gross_profit_inr,gp_pct,net_profit_inr,np_pct")
@@ -1443,18 +1442,6 @@ Deno.serve(async (req: Request) => {
         }
         const batch = (page.data ?? []) as Record<string, unknown>[];
         allProfitRows.push(...batch);
-        if (batch.length < pageSize) break;
-      }
-      for (let offset = 0; ; offset += pageSize) {
-        const page = await db.from("vw_sales_monthly_by_country")
-          .select("month,country,order_count,revenue_inr,total_cost_inr,profit_inr")
-          .order("month").order("country").range(offset, offset + pageSize - 1);
-        if (page.error) {
-          console.error("Sales cost KPI query failed:", page.error.message);
-          return respond({ error: "Could not read complete sales cost data. Please retry." }, 502, origin);
-        }
-        const batch = (page.data ?? []) as Record<string, unknown>[];
-        allSalesRows.push(...batch);
         if (batch.length < pageSize) break;
       }
       const namedProfitCountry = [...new Set(allProfitRows.map(row => txt(row.country)).filter(Boolean))]
@@ -1469,10 +1456,9 @@ Deno.serve(async (req: Request) => {
             || txt(row.country).toLowerCase() === namedProfitCountry.toLowerCase());
       };
       const relevantProfitRows = allProfitRows.filter(inScope);
-      const relevantSalesRows = allSalesRows.filter(inScope);
       const hasExplicitScope = periodFilter.kind !== "all" || Boolean(qMonth)
         || Boolean(namedProfitCountry && namedProfitCountry !== "All countries");
-      if (hasExplicitScope && (!relevantProfitRows.length || !relevantSalesRows.length)) {
+      if (hasExplicitScope && !relevantProfitRows.length) {
         return respond({ answer: "No complete profitability records were found for " + periodFilter.label + " and the selected country filter.", unavailable: true, sources: [], question }, 200, origin);
       }
       const revenue = sum(relevantProfitRows, "revenue_inr");
