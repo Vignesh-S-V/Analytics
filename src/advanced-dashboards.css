@@ -6,3 +6,24 @@
 .supplier-score-chart{min-height:320px;overflow:visible}
 .supplier-mix-chart{min-height:260px;padding-left:4px}
 .adv-table th{white-space:nowrap}
+
+/* Premium 3D accent treatment for all React KPI cards */
+.adv-metric{position:relative;isolation:isolate;overflow:hidden;padding:18px 17px 16px 22px;border:1px solid #e7e5e2;border-radius:15px;background:linear-gradient(145deg,#fff 0%,#fbfcfe 58%,#f4f6f9 100%);box-shadow:0 2px 4px rgba(30,48,68,.035),0 8px 18px rgba(30,48,68,.045),inset 0 1px 0 rgba(255,255,255,.95);transition:transform .18s ease,box-shadow .18s ease}
+.adv-metric::before{content:"";position:absolute;z-index:1;left:0;top:0;bottom:0;width:6px;border-radius:15px 0 0 15px;background:linear-gradient(180deg,var(--metric-hi),var(--metric-accent) 52%,var(--metric-low));box-shadow:2px 0 7px color-mix(in srgb,var(--metric-accent) 28%,transparent),inset -1px 0 1px rgba(255,255,255,.55)}
+.adv-metric::after{content:"";position:absolute;z-index:-1;right:-25px;top:-34px;width:100px;height:100px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--metric-accent) 13%,transparent),transparent 70%);pointer-events:none}
+.adv-metric:hover{transform:translateY(-2px);box-shadow:0 4px 8px rgba(30,48,68,.05),0 13px 24px rgba(30,48,68,.09),inset 0 1px 0 #fff}
+.adv-metric[data-tone="orange"]{--metric-hi:#ffc28f;--metric-accent:#ed7b39;--metric-low:#a84418}
+.adv-metric[data-tone="blue"]{--metric-hi:#9cc9f5;--metric-accent:#397db8;--metric-low:#21456e}
+.adv-metric[data-tone="teal"]{--metric-hi:#8be0d1;--metric-accent:#239b8b;--metric-low:#12645d}
+.adv-metric[data-tone="violet"]{--metric-hi:#c4b2f7;--metric-accent:#8061c9;--metric-low:#4b3988}
+.adv-metric[data-tone="rose"]{--metric-hi:#f4aab1;--metric-accent:#d95b65;--metric-low:#963744}
+.adv-metric[data-tone="gold"]{--metric-hi:#f7dc91;--metric-accent:#c99a32;--metric-low:#896018}
+.adv-metric>span,.adv-metric>strong,.adv-metric>small{position:relative;z-index:2}
+.adv-metric>strong{letter-spacing:-.025em}
+.adv-metric-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:13px}
+.adv-panel{box-shadow:0 3px 12px rgba(34,48,64,.035)}
+.adv-table-wrap{max-width:100%;overflow:auto;overscroll-behavior-inline:contain}
+.adv-table{min-width:1050px}
+.adv-table tbody tr:hover{background:#fff8f2}
+@media(max-width:1000px){.adv-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.adv-metric-grid{grid-template-columns:1fr}.adv-metric{padding:15px 14px 14px 20px}}
