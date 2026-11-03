@@ -1022,6 +1022,11 @@ Deno.serve(async (req: Request) => {
     const normalizedQ = rawQ.replace(/[^a-z0-9 ]+/g, " ").replace(/  +/g, " ").trim();
     const qYear = question.match(/20[0-9]{2}/)?.[0] ?? requestedYear;
     const qMonths: Record<string,string> = { january:"01",jan:"01",february:"02",feb:"02",march:"03",mar:"03",april:"04",apr:"04",may:"05",june:"06",jun:"06",july:"07",jul:"07",august:"08",aug:"08",september:"09",sep:"09",sept:"09",october:"10",oct:"10",november:"11",nov:"11",december:"12",dec:"12" };
+    const asksStatePerformance = /\bstate(?:s|wise)?\b/i.test(normalizedQ)
+      && /\b(?:performance|perform|sales|revenue|profit|worst|lowest|best|highest|rank|ranking|behave|behaving)\b/i.test(normalizedQ);
+    if (asksStatePerformance) {
+      return respond({ answer: "I can’t identify the worst-performing state because this workspace currently contains country-level sales data, not state-level records. I can compare countries by revenue, recorded profit, or profit margin. State-wise analysis requires state-level data to be added.", question }, 200, origin);
+    }
     const qMonth = Object.entries(qMonths).find(([name]) => (" "+normalizedQ+" ").includes(" "+name+" "))?.[1] ?? "";
     // Singular leader questions are resolved before ranking-table routes, including on warm-cache requests.
     const leaderIsMulti = (question.match(/\?/g) ?? []).length > 1 || question.split(/[\n\r]+/).map(part => part.trim()).filter(Boolean).length > 1;
@@ -1231,8 +1236,8 @@ Deno.serve(async (req: Request) => {
     }
 
     const asksCountryRankingEarly = /\b(countr(?:y|ies))\b/.test(normalizedQ)
-      && /\b(rank|ranking|ranked|top|highest|lowest|sort|list|all|compare)\b/.test(normalizedQ)
-      && /\b(revenue|sales|profit)\b/.test(normalizedQ);
+      && /\b(rank|ranking|ranked|top|highest|lowest|worst|best|least|sort|list|all|compare|performance|performing)\b/.test(normalizedQ)
+      && /\b(revenue|sales|profit|margin|performance|performing)\b/.test(normalizedQ);
     if (asksCountryRankingEarly) {
       const rows: Record<string, unknown>[] = [];
        const pageSize = 1000;
@@ -1252,17 +1257,23 @@ Deno.serve(async (req: Request) => {
        }
        const grouped=new Map<string,Record<string,unknown>>();
       for(const row of rows){const m=monthOf(row);if(qYear&&!m.startsWith(qYear))continue;if(qMonth&&!m.endsWith("-"+qMonth))continue;const country=txt(row.country)||"Unknown";const cur=grouped.get(country)??{country,revenue_inr:0,profit_inr:0,order_count:0};cur.revenue_inr=num(cur.revenue_inr)+num(row.revenue_inr);cur.profit_inr=num(cur.profit_inr)+num(row.profit_inr);cur.order_count=num(cur.order_count)+num(row.order_count);grouped.set(country,cur);}
-      const metric=/\bby\s+(?:recorded\s+)?(?:profit|net profit|np)\b/.test(normalizedQ)&&!/\bby\s+(?:total\s+)?(?:revenue|sales)\b/.test(normalizedQ)?"profit_inr":"revenue_inr";
-       const ranked=[...grouped.values()].sort((a,b)=>num(b[metric])-num(a[metric]));
+      const metric = /\b(?:profit margin|margin)\b/.test(normalizedQ) ? "profit_margin_pct"
+        : /\b(?:profit|net profit|recorded profit|np)\b/.test(normalizedQ) && !/\b(?:revenue|sales)\b/.test(normalizedQ) ? "profit_inr" : "revenue_inr";
+      const isLowest = /\b(lowest|worst|least|minimum|bottom)\b/.test(normalizedQ)
+        && !/\b(highest to lowest|descending|high to low)\b/.test(normalizedQ);
+      const marginPct=(r:Record<string,unknown>)=>num(r.revenue_inr)!==0?num(r.profit_inr)/num(r.revenue_inr)*100:0;
+      const ranked=[...grouped.values()].sort((a,b)=>(isLowest?1:-1)*(metric==="profit_margin_pct"?marginPct(a)-marginPct(b):num(a[metric])-num(b[metric])));
        if(!ranked.length)return respond({answer:"No country ranking rows are available for the selected scope.",sources:[{name:"vw_sales_monthly_by_country",records:rows.length}],question},200,origin);
        const topNMatch=normalizedQ.match(/\btop\s+(\d{1,2})\b/i);
        const wantsAllCountries=/\b(?:all|every)\s+countries\b|\brank all\b/.test(normalizedQ);
        const requestedTopN=topNMatch?Math.max(1,Math.min(20,Number(topNMatch[1]))):(wantsAllCountries?ranked.length:1);
        const displayed=ranked.slice(0,requestedTopN);
        const marginPct=(r:Record<string,unknown>)=>num(r.revenue_inr)!==0?num(r.profit_inr)/num(r.revenue_inr)*100:0;
-       const label=metric==="profit_inr"?"recorded profit":"revenue";
-       const answer=displayed.map((r,i)=>(i+1)+". "+txt(r.country)+" — Revenue: "+formatINR(num(r.revenue_inr))+"; recorded profit: "+formatINR(num(r.profit_inr))+"; weighted profit margin: "+marginPct(r).toFixed(2)+"%; orders: "+num(r.order_count).toLocaleString("en-IN")+".").join("\n");
-       return respond({answer,rankingTable:displayed.length>1?{title:"Country sales ranking",subtitle:"Sorted by "+label+" · showing "+displayed.length+" of "+ranked.length+" countries",columns:[{key:"rank",label:"Rank",type:"number"},{key:"country",label:"Country"},{key:"revenue_inr",label:"Revenue",type:"currency"},{key:"profit_inr",label:"Recorded Profit",type:"currency"},{key:"order_count",label:"Orders",type:"number"},{key:"profit_margin_pct",label:"Weighted Profit Margin",type:"percent"}],rows:displayed.map((r,i)=>({rank:i+1,country:txt(r.country),revenue_inr:num(r.revenue_inr),profit_inr:num(r.profit_inr),order_count:num(r.order_count),profit_margin_pct:marginPct(r)}))}:null,sources:[{name:"vw_sales_monthly_by_country",records:rows.length,note:"monthly country rows aggregated by country before ranking; margin recalculated from total profit / total revenue"}],question},200,origin);
+       const label=metric==="profit_inr"?"recorded profit":metric==="profit_margin_pct"?"weighted profit margin":"revenue";
+       const direction=isLowest?"lowest to highest":"highest to lowest";
+       const answer=displayed.map((r,i)=>(i+1)+". "+txt(r.country)+" — "+label+": "+(metric==="profit_margin_pct"?marginPct(r).toFixed(2)+"%":formatINR(num(r[metric])))+"; revenue: "+formatINR(num(r.revenue_inr))+"; recorded profit: "+formatINR(num(r.profit_inr))+"; weighted profit margin: "+marginPct(r).toFixed(2)+"%; orders: "+num(r.order_count).toLocaleString("en-IN")+".").join("\n")
+         + (metric==="revenue_inr" && /\b(?:performance|performing|worst|lowest)\b/.test(normalizedQ) ? " Assumption: overall performance is measured by revenue because no specific metric was stated." : "");
+       return respond({answer,rankingTable:displayed.length>1?{title:"Country sales ranking",subtitle:"Sorted "+direction+" by "+label+" · showing "+displayed.length+" of "+ranked.length+" countries",columns:[{key:"rank",label:"Rank",type:"number"},{key:"country",label:"Country"},{key:"revenue_inr",label:"Revenue",type:"currency"},{key:"profit_inr",label:"Recorded Profit",type:"currency"},{key:"order_count",label:"Orders",type:"number"},{key:"profit_margin_pct",label:"Weighted Profit Margin",type:"percent"}],rows:displayed.map((r,i)=>({rank:i+1,country:txt(r.country),revenue_inr:num(r.revenue_inr),profit_inr:num(r.profit_inr),order_count:num(r.order_count),profit_margin_pct:marginPct(r)}))}:null,sources:[{name:"vw_sales_monthly_by_country",records:rows.length,note:"monthly country rows aggregated by country before ranking; margin recalculated from total profit / total revenue"}],question},200,origin);
     }
 
     const asksProductionRankingEarly = /\b(production lines?|production line performance|manufacturing lines?)\b/.test(normalizedQ)
