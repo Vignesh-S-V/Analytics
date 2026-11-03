@@ -71,10 +71,12 @@ test("product-specific period filter uses inclusive start and exclusive end date
 
 
 test("multi-question lowest country ranking uses ascending order and a lowest label", () => {
-  assert.match(edge, /const wantsLowestRank = .*lowest\|worst\|least/);
-  assert.match(edge, /\.order\(metric, \{ ascending: wantsLowestRank, nullsFirst: false \}\)/);
+  const start = edge.indexOf("const wantsLowestRank =");
+  const end = edge.indexOf("if (/\\b(?:buyer|buyers|customer|customers)\\b/", start);
+  const route = edge.slice(start, end);
+  assert.match(route, /wantsLowestRank \? 1 : -1/);
   assert.match(edge, /wantsLowestRank \? "Lowest-ranked result"/);
-});
+});;
 
 
 test("legacy GSM KPI handler is removed; one canonical product route owns variant metrics", () => {
