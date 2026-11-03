@@ -140,7 +140,7 @@ test("Hoodie resolves to the stored Sweatshirt/Hoodie product category", () => {
   const start = edge.indexOf("// Resolve explicit product/fabric requests");
   const end = edge.indexOf("// Handle multi-intent prompts before any single-intent deterministic route can return.", start);
   const route = edge.slice(start, end);
-  assert.match(route, /"sweatshirt\\/hoodie": \["hoodie", "sweatshirt", "hoodies", "sweatshirts"\]/);
+  assert.ok(route.includes('"sweatshirt/hoodie": ["hoodie", "sweatshirt", "hoodies", "sweatshirts"]'));
   assert.match(route, /aliases\.some\(\(alias\) => fullQuestionNormalized\.includes/);
 });
 
