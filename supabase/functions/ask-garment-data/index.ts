@@ -1964,7 +1964,8 @@ const geminiKey = Deno.env.get("GEMINI_API_KEY");
     const output=new ReadableStream<Uint8Array>({
       async start(controller){
         let buffer="";
-        const emit=(value:Record<string,unknown>)=>controller.enqueue(encoder.encode(JSON.stringify(value)+NL));
+        let completeText="";
+        const emit=(value:Record<string,unknown>)=>controller.enqueue(encoder.encode(JSON.stringify(hideInternalNames(value))+NL));
         const processBlock=(block:string)=>{
           for(const line of block.split(NL)){
             if(!line.startsWith("data:"))continue;
@@ -1973,7 +1974,7 @@ const geminiKey = Deno.env.get("GEMINI_API_KEY");
             try{
               const part=JSON.parse(payload);
               const text=(part?.candidates?.[0]?.content?.parts??[]).map((x:{text?:string})=>x.text??"").join("");
-              if(text)emit({type:"token",text});
+              if(text)completeText+=text;
               const finish=part?.candidates?.[0]?.finishReason;
               if(finish&&finish!=="STOP")emit({type:"status",message:"AI completed with finish reason "+finish});
             }catch(error){console.error("Could not parse Gemini stream chunk:",error instanceof Error?error.message:String(error));}
@@ -1992,6 +1993,7 @@ const geminiKey = Deno.env.get("GEMINI_API_KEY");
           }
           buffer+=decoder.decode();
           if(buffer.trim())processBlock(buffer);
+          if(completeText)emit({type:"token",text:completeText});
           emit({type:"done",sources,question});
           controller.close();
         }catch(error){
