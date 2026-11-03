@@ -4,6 +4,7 @@ import { aggregateProductGroups, detectProductRankingIntent, isCountryComparison
 const allowedOrigins = new Set([
   "https://analytics.vigneshw-5416.workers.dev",
   "https://analytics-threadiq.onrender.com",
+  "https://analytics-mis.onrender.com",
   // Public GitHub Pages origin for the project site at /Analytics/.
   "https://vignesh-s-v.github.io",
 ]);
