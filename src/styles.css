@@ -1035,3 +1035,15 @@ html{background:#f7f8fa;scroll-behavior:smooth}body{min-width:320px;background:#
 .yoy-kpis .result-card{min-height:120px;padding:18px 16px 18px 22px!important}
 .yoy-kpis .result-card p{margin-top:8px;line-height:1.45}
 @media(max-width:700px){.kpi-grid+.chart-grid{margin-top:17px!important}.yoy-kpis{gap:10px!important}}
+
+/* Improve readability across all business tables without changing density excessively */
+.table-scroll table,.adv-table-wrap table,.ask-supplier-table,.ask-benchmark-table-wrap table{font-size:13px!important}
+.table-scroll thead th,.adv-table-wrap thead th,.ask-supplier-table thead th,.ask-benchmark-table-wrap thead th{font-size:12px!important;line-height:1.4!important;padding:12px 13px!important;font-weight:750!important}
+.table-scroll tbody td,.adv-table-wrap tbody td,.ask-supplier-table tbody td,.ask-benchmark-table-wrap tbody td{font-size:13px!important;line-height:1.5!important;padding:11px 13px!important}
+.table-scroll tbody td small,.adv-table-wrap tbody td small{font-size:11px!important}
+.ask-supplier-table tbody td{font-size:13px!important}
+.ask-supplier-table thead th{font-size:12px!important}
+@media(max-width:700px){
+ .table-scroll thead th,.adv-table-wrap thead th,.ask-supplier-table thead th,.ask-benchmark-table-wrap thead th{font-size:11px!important;padding:10px!important}
+ .table-scroll tbody td,.adv-table-wrap tbody td,.ask-supplier-table tbody td,.ask-benchmark-table-wrap tbody td{font-size:12px!important;padding:10px!important}
+}
