@@ -664,6 +664,82 @@ Deno.serve(async (req: Request) => {
     }
     // Deterministic KPI and country comparison route; compute from all raw order pages.
     const normalizedKpiQ = question.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\u0B80-\u0BFF ]+/g, " ").replace(/\s+/g, " ").trim();
+
+    // Product/fabric-specific KPI route MUST run before the company-wide KPI route.
+    // This prevents a question such as "Single Jersey 150 GSM revenue, orders, GP and NP"
+    // from being intercepted by the broad revenue/profit fast path.
+    const asksProductMetrics = /\b(revenue|sales|turnover|orders?|gp|gross profit|np|net profit|profit)\b/.test(normalizedKpiQ);
+    if (asksProductMetrics) {
+      const { data: fabricOptions, error: fabricOptionsError } = await db
+        .from("fact_orders").select("fabric").not("fabric", "is", null).limit(1000);
+      if (fabricOptionsError) {
+        console.error("Product fabric lookup failed:", fabricOptionsError.message);
+      } else {
+        const normalizeProductText = (value: unknown) => txt(value).toLowerCase()
+          .normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+        const matchedFabrics = [...new Set((fabricOptions ?? []).map((row: any) => txt(row.fabric).trim()).filter(Boolean))]
+          .filter((fabric) => {
+            const normalizedFabric = normalizeProductText(fabric);
+            return normalizedFabric.length >= 6 && (" " + normalizedKpiQ + " ").includes(" " + normalizedFabric + " ");
+          })
+          .sort((a, b) => b.length - a.length);
+        if (matchedFabrics.length) {
+          const selectedFabric = matchedFabrics[0];
+          const productRows: Record<string, unknown>[] = [];
+          const pageSize = 1000;
+          for (let offset = 0; ; offset += pageSize) {
+            const page = await db.from("fact_orders")
+              .select("order_id,order_date,country,fabric,revenue_inr,profit_inr,fabric_cost_per_pc_inr,trims_cost_per_pc_inr,cmt_cost_per_pc_inr,shipped_qty,order_qty")
+              .ilike("fabric", selectedFabric)
+              .order("order_id", { ascending: true })
+              .range(offset, offset + pageSize - 1);
+            if (page.error) {
+              console.error("Product-specific KPI query failed:", page.error.message);
+              return respond({ error: "Could not calculate metrics for the selected product. Please retry." }, 502, origin);
+            }
+            const batch = (page.data ?? []) as Record<string, unknown>[];
+            productRows.push(...batch);
+            if (batch.length < pageSize) break;
+          }
+          const explicitYearsForProduct = [...new Set([...normalizedKpiQ.matchAll(/\b(20\d{2})\b/g)].map((m) => m[1]))];
+          const selectedRows = productRows.filter((row) => {
+            const date = txt(row.order_date).slice(0, 10);
+            const yearFilter = explicitYearsForProduct.length
+              ? date.startsWith(explicitYearsForProduct[explicitYearsForProduct.length - 1] + "-")
+              : (!requestedYear || date.startsWith(requestedYear + "-"));
+            const countryFilter = !requestedCountry || txt(row.country).trim().toLowerCase() === requestedCountry.toLowerCase();
+            return yearFilter && countryFilter;
+          });
+          if (!selectedRows.length) {
+            return respond({ answer: "No matching records were found for " + selectedFabric + " under the selected period and filters.", unavailable: true, question }, 200, origin);
+          }
+          const revenue = sum(selectedRows, "revenue_inr");
+          const netProfit = sum(selectedRows, "profit_inr");
+          const directCost = selectedRows.reduce((total, row) => {
+            const quantity = num(row.shipped_qty) > 0 ? num(row.shipped_qty) : num(row.order_qty);
+            return total + (num(row.fabric_cost_per_pc_inr) + num(row.trims_cost_per_pc_inr) + num(row.cmt_cost_per_pc_inr)) * quantity;
+          }, 0);
+          const grossProfit = revenue - directCost;
+          const orderCount = new Set(selectedRows.map((row) => txt(row.order_id).trim()).filter(Boolean)).size;
+          const gpPct = revenue ? grossProfit / revenue * 100 : null;
+          const npPct = revenue ? netProfit / revenue * 100 : null;
+          const wantsRevenue = /\b(revenue|sales|turnover)\b/.test(normalizedKpiQ);
+          const wantsOrders = /\b(orders?|order count)\b/.test(normalizedKpiQ);
+          const wantsGP = /\b(gp|gross profit|gross profitability)\b/.test(normalizedKpiQ);
+          const wantsNP = /\b(np|net profit|recorded profit)\b/.test(normalizedKpiQ);
+          const metrics: string[] = [];
+          if (wantsRevenue) metrics.push("Revenue / Sales: " + formatINR(revenue));
+          if (wantsOrders) metrics.push("Distinct orders: " + orderCount.toLocaleString("en-IN"));
+          if (wantsGP) metrics.push("Gross profit (GP): " + formatINR(grossProfit) + "; GP%: " + (gpPct === null ? "N/A" : gpPct.toFixed(2) + "%"));
+          if (wantsNP) metrics.push("Net profit (NP): " + formatINR(netProfit) + "; NP%: " + (npPct === null ? "N/A" : npPct.toFixed(2) + "%"));
+          if (!metrics.length) metrics.push("Revenue / Sales: " + formatINR(revenue), "Distinct orders: " + orderCount.toLocaleString("en-IN"), "Gross profit (GP): " + formatINR(grossProfit) + "; GP%: " + (gpPct === null ? "N/A" : gpPct.toFixed(2) + "%"), "Net profit (NP): " + formatINR(netProfit) + "; NP%: " + (npPct === null ? "N/A" : npPct.toFixed(2) + "%"));
+          const productScope = selectedFabric + (explicitYearsForProduct.length ? " · " + explicitYearsForProduct[explicitYearsForProduct.length - 1] : requestedYear ? " · " + requestedYear : " · All available years");
+          const answer = productScope + "\\n" + metrics.join("\\n");
+          return respond({ answer, sources: [{ name: "fact_orders", records: selectedRows.length, note: "Filtered to the exact requested fabric; distinct orders counted; GP calculated from revenue less fabric, trims and CMT costs; NP uses recorded profit." }], question }, 200, origin);
+        }
+      }
+    }
     const asksTamil = false;
     const asksComparison = /\b(compare|comparison|versus|vs|difference)\b/.test(normalizedKpiQ) || /ஒப்பிட|ஒப்பீடு/.test(question);
     const asksRanking = /\b(rank|ranking|ranked|top|highest|lowest|sort|list|best|most profitable)\b/.test(normalizedKpiQ);
