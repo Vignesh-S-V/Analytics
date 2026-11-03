@@ -71,7 +71,11 @@ function hideInternalNames(value: unknown): unknown {
   result = result
     .replace(/\b(?:source|table|view|relation)\s*:\s*workspace data\b/gi, "workspace data")
     .replace(/\bworkspace data rows\b/gi, "matching business records")
-    .replace(/\b(?:from|using)\s+workspace data\s+rows\b/gi, "using matching business records");
+    .replace(/\b(?:from|using)\s+workspace data\s+rows\b/gi, "using matching business records")
+    .replace(/^\s*\*{0,2}svg(?:grounded in workspace data)?\*{0,2}\s*$/gim, "")
+    .replace(/\*{0,2}svggrounded in workspace data\*{0,2}/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
   return result;
 }
 function respond(body: Record<string, unknown>, status: number, origin: string | null) {
