@@ -112,3 +112,25 @@ test("multi-question country ranking uses monthly rows and the requested fiscal 
   assert.match(route, /requestedCountry/);
   assert.match(route, /No country records were found/);
 });
+
+
+test("product-category KPI requests resolve product_category separately from fabric", () => {
+  const start = edge.indexOf("// Resolve explicit product-category OR fabric requests");
+  const end = edge.indexOf("// Handle multi-intent prompts before any single-intent deterministic route can return.", start);
+  const route = edge.slice(start, end);
+  assert.match(route, /select\("order_id,product_category,fabric"\)/);
+  assert.match(route, /const exactCategory = productCategories\.find/);
+  assert.match(route, /categoryMatch\.fabric \? "product_category"/);
+  assert.match(route, /query\.ilike\("product_category", selectedProduct\)/);
+  assert.match(route, /query\.ilike\("fabric", selectedProduct\)/);
+  assert.match(route, /I have not substituted company-wide figures/);
+  assert.match(route, /const grossProfit = revenue - directCost/);
+});
+
+test("Polo T-Shirt exact phrase can match despite the one-letter T token", () => {
+  const start = edge.indexOf("// Resolve explicit product-category OR fabric requests");
+  const end = edge.indexOf("// Handle multi-intent prompts before any single-intent deterministic route can return.", start);
+  const route = edge.slice(start, end);
+  assert.match(route, /fullQuestionNormalized\.includes\(normalizeEntity\(value\)\)/);
+  assert.match(route, /const exactCategory = productCategories\.find/);
+});
