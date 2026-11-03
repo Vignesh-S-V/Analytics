@@ -173,7 +173,7 @@ export function matchFabricFromQuestion(question, fabricNames) {
     .map((value) => String(value ?? "").trim()).filter(Boolean))];
   const ranked = candidates.map((fabric) => {
     const tokens = normalizeQuery(fabric).split(" ").filter(Boolean);
-    const numericTokens = tokens.filter((token) => /^\\d+$/.test(token));
+    const numericTokens = tokens.filter((token) => /^\d+$/.test(token));
     const numericMatch = numericTokens.every((token) => queryTokens.includes(token));
     const tokenScores = tokens.map((target) => Math.max(0, ...queryTokens.map((token) => tokenSimilarity(token, target))));
     const score = tokenScores.length ? tokenScores.reduce((total, value) => total + value, 0) / tokenScores.length : 0;
@@ -195,11 +195,11 @@ export function matchFabricFromQuestion(question, fabricNames) {
 export function resolveFiscalPeriod(question, selectedPeriod = "", now = new Date()) {
   const source = String(question ?? "");
   const normalized = normalizeQuery(source);
-  const explicitFy = source.match(/\\bfy\\s*(20\\d{2})\\s*[-–/]\\s*(\\d{2}|20\\d{2})\\b/i);
-  const explicitCalendarYear = !explicitFy ? normalized.match(/\\b(20\\d{2})\\b/) : null;
+  const explicitFy = source.match(/\bfy\s*(20\d{2})\s*[-–/]\s*(\d{2}|20\d{2})\b/i);
+  const explicitCalendarYear = !explicitFy ? normalized.match(/\b(20\d{2})\b/) : null;
   const selected = String(selectedPeriod ?? "").trim();
-  const selectedFy = selected.match(/^FY\\s*(20\\d{2})\\s*[-–/]\\s*(\\d{2}|20\\d{2})$/i);
-  const selectedStart = selectedFy ? Number(selectedFy[1]) : (/^20\\d{2}$/.test(selected) ? Number(selected) : null);
+  const selectedFy = selected.match(/^FY\s*(20\d{2})\s*[-–/]\s*(\d{2}|20\d{2})$/i);
+  const selectedStart = selectedFy ? Number(selectedFy[1]) : (/^20\d{2}$/.test(selected) ? Number(selected) : null);
   let startYear = null;
   let endYear = null;
   let kind = "all";
@@ -217,7 +217,7 @@ export function resolveFiscalPeriod(question, selectedPeriod = "", now = new Dat
       ? (Number(selectedFy[2]) < 100 ? Math.floor(startYear / 100) * 100 + Number(selectedFy[2]) : Number(selectedFy[2]))
       : startYear + 1;
     kind = "fiscal";
-  } else if (/\\b(this year|current year|year to date|ytd)\\b/.test(normalized)) {
+  } else if (/\b(this year|current year|year to date|ytd)\b/.test(normalized)) {
     const year = now.getUTCFullYear();
     const month = now.getUTCMonth() + 1;
     startYear = month >= 4 ? year : year - 1;
