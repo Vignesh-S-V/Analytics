@@ -1376,7 +1376,19 @@ Deno.serve(async (req: Request) => {
          if (page.length < pageSize) break;
        }
        const grouped=new Map<string,Record<string,unknown>>();
-      for(const row of rows){const m=monthOf(row);if(qYear&&!m.startsWith(qYear))continue;if(qMonth&&!m.endsWith("-"+qMonth))continue;const country=txt(row.country)||"Unknown";const cur=grouped.get(country)??{country,revenue_inr:0,profit_inr:0,order_count:0};cur.revenue_inr=num(cur.revenue_inr)+num(row.revenue_inr);cur.profit_inr=num(cur.profit_inr)+num(row.profit_inr);cur.order_count=num(cur.order_count)+num(row.order_count);grouped.set(country,cur);}
+      const countryPeriod=resolveFiscalPeriod(question,requestedYear);
+      for(const row of rows){
+        const month=monthOf(row),monthDate=month+"-01";
+        if(countryPeriod.startDate&&(monthDate<countryPeriod.startDate||monthDate>=String(countryPeriod.endDateExclusive)))continue;
+        if(qMonth&&!month.endsWith("-"+qMonth))continue;
+        if(requestedCountry&&requestedCountry!=="All countries"&&txt(row.country).trim().toLowerCase()!==requestedCountry.toLowerCase())continue;
+        const country=txt(row.country)||"Unknown";
+        const cur=grouped.get(country)??{country,revenue_inr:0,profit_inr:0,order_count:0};
+        cur.revenue_inr=num(cur.revenue_inr)+num(row.revenue_inr);
+        cur.profit_inr=num(cur.profit_inr)+num(row.profit_inr);
+        cur.order_count=num(cur.order_count)+num(row.order_count);
+        grouped.set(country,cur);
+      }
       const metric = /\b(?:profit margin|margin)\b/.test(normalizedQ) ? "profit_margin_pct"
         : /\b(?:profit|net profit|recorded profit|np)\b/.test(normalizedQ) && !/\b(?:revenue|sales)\b/.test(normalizedQ) ? "profit_inr" : "revenue_inr";
       const isLowest = /\b(lowest|worst|least|minimum|bottom)\b/.test(normalizedQ)
