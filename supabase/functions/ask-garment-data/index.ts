@@ -1305,6 +1305,62 @@ Deno.serve(async (req: Request) => {
       return respond({answer:"Production lines ranked by "+metric.replaceAll("_"," ")+" ("+(ascending?"lowest to highest":"highest to lowest")+"); "+ranked.length+" lines."+missingShipmentNote,rankingTable:{title:"Production line performance",subtitle:"Sorted by "+metric.replaceAll("_"," ")+" · "+rows.length+" lines",columns:[{key:"rank",label:"Rank",type:"number"},{key:"line_id",label:"Line"},{key:"unit",label:"Unit"},{key:"specialisation",label:"Specialisation"},{key:"order_count",label:"Orders",type:"number"},{key:"rework_cost_inr",label:"Rework Cost",type:"currency"},{key:"rejection_rate_pct",label:"Rejection Rate",type:"percent"},{key:"avg_actual_efficiency_pct",label:"Actual Efficiency",type:"percent"},{key:"avg_target_efficiency_pct",label:"Target Efficiency",type:"percent"},{key:"overtime_hours",label:"Overtime Hours",type:"decimal"}],rows:productionDisplayRows.map((r,i)=>({rank:i+1,line_id:txt(r.line_id),unit:txt(r.unit),specialisation:txt(r.specialisation),order_count:num(r.order_count),rework_cost_inr:num(r.rework_cost_inr),rejection_rate_pct:num(r.rejection_rate_pct),avg_actual_efficiency_pct:num(r.avg_actual_efficiency_pct)*100,avg_target_efficiency_pct:num(r.avg_target_efficiency_pct)*100,overtime_hours:num(r.overtime_hours)}))},sources:[{name:"vw_production_by_line",records:rows.length,note:"all production-line groups sorted by requested metric"}],question},200,origin);
     }
 
+    // Product-variant KPI route: answer every metric requested for the named GSM variant.
+    // This must run before the company-wide GP/NP fast path below.
+    const gsmMatch = normalizedQ.match(/\b(\d{2,3})\s*gsm\b/i);
+    const fabricMatch = normalizedQ.match(/\b(single jersey|double jersey|pique|interlock|rib|fleece|cotton|polyester|dry fit|microfiber)\b/i);
+    const asksVariantMetrics = Boolean(gsmMatch && fabricMatch)
+      && /\b(revenue|sales|turnover|orders?|order count|gp|gpm|gross profit|gross margin|np|npm|net profit|net margin)\b/i.test(normalizedQ);
+    if (asksVariantMetrics && gsmMatch && fabricMatch) {
+      const fabricTerm = fabricMatch[1];
+      const gsmTerm = gsmMatch[1];
+      const productRows: Record<string, unknown>[] = [];
+      const pageSize = 1000;
+      for (let offset = 0; ; offset += pageSize) {
+        const page = await db.from("fact_orders")
+          .select("order_id,order_date,product_category,fabric,style_id,order_qty,shipped_qty,revenue_inr,profit_inr,fabric_cost_per_pc_inr,trims_cost_per_pc_inr,cmt_cost_per_pc_inr")
+          .or("product_category.ilike.%"+fabricTerm+"%,fabric.ilike.%"+fabricTerm+"%,style_id.ilike.%"+fabricTerm+"%")
+          .order("order_id", { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (page.error) {
+          console.error("Product variant KPI lookup failed:", page.error.message);
+          return respond({ error: "Could not calculate the requested product variant metrics. Please retry." }, 502, origin);
+        }
+        const rows = (page.data ?? []) as Record<string, unknown>[];
+        productRows.push(...rows);
+        if (rows.length < pageSize) break;
+      }
+      const matchingRows = productRows.filter(row => {
+        const productText = [row.product_category,row.fabric,row.style_id].map(txt).join(" ").toLowerCase().replace(/\s+/g," ");
+        const hasFabric = productText.includes(fabricTerm.toLowerCase());
+        const hasGsm = new RegExp("\\b"+gsmTerm+"\\s*gsm\\b|\\b"+gsmTerm+"gsm\\b","i").test(productText);
+        const date = txt(row.order_date).slice(0,10);
+        return hasFabric && hasGsm && (!qYear || date.startsWith(qYear+"-")) && (!qMonth || date.slice(5,7)===qMonth);
+      });
+      if (!matchingRows.length) {
+        return respond({ answer: "No matching "+fabricTerm+" "+gsmTerm+" GSM order records were found for the selected period. No company-wide figures have been substituted.", unavailable: true, sources: [], question }, 200, origin);
+      }
+      const asksVariantRevenue = /\b(revenue|sales|turnover)\b/i.test(normalizedQ);
+      const asksVariantOrders = /\b(orders?|order count)\b/i.test(normalizedQ);
+      const asksVariantGP = /\b(gp|gpm|gross profit|gross margin)\b/i.test(normalizedQ);
+      const asksVariantNP = /\b(np|npm|net profit|net margin)\b/i.test(normalizedQ);
+      const variantRevenue = sum(matchingRows,"revenue_inr");
+      const variantOrders = new Set(matchingRows.map(row=>txt(row.order_id).trim()).filter(Boolean)).size;
+      const variantDirectCost = matchingRows.reduce((total,row)=>{
+        const quantity = num(row.shipped_qty) || num(row.order_qty);
+        return total + (num(row.fabric_cost_per_pc_inr)+num(row.trims_cost_per_pc_inr)+num(row.cmt_cost_per_pc_inr))*quantity;
+      },0);
+      const variantGP = variantRevenue-variantDirectCost;
+      const variantNP = sum(matchingRows,"profit_inr");
+      const answerLines:string[] = [];
+      const variantLabel = fabricTerm.replace(/\b\w/g,letter=>letter.toUpperCase())+" "+gsmTerm+" GSM";
+      if (asksVariantRevenue) answerLines.push(variantLabel+" revenue / sales: "+formatINR(variantRevenue)+".");
+      if (asksVariantOrders) answerLines.push("Distinct orders: "+variantOrders.toLocaleString("en-IN")+".");
+      if (asksVariantGP) answerLines.push("Gross profit (GP): "+formatINR(variantGP)+"; GP%: "+(variantRevenue?variantGP/variantRevenue*100:0).toFixed(2)+"%.");
+      if (asksVariantNP) answerLines.push("Net profit (NP): "+formatINR(variantNP)+"; NP%: "+(variantRevenue?variantNP/variantRevenue*100:0).toFixed(2)+"%.");
+      return respond({ answer: answerLines.join(String.fromCharCode(10)), sources:[{name:"fact_orders",records:matchingRows.length,note:"Only matching product and GSM variant records were included."}], question },200,origin);
+    }
+
     const asksGrossMetric = /\bgp\b|\bgpm\b|gross profit|gross margin|gp\s*%/.test(rawQ);
     const asksNetMargin = /\bnp\b|\bnpm\b|net profit margin|net margin|profit margin|np\s*%/.test(rawQ);
     if (asksGrossMetric || asksNetMargin) {
