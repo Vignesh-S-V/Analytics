@@ -600,20 +600,23 @@ Deno.serve(async (req: Request) => {
             const rankLimit = requestedRankCount
               ? Math.max(1, Math.min(500, Number(requestedRankCount[1])))
               : wantsAllRankRows ? Number.POSITIVE_INFINITY : 1;
-            const rankLabel = requestedRankCount ? "Top " + rankLimit : wantsAllRankRows ? "Complete available ranking" : "Highest-ranked result";
+            const wantsLowestRank = /\b(?:lowest|worst|least|minimum|bottom)\b/.test(normalizedSubQuestion)
+              && !/\b(?:highest to lowest|descending|high to low)\b/.test(normalizedSubQuestion);
+            const rankLabel = requestedRankCount ? "Top " + rankLimit : wantsAllRankRows ? "Complete available ranking" : wantsLowestRank ? "Lowest-ranked result" : "Highest-ranked result";
 
             if (/\b(?:country|countries|market|markets)\b/.test(normalizedSubQuestion)
-              && /\b(?:revenue|sales|profit|margin|orders)\b/.test(normalizedSubQuestion)
-              && /\b(?:top\s+\d+|all|every|complete|full|rank|ranking|highest|lowest|leader)\b/.test(normalizedSubQuestion)) {
-              const metric = /\b(?:profit|net profit|recorded profit)\b/.test(normalizedSubQuestion) ? "profit_inr" : "revenue_inr";
+              && /\b(?:revenue|sales|profit|margin|orders|performance|performing)\b/.test(normalizedSubQuestion)
+              && /\b(?:top\s+\d+|all|every|complete|full|rank|ranking|highest|lowest|worst|least|leader|performance|performing)\b/.test(normalizedSubQuestion)) {
+              const metric = /\b(?:profit margin|margin)\b/.test(normalizedSubQuestion) ? "profit_margin_pct"
+                : /\b(?:profit|net profit|recorded profit)\b/.test(normalizedSubQuestion) ? "profit_inr" : "revenue_inr";
               const { data, error } = await db.from("vw_sales_by_country")
                 .select("country,revenue_inr,profit_inr,order_count")
-                .order(metric, { ascending: false, nullsFirst: false });
+                .order(metric === "profit_margin_pct" ? "profit_margin_pct" : metric, { ascending: wantsLowestRank, nullsFirst: false });
               if (error) throw new Error("Country ranking query failed: " + error.message);
               const rows = (data ?? []) as Record<string, unknown>[];
               if (rows.length) {
                 const shown = rows.slice(0, rankLimit);
-                const metricLabel = metric === "profit_inr" ? "recorded profit" : "revenue";
+                const metricLabel = metric === "profit_inr" ? "recorded profit" : metric === "profit_margin_pct" ? "weighted profit margin" : "revenue";
                 const answer = shown.map((row, i) => (i + 1) + ". " + txt(row.country)
                   + " — Revenue: " + formatINR(num(row.revenue_inr))
                   + "; profit: " + formatINR(num(row.profit_inr))
