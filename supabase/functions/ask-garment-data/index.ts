@@ -708,7 +708,7 @@ Deno.serve(async (req: Request) => {
             const yearFilter = explicitYearsForProduct.length
               ? date.startsWith(explicitYearsForProduct[explicitYearsForProduct.length - 1] + "-")
               : (!requestedYear || date.startsWith(requestedYear + "-"));
-            const countryFilter = !requestedCountry || txt(row.country).trim().toLowerCase() === requestedCountry.toLowerCase();
+            const countryFilter = !requestedCountry || requestedCountry === "All countries" || txt(row.country).trim().toLowerCase() === requestedCountry.toLowerCase();
             return yearFilter && countryFilter;
           });
           if (!selectedRows.length) {
@@ -735,7 +735,7 @@ Deno.serve(async (req: Request) => {
           if (wantsNP) metrics.push("Net profit (NP): " + formatINR(netProfit) + "; NP%: " + (npPct === null ? "N/A" : npPct.toFixed(2) + "%"));
           if (!metrics.length) metrics.push("Revenue / Sales: " + formatINR(revenue), "Distinct orders: " + orderCount.toLocaleString("en-IN"), "Gross profit (GP): " + formatINR(grossProfit) + "; GP%: " + (gpPct === null ? "N/A" : gpPct.toFixed(2) + "%"), "Net profit (NP): " + formatINR(netProfit) + "; NP%: " + (npPct === null ? "N/A" : npPct.toFixed(2) + "%"));
           const productScope = selectedFabric + (explicitYearsForProduct.length ? " · " + explicitYearsForProduct[explicitYearsForProduct.length - 1] : requestedYear ? " · " + requestedYear : " · All available years");
-          const answer = productScope + "\\n" + metrics.join("\\n");
+          const answer = productScope + "\n" + metrics.join("\n");
           return respond({ answer, sources: [{ name: "fact_orders", records: selectedRows.length, note: "Filtered to the exact requested fabric; distinct orders counted; GP calculated from revenue less fabric, trims and CMT costs; NP uses recorded profit." }], question }, 200, origin);
         }
       }
