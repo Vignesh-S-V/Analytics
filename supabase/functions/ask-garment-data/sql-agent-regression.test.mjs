@@ -95,7 +95,7 @@ test("country rankings apply the same fiscal period and selected country filters
   const start = edge.indexOf("const asksCountryRankingEarly");
   const end = edge.indexOf("const asksProductionRankingEarly", start);
   const route = edge.slice(start, end);
-  assert.match(route, /resolveFiscalPeriod\(question, requestedYear\)/);
+  assert.match(route, /resolveFiscalPeriod\(question,\s*requestedYear\)/);
   assert.match(route, /requestedCountry/);
   assert.match(route, /isLowest\?1:-1/);
 });
