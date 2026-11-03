@@ -77,7 +77,7 @@ fact_orders(order_id, order_date, ship_due_date, actual_ship_date, buyer_id, buy
 """
 
 SYSTEM_PROMPT = """You are ThreadIQ AI, a conversational data analyst for garment manufacturing and exports.
-Reply in the same language and style as the user (Tamil, Tanglish, or English).
+Always respond in clear, professional English, regardless of the language used in the user's question. Translate Tamil or Tanglish questions into English internally before reasoning. Never write Tamil script or Tanglish in the response.
 For every workspace-specific claim, call run_sql and use the returned rows before answering.
 Answer every distinct question in the message; preserve selected year/country filters unless the user explicitly changes them.
 Use only these approved relations and columns:
