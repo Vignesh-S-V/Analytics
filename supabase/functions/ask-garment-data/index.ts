@@ -332,7 +332,7 @@ Deno.serve(async (req: Request) => {
     // multi-intent splitting or company-wide KPI routes. Tolerate common voice/typing misspellings.
     const fullQuestionNormalized = question.toLowerCase().normalize("NFKD")
       .replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
-    const hasRequestedBusinessMetrics = /\b(revenue|sales|turnover|orders?|gp|gross profit|np|net profit|profit)\b/.test(fullQuestionNormalized);
+    const hasRequestedBusinessMetrics = /\b(revenue|sales|turnover|orders?|cost|expenses|spend|gp|gross profit|np|net profit|profit)\b/.test(fullQuestionNormalized);
     if (hasRequestedBusinessMetrics) {
       const fabricOptions: Record<string, unknown>[] = [];
       let fabricOptionsError: { message: string } | null = null;
@@ -400,13 +400,15 @@ Deno.serve(async (req: Request) => {
           const gpPct = revenue ? grossProfit / revenue * 100 : null;
           const npPct = revenue ? netProfit / revenue * 100 : null;
           const asksRevenue = /\b(revenue|sales|turnover)\b/.test(fullQuestionNormalized);
-          const asksTotalCost = /\b(total cost|cost total|overall cost)\b/.test(fullQuestionNormalized);
+          const asksDirectCost = /\bdirect cost\b/.test(fullQuestionNormalized);
+          const asksTotalCost = !asksDirectCost && /\b(total cost|cost total|overall cost|cost|expenses|spend)\b/.test(fullQuestionNormalized);
           const asksOrders = /\b(orders?|order count)\b/.test(fullQuestionNormalized);
           const asksGP = /\b(gp|gross profit|gross profitability)\b/.test(fullQuestionNormalized);
           const asksNP = /\b(np|net profit|recorded profit)\b/.test(fullQuestionNormalized);
           const metrics: string[] = [];
           if (asksRevenue) metrics.push("Total revenue / sales: " + formatINR(revenue));
           if (asksTotalCost) metrics.push("Total cost: " + formatINR(totalCost));
+          if (asksDirectCost) metrics.push("Direct cost (fabric + trims + CMT): " + formatINR(directCost));
           if (asksOrders) metrics.push("Total orders: " + orderCount.toLocaleString("en-IN"));
           if (asksGP) metrics.push("Gross profit (GP): " + formatINR(grossProfit) + "; GP%: " + (gpPct === null ? "N/A" : gpPct.toFixed(2) + "%"));
           if (asksNP) metrics.push("Net profit (NP): " + formatINR(netProfit) + "; NP%: " + (npPct === null ? "N/A" : npPct.toFixed(2) + "%"));
@@ -782,7 +784,7 @@ Deno.serve(async (req: Request) => {
     const mentionedCountries = Object.entries(countryAliases).filter(([alias]) => (" " + normalizedKpiQ + " ").includes(" " + alias + " ")).map(([,country])=>country);
     const uniqueCountries = [...new Set(mentionedCountries)];
     const asksCoreKpi = !asksRanking && /\b(total revenue|total sales|total recorded profit|recorded profit|weighted profit margin|profit margin|total recorded cost|total cost|total expenses|average revenue per order|average revenue|distinct order count|distinct orders|number of orders|total orders|numerator|denominator|formula)\b/.test(normalizedKpiQ);
-    if ((asksCoreKpi || (asksComparison && uniqueCountries.length >= 2 && /\b(revenue|sales|profit|orders|margin|cost|வருவாய்|விற்பனை|லாபம்|ஆர்டர்|மார்ஜின்)\b/.test(normalizedKpiQ))) && !/\b(product|buyer|supplier|marketing|production|channel|style|category|month|trend|forecast)\b/.test(normalizedKpiQ)) {
+    if ((asksCoreKpi || (asksComparison && uniqueCountries.length >= 2 && /\b(revenue|sales|profit|orders|margin|cost|வருவாய்|விற்பனை|லாபம்|ஆர்டர்|மார்ஜின்)\b/.test(normalizedKpiQ))) && !/\b(product|buyer|supplier|marketing|production|channel|style|fabric|gsm|category|month|trend|forecast)\b/.test(normalizedKpiQ)) {
       const factRows: Record<string, unknown>[] = [];
       const pageSize = 1000;
       for (let offset = 0; ; offset += pageSize) {
