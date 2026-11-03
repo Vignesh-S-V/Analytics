@@ -348,12 +348,22 @@ Deno.serve(async (req: Request) => {
       return 1 - editDistance(a, b) / Math.max(a.length, b.length);
     };
     if (hasRequestedBusinessMetrics) {
-      const { data: fabricOptions, error: fabricOptionsError } = await db
-        .from("fact_orders").select("fabric").not("fabric", "is", null).limit(1000);
+      const fabricOptions: Record<string, unknown>[] = [];
+      let fabricOptionsError: { message: string } | null = null;
+      const fabricPageSize = 1000;
+      for (let offset = 0; ; offset += fabricPageSize) {
+        const page = await db.from("fact_orders").select("order_id,fabric")
+          .not("fabric", "is", null).order("order_id", { ascending: true })
+          .range(offset, offset + fabricPageSize - 1);
+        if (page.error) { fabricOptionsError = page.error; break; }
+        const batch = (page.data ?? []) as Record<string, unknown>[];
+        fabricOptions.push(...batch);
+        if (batch.length < fabricPageSize) break;
+      }
       if (fabricOptionsError) {
         console.error("Product fabric lookup failed:", fabricOptionsError.message);
       } else {
-        const fabrics = [...new Set((fabricOptions ?? []).map((row: any) => txt(row.fabric).trim()).filter(Boolean))];
+        const fabrics = [...new Set(fabricOptions.map((row: any) => txt(row.fabric).trim()).filter(Boolean))];
         const queryTokens = fullQuestionNormalized.split(" ").filter(Boolean);
         const scoredFabrics = fabrics.map((fabric) => {
           const fabricTokens = fabric.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, " ").split(" ").filter(Boolean);
@@ -370,7 +380,7 @@ Deno.serve(async (req: Request) => {
           const pageSize = 1000;
           for (let offset = 0; ; offset += pageSize) {
             const page = await db.from("fact_orders")
-              .select("order_id,order_date,country,fabric,revenue_inr,profit_inr,fabric_cost_per_pc_inr,trims_cost_per_pc_inr,cmt_cost_per_pc_inr,shipped_qty,order_qty")
+              .select("order_id,order_date,country,fabric,revenue_inr,total_cost_inr,profit_inr,fabric_cost_per_pc_inr,trims_cost_per_pc_inr,cmt_cost_per_pc_inr,shipped_qty,order_qty")
               .ilike("fabric", selectedFabric)
               .order("order_id", { ascending: true })
               .range(offset, offset + pageSize - 1);
@@ -396,6 +406,7 @@ Deno.serve(async (req: Request) => {
             return respond({ answer: "No matching records were found for " + selectedFabric + " under the selected period and filters.", unavailable: true, question }, 200, origin);
           }
           const revenue = sum(selectedRows, "revenue_inr");
+          const totalCost = sum(selectedRows, "total_cost_inr");
           const netProfit = sum(selectedRows, "profit_inr");
           const directCost = selectedRows.reduce((total, row) => {
             const quantity = num(row.shipped_qty) > 0 ? num(row.shipped_qty) : num(row.order_qty);
@@ -406,15 +417,17 @@ Deno.serve(async (req: Request) => {
           const gpPct = revenue ? grossProfit / revenue * 100 : null;
           const npPct = revenue ? netProfit / revenue * 100 : null;
           const asksRevenue = /\b(revenue|sales|turnover)\b/.test(fullQuestionNormalized);
+          const asksTotalCost = /\b(total cost|cost total|overall cost)\b/.test(fullQuestionNormalized);
           const asksOrders = /\b(orders?|order count)\b/.test(fullQuestionNormalized);
           const asksGP = /\b(gp|gross profit|gross profitability)\b/.test(fullQuestionNormalized);
           const asksNP = /\b(np|net profit|recorded profit)\b/.test(fullQuestionNormalized);
           const metrics: string[] = [];
-          if (asksRevenue) metrics.push("Revenue / Sales: " + formatINR(revenue));
+          if (asksRevenue) metrics.push("Total revenue / sales: " + formatINR(revenue));
+          if (asksTotalCost) metrics.push("Total cost: " + formatINR(totalCost));
           if (asksOrders) metrics.push("Total orders: " + orderCount.toLocaleString("en-IN"));
           if (asksGP) metrics.push("Gross profit (GP): " + formatINR(grossProfit) + "; GP%: " + (gpPct === null ? "N/A" : gpPct.toFixed(2) + "%"));
           if (asksNP) metrics.push("Net profit (NP): " + formatINR(netProfit) + "; NP%: " + (npPct === null ? "N/A" : npPct.toFixed(2) + "%"));
-          if (!metrics.length) metrics.push("Revenue / Sales: " + formatINR(revenue), "Total orders: " + orderCount.toLocaleString("en-IN"),
+          if (!metrics.length) metrics.push("Total revenue / sales: " + formatINR(revenue), "Total cost: " + formatINR(totalCost), "Total orders: " + orderCount.toLocaleString("en-IN"),
             "Gross profit (GP): " + formatINR(grossProfit) + "; GP%: " + (gpPct === null ? "N/A" : gpPct.toFixed(2) + "%"),
             "Net profit (NP): " + formatINR(netProfit) + "; NP%: " + (npPct === null ? "N/A" : npPct.toFixed(2) + "%"));
           const period = explicitYears.length ? explicitYears[explicitYears.length - 1] : requestedYear || "All available years";
