@@ -86,7 +86,7 @@ test("general GP and NP calculations paginate and respect fiscal/dashboard filte
   const start = edge.indexOf("const asksGrossMetric");
   const end = edge.indexOf("// Exact entity-specific answers must run BEFORE generic KPI intents.", start);
   const route = edge.slice(start, end);
-  assert.match(route, /resolveFiscalPeriod\(question, requestedYear\)/);
+  assert.match(route, /resolveFiscalPeriod\(question,\s*requestedYear\)/);
   assert.match(route, /\.range\(offset, offset \+ pageSize - 1\)/);
   assert.doesNotMatch(route, /\.limit\(1000\)/);
 });
