@@ -115,7 +115,7 @@ test("multi-question country ranking uses monthly rows and the requested fiscal 
 
 
 test("product-category KPI requests resolve product_category separately from fabric", () => {
-  const start = edge.indexOf("// Resolve explicit product-category OR fabric requests");
+  const start = edge.indexOf("// Resolve explicit product/fabric requests");
   const end = edge.indexOf("// Handle multi-intent prompts before any single-intent deterministic route can return.", start);
   const route = edge.slice(start, end);
   assert.match(route, /select\("order_id,product_category,fabric"\)/);
@@ -128,7 +128,7 @@ test("product-category KPI requests resolve product_category separately from fab
 });
 
 test("Polo T-Shirt exact phrase can match despite the one-letter T token", () => {
-  const start = edge.indexOf("// Resolve explicit product-category OR fabric requests");
+  const start = edge.indexOf("// Resolve explicit product/fabric requests");
   const end = edge.indexOf("// Handle multi-intent prompts before any single-intent deterministic route can return.", start);
   const route = edge.slice(start, end);
   assert.match(route, /fullQuestionNormalized\.includes\(normalizeEntity\(value\)\)/);
