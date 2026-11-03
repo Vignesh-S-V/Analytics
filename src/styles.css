@@ -960,3 +960,35 @@ html{background:#f7f8fa;scroll-behavior:smooth}body{min-width:320px;background:#
 #root table thead th:hover{color:#d9652b!important;background:#fff7f1}
 #root table thead th[aria-sort="ascending"],#root table thead th[aria-sort="descending"]{color:#d9652b!important}
 .global-sort-indicator{display:inline-block;margin-left:5px;color:#e87535;font-size:11px;font-weight:800;white-space:nowrap}
+
+/* Site-wide KPI card accent system: consistent raised cards with multicolour 3D edge bars */
+:root{--kpi-orange:#ed7b39;--kpi-blue:#397db8;--kpi-teal:#239b8b;--kpi-violet:#8061c9;--kpi-rose:#d95b65;--kpi-gold:#c99a32}
+.kpi-card,.result-card,.ask-answer-metric,.ask-answer-insight-metrics>div,.interpretation-kpi,.adv-metric,.yoy-kpis .result-card{
+  position:relative!important;isolation:isolate;overflow:hidden;
+  border:1px solid rgba(123,145,171,.22)!important;
+  border-radius:14px!important;
+  box-shadow:0 3px 8px rgba(24,43,66,.055),0 10px 22px rgba(24,43,66,.045),inset 0 1px 0 rgba(255,255,255,.72)!important;
+  transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease;
+}
+.kpi-card::before,.result-card::before,.ask-answer-metric::before,.ask-answer-insight-metrics>div::before,.interpretation-kpi::before,.adv-metric::before,.yoy-kpis .result-card::before{
+  content:"";position:absolute;z-index:2;left:0;top:0;bottom:0;width:5px;
+  border-radius:14px 0 0 14px;
+  background:linear-gradient(180deg,var(--kpi-hi,#ffc28f) 0%,var(--kpi-accent,#ed7b39) 48%,var(--kpi-low,#a84418) 100%);
+  box-shadow:2px 0 8px color-mix(in srgb,var(--kpi-accent,#ed7b39) 32%,transparent),inset -1px 0 1px rgba(255,255,255,.55);
+}
+.kpi-card::after,.result-card::after,.ask-answer-metric::after,.ask-answer-insight-metrics>div::after,.interpretation-kpi::after,.adv-metric::after,.yoy-kpis .result-card::after{
+  content:"";position:absolute;z-index:-1;right:-30px;top:-38px;width:112px;height:112px;border-radius:50%;
+  background:radial-gradient(circle,color-mix(in srgb,var(--kpi-accent,#ed7b39) 14%,transparent),transparent 72%);pointer-events:none;
+}
+.kpi-card:hover,.result-card:hover,.ask-answer-metric:hover,.ask-answer-insight-metrics>div:hover,.interpretation-kpi:hover,.adv-metric:hover,.yoy-kpis .result-card:hover{
+  transform:translateY(-2px);box-shadow:0 5px 12px rgba(24,43,66,.07),0 15px 28px rgba(24,43,66,.10),inset 0 1px 0 rgba(255,255,255,.8)!important;
+}
+.kpi-card:nth-child(6n+1),.result-card:nth-child(6n+1),.ask-answer-metric:nth-child(6n+1),.ask-answer-insight-metrics>div:nth-child(6n+1),.interpretation-kpi:nth-child(6n+1),.adv-metric:nth-child(6n+1),.yoy-kpis .result-card:nth-child(6n+1){--kpi-hi:#ffc28f;--kpi-accent:#ed7b39;--kpi-low:#a84418}
+.kpi-card:nth-child(6n+2),.result-card:nth-child(6n+2),.ask-answer-metric:nth-child(6n+2),.ask-answer-insight-metrics>div:nth-child(6n+2),.interpretation-kpi:nth-child(6n+2),.adv-metric:nth-child(6n+2),.yoy-kpis .result-card:nth-child(6n+2){--kpi-hi:#9cc9f5;--kpi-accent:#397db8;--kpi-low:#21456e}
+.kpi-card:nth-child(6n+3),.result-card:nth-child(6n+3),.ask-answer-metric:nth-child(6n+3),.ask-answer-insight-metrics>div:nth-child(6n+3),.interpretation-kpi:nth-child(6n+3),.adv-metric:nth-child(6n+3),.yoy-kpis .result-card:nth-child(6n+3){--kpi-hi:#8be0d1;--kpi-accent:#239b8b;--kpi-low:#12645d}
+.kpi-card:nth-child(6n+4),.result-card:nth-child(6n+4),.ask-answer-metric:nth-child(6n+4),.ask-answer-insight-metrics>div:nth-child(6n+4),.interpretation-kpi:nth-child(6n+4),.adv-metric:nth-child(6n+4),.yoy-kpis .result-card:nth-child(6n+4){--kpi-hi:#c4b2f7;--kpi-accent:#8061c9;--kpi-low:#4b3988}
+.kpi-card:nth-child(6n+5),.result-card:nth-child(6n+5),.ask-answer-metric:nth-child(6n+5),.ask-answer-insight-metrics>div:nth-child(6n+5),.interpretation-kpi:nth-child(6n+5),.adv-metric:nth-child(6n+5),.yoy-kpis .result-card:nth-child(6n+5){--kpi-hi:#f4aab1;--kpi-accent:#d95b65;--kpi-low:#963744}
+.kpi-card:nth-child(6n),.result-card:nth-child(6n),.ask-answer-metric:nth-child(6n),.ask-answer-insight-metrics>div:nth-child(6n),.interpretation-kpi:nth-child(6n),.adv-metric:nth-child(6n),.yoy-kpis .result-card:nth-child(6n){--kpi-hi:#f7dc91;--kpi-accent:#c99a32;--kpi-low:#896018}
+.kpi-card,.result-card,.ask-answer-metric,.ask-answer-insight-metrics>div,.interpretation-kpi,.adv-metric{padding-left:calc(var(--card-pad-left,14px) + 5px)}
+.kpi-card{--card-pad-left:12px}
+@media(prefers-reduced-motion:reduce){.kpi-card,.result-card,.ask-answer-metric,.ask-answer-insight-metrics>div,.interpretation-kpi,.adv-metric,.yoy-kpis .result-card{transition:none}.kpi-card:hover,.result-card:hover,.ask-answer-metric:hover,.ask-answer-insight-metrics>div:hover,.interpretation-kpi:hover,.adv-metric:hover,.yoy-kpis .result-card:hover{transform:none}}
