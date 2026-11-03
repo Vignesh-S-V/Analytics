@@ -348,13 +348,16 @@ function AskAI({db,range,country}){
   if(!SpeechRecognition){setKeyboardDictationFallback(true);setError('Safari does not provide a working speech-recognition service in this session. Your microphone permission may still be Allow. Use the device keyboard dictation fallback below, or type your question.');return}
   setError('');setKeyboardDictationFallback(false);transcriptRef.current='';autoSpeakRef.current=false;
   const recognition=new SpeechRecognition();
-  recognition.lang=voiceLang;recognition.interimResults=true;recognition.continuous=false;recognition.maxAlternatives=3;
+  recognition.lang=voiceLang;recognition.interimResults=true;recognition.continuous=false;recognition.maxAlternatives=5;
   recognition.onstart=()=>setListening(true);
   recognition.onresult=(event)=>{
    let finalTranscript='',interimTranscript='';
    for(let i=0;i<event.results.length;i++){
     const result=event.results[i];
-    const phrase=result?.[0]?.transcript||'';
+    const alternatives=Array.from(result||[]).map(item=>({text:String(item?.transcript||''),confidence:Number(item?.confidence||0)}));
+    const businessTerms=['worst','lowest','highest','best','revenue','sales','profit','orders','order','country','state','performance','cost','fabric','gsm','jersey','single','margin','gp','np'];
+    const relevance=(text)=>{const normalized=String(text||'').toLowerCase();return businessTerms.reduce((score,term)=>score+(normalized.split(/\\s+/).includes(term)?(term==='worst'||term==='lowest'||term==='highest'?3:1):0),0);};
+    const phrase=alternatives.sort((a,b)=>relevance(b.text)-relevance(a.text)||b.confidence-a.confidence)[0]?.text||'';
     if(result.isFinal)finalTranscript+=phrase+' ';
     else interimTranscript+=phrase+' ';
    }
