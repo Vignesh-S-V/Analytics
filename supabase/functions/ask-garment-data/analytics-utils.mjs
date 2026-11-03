@@ -181,7 +181,7 @@ export function matchFabricFromQuestion(question, fabricNames) {
   }).filter((item) => item.numericMatch && item.score >= 0.78 && item.tokenScores.every((value) => value >= 0.60))
     .sort((a, b) => b.score - a.score || a.fabric.localeCompare(b.fabric));
   if (!ranked.length) return { fabric: null, ambiguous: false, score: 0 };
-  if (ranked[1] && ranked[0].fabric !== ranked[1].fabric && ranked[0].score - ranked[1].score < 0.04) {
+  if (ranked[1] && ranked[0].fabric !== ranked[1].fabric && ranked[0].score - ranked[1].score < 0.05) {
     return { fabric: null, ambiguous: true, score: ranked[0].score, candidates: ranked.slice(0, 5).map((item) => item.fabric) };
   }
   return { fabric: ranked[0].fabric, ambiguous: false, score: ranked[0].score };
