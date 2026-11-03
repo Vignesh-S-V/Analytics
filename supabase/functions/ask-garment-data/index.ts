@@ -332,9 +332,9 @@ Deno.serve(async (req: Request) => {
     // before multi-intent splitting or company-wide KPI routes. Product categories (e.g. Polo T-Shirt)
     // and fabric variants (e.g. Pique 200 GSM) are separate dimensions and must never be conflated.
     const fullQuestionNormalized = question.toLowerCase().normalize("NFKD")
-      .replace(/[\\u0300-\\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").replace(/\\s+/g, " ").trim();
-    const hasRequestedBusinessMetrics = /\\b(revenue|sales|turnover|orders?|cost|expenses|spend|gp|gross profit|np|net profit|profit)\\b/.test(fullQuestionNormalized);
-    const mentionsProductEntity = /\\b(?:product|products|polo|t[ -]?shirt|shirt|hoodie|sweatshirt|jogger|track pant|brief|vest|tank top|innerwear|fabric|gsm|category)\\b/.test(fullQuestionNormalized);
+      .replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+    const hasRequestedBusinessMetrics = /\b(revenue|sales|turnover|orders?|cost|expenses|spend|gp|gross profit|np|net profit|profit)\b/.test(fullQuestionNormalized);
+    const mentionsProductEntity = /\b(?:product|products|polo|t[ -]?shirt|shirt|hoodie|sweatshirt|jogger|track pant|brief|vest|tank top|innerwear|fabric|gsm|category)\b/.test(fullQuestionNormalized);
     if (hasRequestedBusinessMetrics && mentionsProductEntity) {
       const productOptions: Record<string, unknown>[] = [];
       let productOptionsError: { message: string } | null = null;
@@ -357,7 +357,7 @@ Deno.serve(async (req: Request) => {
       const productCategories = [...new Set(productOptions.map((row: any) => txt(row.product_category).trim()).filter(Boolean))];
       const fabrics = [...new Set(productOptions.map((row: any) => txt(row.fabric).trim()).filter(Boolean))];
       const normalizeEntity = (value: string) => value.toLowerCase().normalize("NFKD")
-        .replace(/[\\u0300-\\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").replace(/\\s+/g, " ").trim();
+        .replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
       // Exact phrase matching is needed for names such as "Polo T-Shirt": fuzzy
       // token matching intentionally ignores one-letter tokens such as "T".
       const exactCategory = productCategories.find((value) => fullQuestionNormalized.includes(normalizeEntity(value)));
@@ -398,7 +398,7 @@ Deno.serve(async (req: Request) => {
           return periodMatch && countryFilter;
         });
         if (!selectedRows.length) {
-          const availableYears = [...new Set(rows.map((row) => txt(row.order_date).slice(0, 4)).filter((year) => /^20\\d{2}$/.test(year)))].sort();
+          const availableYears = [...new Set(rows.map((row) => txt(row.order_date).slice(0, 4)).filter((year) => /^20\d{2}$/.test(year)))].sort();
           const periodMessage = periodFilter.kind !== "all"
             ? "No sales were recorded for " + selectedProduct + " in " + periodFilter.label + ". Available data years: " + (availableYears.join(", ") || "none") + "."
             : "No matching records were found for " + selectedProduct + " under the selected filters.";
@@ -415,12 +415,12 @@ Deno.serve(async (req: Request) => {
         const orderCount = new Set(selectedRows.map((row) => txt(row.order_id).trim()).filter(Boolean)).size;
         const gpPct = revenue ? grossProfit / revenue * 100 : null;
         const npPct = revenue ? netProfit / revenue * 100 : null;
-        const asksRevenue = /\\b(revenue|sales|turnover)\\b/.test(fullQuestionNormalized);
-        const asksDirectCost = /\\bdirect cost\\b/.test(fullQuestionNormalized);
-        const asksTotalCost = !asksDirectCost && /\\b(total cost|cost total|overall cost|cost|expenses|spend)\\b/.test(fullQuestionNormalized);
-        const asksOrders = /\\b(orders?|order count)\\b/.test(fullQuestionNormalized);
-        const asksGP = /\\b(gp|gross profit|gross profitability)\\b/.test(fullQuestionNormalized);
-        const asksNP = /\\b(np|net profit|recorded profit)\\b/.test(fullQuestionNormalized);
+        const asksRevenue = /\b(revenue|sales|turnover)\b/.test(fullQuestionNormalized);
+        const asksDirectCost = /\bdirect cost\b/.test(fullQuestionNormalized);
+        const asksTotalCost = !asksDirectCost && /\b(total cost|cost total|overall cost|cost|expenses|spend)\b/.test(fullQuestionNormalized);
+        const asksOrders = /\b(orders?|order count)\b/.test(fullQuestionNormalized);
+        const asksGP = /\b(gp|gross profit|gross profitability)\b/.test(fullQuestionNormalized);
+        const asksNP = /\b(np|net profit|recorded profit)\b/.test(fullQuestionNormalized);
         const metrics: string[] = [];
         if (asksRevenue) metrics.push("Revenue: " + formatINR(revenue));
         if (asksTotalCost) metrics.push("Total cost: " + formatINR(totalCost));
@@ -436,7 +436,7 @@ Deno.serve(async (req: Request) => {
           "Net profit (NP): " + formatINR(netProfit) + "; NP%: " + (npPct === null ? "N/A" : npPct.toFixed(2) + "%")
         );
         return respond({
-          answer: selectedProduct + " (" + matchDimension + ") · " + periodFilter.label + "\\n" + metrics.join("\\n"),
+          answer: selectedProduct + " (" + matchDimension + ") · " + periodFilter.label + "\n" + metrics.join("\n"),
           sources: [{ name: "workspace data", records: selectedRows.length, note: "Exact product-category or fabric match with requested filters; metrics calculated from matching orders." }],
           question
         }, 200, origin);
@@ -444,8 +444,7 @@ Deno.serve(async (req: Request) => {
 
       // If the user explicitly named a product-like entity but it cannot be resolved,
       // fail closed instead of falling through to company-wide KPI figures.
-      const productCandidates = [...new Set([...productCategories, ...fabrics])];
-      if (/\\b\\d{2,3}\\s*gsm\\b/i.test(question)) {
+      if (/\b\d{2,3}\s*gsm\b/i.test(question)) {
         return respond({ answer: "I could not match the requested GSM specification to workspace data. I have not substituted company-wide figures.", unavailable: true, question }, 200, origin);
       }
       return respond({
