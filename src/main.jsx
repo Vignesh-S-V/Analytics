@@ -23,7 +23,7 @@ const INTERNAL_ASK_AI_NAMES=['vw_sales_monthly_by_country','vw_sales_by_country'
 function safeAskAnswer(value){
  let result=normalizeAskAnswer(value);
  for(const name of INTERNAL_ASK_AI_NAMES)result=result.replace(new RegExp('\\b'+name+'\\b','gi'),'workspace data');
- return result.replace(/\b(?:source|table|view|relation)\s*:\s*workspace data\b/gi,'workspace data').replace(/\bworkspace data rows\b/gi,'matching business records');
+ return result.replace(/(₹\s*[\d,.]+\s*(?:Cr|crore|Lakh|L|Thousand|T))\s*\(\s*₹[\d,]+(?:\.\d+)?\s*\)/gi,'$1').replace(/\b(?:source|table|view|relation)\s*:\s*workspace data\b/gi,'workspace data').replace(/\bworkspace data rows\b/gi,'matching business records');
 }
 function rankingTableFromAnswer(answer){
  const text=String(answer||'');
