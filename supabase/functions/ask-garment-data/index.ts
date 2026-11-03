@@ -74,8 +74,8 @@ function hideInternalNames(value: unknown): unknown {
     .replace(/\b(?:from|using)\s+workspace data\s+rows\b/gi, "using matching business records")
     .replace(/^\s*\*{0,2}svg(?:grounded in workspace data)?\*{0,2}\s*$/gim, "")
     .replace(/\*{0,2}svggrounded in workspace data\*{0,2}/gi, "")
-    .replace(/(^|\\n)(\\s*(?:\\d+[.)]\\s*)?)(?:based on|according to) (?:the )?workspace (?:records|data)[,.:;!?-]*\\s*/gim, "$1$2")
-    .replace(/\\b(?:source|table|view|relation)\\s+(?:named|called)\\s+[a-z_][a-z0-9_]*\\b/gi, "workspace data")
+    .replace(/(^|\n)(\s*(?:\d+[.)]\s*)?)(?:based on|according to) (?:the )?workspace (?:records|data)[,.:;!?-]*\s*/gim, "$1$2")
+    .replace(/\b(?:source|table|view|relation)\s+(?:named|called)\s+[a-z_][a-z0-9_]*\b/gi, "workspace data")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
   return result;
