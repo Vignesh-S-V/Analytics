@@ -1343,18 +1343,12 @@ Deno.serve(async (req: Request) => {
       const netProfit=sum(relevantProfitRows,"net_profit_inr");
       const gpPct=revenue?grossProfit/revenue*100:0;
       const npPct=revenue?netProfit/revenue*100:0;
-      const asksTotalCost=/total cost|total expenses|total expense|expenses evlo|cost evlo|total spend/.test(normalizedQ) || /\b(cost|expenses|expense)\b/.test(normalizedQ);
-      const asksProfitAmount=/\b(total profit|net profit|profit|np)\b/.test(normalizedQ);
-      const asksRevenueAmount=/total sales|sales evlo|total revenue|revenue evlo|sales value|turnover|overall sales|\brevenue\b/.test(normalizedQ);
       const lines:string[]=[];
-      if(asksRevenueAmount || asksTotalCost || asksProfitAmount) {
-        lines.push("Total revenue: "+formatINR(sum(relevantSalesRows,"revenue_inr"))+".");
-        if(asksTotalCost) lines.push("Total cost / expenses: "+formatINR(totalCost)+".");
-        if(asksProfitAmount) lines.push("Recorded profit (workspace profit metric): "+formatINR(sum(relevantSalesRows,"profit_inr"))+".");
-      }
-      if(asksGrossMetric)lines.push("Gross profit (GP): "+formatINR(grossProfit)+"; GP%: "+gpPct.toFixed(2)+"%; direct cost (fabric + trims + CMT): "+formatINR(directCost)+".");
+      // GP/NP fast path: return only the requested profitability measures.
+      // Supporting revenue/direct-cost inputs are calculation components, not unsolicited output.
+      if(asksGrossMetric)lines.push("Gross profit (GP): "+formatINR(grossProfit)+"; GP%: "+gpPct.toFixed(2)+"%.");
       if(asksNetMargin)lines.push("Net profit (NP): "+formatINR(netProfit)+"; NP%: "+npPct.toFixed(2)+"%.");
-      return respond({answer:lines.join(String.fromCharCode(10)),sources:[{name:"vw_sales_profitability_by_month_country",records:relevantProfitRows.length},{name:"vw_sales_monthly_by_country",records:relevantSalesRows.length}],summary:{revenue_inr:sum(relevantSalesRows,"revenue_inr"),total_cost_inr:totalCost,recorded_profit_inr:sum(relevantSalesRows,"profit_inr"),direct_cost_inr:directCost,gross_profit_inr:grossProfit,gp_pct:gpPct,net_profit_inr:netProfit,np_pct:npPct},question},200,origin);
+      return respond({answer:lines.join(String.fromCharCode(10)),sources:[{name:"vw_sales_profitability_by_month_country",records:relevantProfitRows.length}],question},200,origin);
     }
     // Exact entity-specific answers must run BEFORE generic KPI intents.
     // This prevents "buyer revenue" from being intercepted by the all-company revenue handler.
