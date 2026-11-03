@@ -399,7 +399,8 @@ function AskAI({db,range,country}){
   const revenue=summary.revenue_inr??summary.revenue;
   const profit=summary.profit_inr??summary.recorded_profit_inr??summary.net_profit_inr;
   const cost=summary.cost_inr??summary.total_cost_inr;
-  const orders=summary.orders??summary.order_count;\n  const answerText=String(answer||'').toLowerCase();
+  const orders=summary.orders??summary.order_count;
+  const answerText=String(answer||'').toLowerCase();
   if((!explicitMetric||asksRevenue)&&! /\b(revenue|sales)\b/.test(answerText)&&revenue!==undefined&&Number.isFinite(Number(revenue)))cards.push({label:'Revenue',value:inr(revenue)});
   if((!explicitMetric||asksProfit)&&! /\b(profit|np|gp)\b/.test(answerText)&&profit!==undefined&&Number.isFinite(Number(profit)))cards.push({label:'Recorded profit',value:inr(profit)});
   if((!explicitMetric||asksCost)&&! /\b(cost|expense)\b/.test(answerText)&&cost!==undefined&&Number.isFinite(Number(cost)))cards.push({label:'Cost',value:inr(cost)});
