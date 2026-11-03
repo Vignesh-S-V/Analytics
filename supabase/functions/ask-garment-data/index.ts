@@ -611,16 +611,41 @@ Deno.serve(async (req: Request) => {
               && /\b(?:top\s+\d+|all|every|complete|full|rank|ranking|highest|lowest|worst|least|leader|performance|performing)\b/.test(normalizedSubQuestion)) {
               const metric = /\b(?:profit margin|margin)\b/.test(normalizedSubQuestion) ? "profit_margin_pct"
                 : /\b(?:profit|net profit|recorded profit)\b/.test(normalizedSubQuestion) ? "profit_inr" : "revenue_inr";
-              const { data, error } = await db.from("vw_sales_by_country")
-                .select("country,revenue_inr,profit_inr,profit_margin_pct,order_count")
-                .order(metric, { ascending: wantsLowestRank, nullsFirst: false });
-              if (error) throw new Error("Country ranking query failed: " + error.message);
-              const rows = (data ?? []) as Record<string, unknown>[];
+              const monthlyRows: Record<string, unknown>[] = [];
+              const pageSize = 1000;
+              for (let offset = 0; ; offset += pageSize) {
+                const page = await db.from("vw_sales_monthly_by_country")
+                  .select("month,country,revenue_inr,profit_inr,order_count")
+                  .order("month").order("country").range(offset, offset + pageSize - 1);
+                if (page.error) throw new Error("Country ranking query failed: " + page.error.message);
+                const batch = (page.data ?? []) as Record<string, unknown>[];
+                monthlyRows.push(...batch);
+                if (batch.length < pageSize) break;
+              }
+              const periodFilter = resolveFiscalPeriod(subQuestion, requestedYear);
+              const totals = new Map<string, Record<string, unknown>>();
+              for (const row of monthlyRows) {
+                const monthDate = monthOf(row) + "-01";
+                if (periodFilter.startDate && (monthDate < periodFilter.startDate || monthDate >= String(periodFilter.endDateExclusive))) continue;
+                if (requestedCountry && requestedCountry !== "All countries" && txt(row.country).toLowerCase() !== requestedCountry.toLowerCase()) continue;
+                const country = txt(row.country) || "Unknown";
+                const current = totals.get(country) ?? { country, revenue_inr: 0, profit_inr: 0, order_count: 0 };
+                current.revenue_inr = num(current.revenue_inr) + num(row.revenue_inr);
+                current.profit_inr = num(current.profit_inr) + num(row.profit_inr);
+                current.order_count = num(current.order_count) + num(row.order_count);
+                totals.set(country, current);
+              }
+              const marginPct = (row: Record<string, unknown>) => num(row.revenue_inr) ? num(row.profit_inr) / num(row.revenue_inr) * 100 : 0;
+              const rows = [...totals.values()].sort((a, b) => {
+                const left = metric === "profit_margin_pct" ? marginPct(a) : num(a[metric]);
+                const right = metric === "profit_margin_pct" ? marginPct(b) : num(b[metric]);
+                return (wantsLowestRank ? 1 : -1) * (left - right);
+              });
               if (rows.length) {
                 const shown = rows.slice(0, rankLimit);
                 const metricLabel = metric === "profit_inr" ? "recorded profit" : metric === "profit_margin_pct" ? "weighted profit margin" : "revenue";
                 const answer = shown.map((row, i) => (i + 1) + ". " + txt(row.country)
-                  + " — " + metricLabel + ": " + (metric === "profit_margin_pct" ? num(row.profit_margin_pct).toFixed(2) + "%" : formatINR(num(row[metric])))
+                  + " — " + metricLabel + ": " + (metric === "profit_margin_pct" ? marginPct(row).toFixed(2) + "%" : formatINR(num(row[metric])))
                   + "; revenue: " + formatINR(num(row.revenue_inr))
                   + "; recorded profit: " + formatINR(num(row.profit_inr))
                   + "; orders: " + num(row.order_count).toLocaleString("en-IN")).join("\n");
