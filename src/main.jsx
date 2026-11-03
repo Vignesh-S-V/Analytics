@@ -356,7 +356,7 @@ function AskAI({db,range,country}){
     const result=event.results[i];
     const alternatives=Array.from(result||[]).map(item=>({text:String(item?.transcript||''),confidence:Number(item?.confidence||0)}));
     const businessTerms=['worst','lowest','highest','best','revenue','sales','profit','orders','order','country','state','performance','cost','fabric','gsm','jersey','single','margin','gp','np'];
-    const relevance=(text)=>{const normalized=String(text||'').toLowerCase();return businessTerms.reduce((score,term)=>score+(normalized.split(/\\s+/).includes(term)?(term==='worst'||term==='lowest'||term==='highest'?3:1):0),0);};
+    const relevance=(text)=>{const normalized=String(text||'').toLowerCase();return businessTerms.reduce((score,term)=>score+(normalized.split(/\s+/).includes(term)?(term==='worst'||term==='lowest'||term==='highest'?3:1):0),0);};
     const phrase=alternatives.sort((a,b)=>relevance(b.text)-relevance(a.text)||b.confidence-a.confidence)[0]?.text||'';
     if(result.isFinal)finalTranscript+=phrase+' ';
     else interimTranscript+=phrase+' ';
