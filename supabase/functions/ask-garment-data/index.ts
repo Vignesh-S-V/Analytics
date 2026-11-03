@@ -42,7 +42,7 @@ const INTERNAL_DATA_OBJECTS = [
   "vw_sales_by_product", "vw_marketing_channel_performance", "vw_production_by_line",
   "vw_supplier_scorecard", "vw_market_monthly", "vw_management_monthly",
   "vw_sales_profitability_by_month_country", "fact_orders", "fact_marketing",
-  "dim_suppliers", "dim_market", "threadiq_workspace_members",
+  "dim_suppliers", "dim_market", "threadiq_workspace_members", "threadiq_run_readonly_query", "threadiq_consume_ai_quota",
   "supabase/functions/ask-garment-data/index.ts"
 ];
 function hideInternalNames(value: unknown): unknown {
@@ -74,8 +74,8 @@ function hideInternalNames(value: unknown): unknown {
     .replace(/\b(?:from|using)\s+workspace data\s+rows\b/gi, "using matching business records")
     .replace(/^\s*\*{0,2}svg(?:grounded in workspace data)?\*{0,2}\s*$/gim, "")
     .replace(/\*{0,2}svggrounded in workspace data\*{0,2}/gi, "")
-    .replace(/^\s*based on (?:the )?workspace records[,.:;!?-]*\s*/gim, "")
-    .replace(/^\s*based on (?:the )?workspace data[,.:;!?-]*\s*/gim, "")
+    .replace(/(^|\\n)(\\s*(?:\\d+[.)]\\s*)?)(?:based on|according to) (?:the )?workspace (?:records|data)[,.:;!?-]*\\s*/gim, "$1$2")
+    .replace(/\\b(?:source|table|view|relation)\\s+(?:named|called)\\s+[a-z_][a-z0-9_]*\\b/gi, "workspace data")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
   return result;
