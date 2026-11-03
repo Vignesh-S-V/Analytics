@@ -211,12 +211,6 @@ export function resolveFiscalPeriod(question, selectedPeriod = "", now = new Dat
     startYear = Number(explicitCalendarYear[1]);
     endYear = startYear;
     kind = "calendar";
-  } else if (selectedStart !== null) {
-    startYear = selectedStart;
-    endYear = selectedFy
-      ? (Number(selectedFy[2]) < 100 ? Math.floor(startYear / 100) * 100 + Number(selectedFy[2]) : Number(selectedFy[2]))
-      : startYear + 1;
-    kind = "fiscal";
   } else if (/\b(this year|current year|year to date|ytd)\b/.test(normalized)) {
     const dateParts = new Intl.DateTimeFormat("en-US", {
       timeZone: "Asia/Kolkata", year: "numeric", month: "numeric",
@@ -225,6 +219,12 @@ export function resolveFiscalPeriod(question, selectedPeriod = "", now = new Dat
     const month = Number(dateParts.find((part) => part.type === "month")?.value);
     startYear = month >= 4 ? year : year - 1;
     endYear = startYear + 1;
+    kind = "fiscal";
+  } else if (selectedStart !== null) {
+    startYear = selectedStart;
+    endYear = selectedFy
+      ? (Number(selectedFy[2]) < 100 ? Math.floor(startYear / 100) * 100 + Number(selectedFy[2]) : Number(selectedFy[2]))
+      : startYear + 1;
     kind = "fiscal";
   }
   if (kind === "all") return { kind, startDate: null, endDateExclusive: null, label: "All available years" };
