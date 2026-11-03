@@ -1353,8 +1353,17 @@ Deno.serve(async (req: Request) => {
        const displayed=ranked.slice(0,requestedTopN);
        const label=metric==="profit_inr"?"recorded profit":metric==="profit_margin_pct"?"weighted profit margin":"revenue";
        const direction=isLowest?"lowest to highest":"highest to lowest";
-       const answer=displayed.map((r,i)=>(i+1)+". "+txt(r.country)+" — "+label+": "+(metric==="profit_margin_pct"?marginPct(r).toFixed(2)+"%":formatINR(num(r[metric])))+"; revenue: "+formatINR(num(r.revenue_inr))+"; recorded profit: "+formatINR(num(r.profit_inr))+"; weighted profit margin: "+marginPct(r).toFixed(2)+"%; orders: "+num(r.order_count).toLocaleString("en-IN")+".").join("\n")
-         + (metric==="revenue_inr" && /\b(?:performance|performing|worst|lowest)\b/.test(normalizedQ) ? " Assumption: overall performance is measured by revenue because no specific metric was stated." : "");
+       const answer=displayed.map((r,i)=>{
+         const country=txt(r.country);
+         const primary=metric==="profit_margin_pct"?marginPct(r).toFixed(2)+"%":formatINR(num(r[metric]));
+         const heading=isLowest?"Lowest-performing country":"Highest-performing country";
+         const primaryLabel=metric==="revenue_inr"?"revenue":metric==="profit_inr"?"recorded profit":"weighted profit margin";
+         const context=metric==="revenue_inr"
+           ? "Orders: "+num(r.order_count).toLocaleString("en-IN")+"; recorded profit: "+formatINR(num(r.profit_inr))+"; profit margin: "+marginPct(r).toFixed(2)+"%."
+           : "Revenue: "+formatINR(num(r.revenue_inr))+"; orders: "+num(r.order_count).toLocaleString("en-IN")+"; recorded profit: "+formatINR(num(r.profit_inr))+".";
+         return (displayed.length===1?heading+": ":String(i+1)+". ")+country+" — "+primaryLabel+": "+primary+". "+context;
+       }).join("\n")
+         + (metric==="revenue_inr" && /\b(?:performance|performing|worst|lowest)\b/.test(normalizedQ) ? " Performance is ranked by revenue because no other metric was specified." : "");
        return respond({answer,rankingTable:displayed.length>1?{title:"Country performance ranking",subtitle:"Sorted "+direction+" by "+label+" · showing "+displayed.length+" of "+ranked.length+" countries",columns:[{key:"rank",label:"Rank",type:"number"},{key:"country",label:"Country"},{key:"revenue_inr",label:"Revenue",type:"currency"},{key:"profit_inr",label:"Recorded Profit",type:"currency"},{key:"order_count",label:"Orders",type:"number"},{key:"profit_margin_pct",label:"Weighted Profit Margin",type:"percent"}],rows:displayed.map((r,i)=>({rank:i+1,country:txt(r.country),revenue_inr:num(r.revenue_inr),profit_inr:num(r.profit_inr),order_count:num(r.order_count),profit_margin_pct:marginPct(r)}))}:null,sources:[{name:"vw_sales_monthly_by_country",records:rows.length,note:"monthly country rows aggregated by country before ranking; margin recalculated from total profit / total revenue"}],question},200,origin);
     }
 
