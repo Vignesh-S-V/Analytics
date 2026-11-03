@@ -379,7 +379,7 @@ Deno.serve(async (req: Request) => {
             return periodMatch && countryFilter;
           });
           if (!selectedRows.length) {
-            const availableYears = [...new Set(rows.map((row) => txt(row.order_date).slice(0, 4)).filter((year) => /^20\\d{2}$/.test(year)))].sort();
+            const availableYears = [...new Set(rows.map((row) => txt(row.order_date).slice(0, 4)).filter((year) => /^20\d{2}$/.test(year)))].sort();
             const periodMessage = periodFilter.kind !== "all"
               ? "No sales were recorded for " + selectedFabric + " in " + periodFilter.label + ". Available data years: " + (availableYears.join(", ") || "none") + "."
               : "No matching records were found for " + selectedFabric + " under the selected filters.";
@@ -416,7 +416,7 @@ Deno.serve(async (req: Request) => {
             sources: [{ name: "workspace data", records: selectedRows.length, note: "Exact fabric match after typo-tolerant product resolution; requested metrics calculated from matching orders." }],
             question
           }, 200, origin);
-        } else if (/\\b\\d{2,3}\\s*gsm\\b/i.test(question)) {
+        } else if (/\b\d{2,3}\s*gsm\b/i.test(question)) {
           const message = fabricMatch.ambiguous
             ? "The product name is ambiguous. Please choose the exact fabric variant: " + (fabricMatch.candidates ?? []).join(", ") + "."
             : "I could not match the requested fabric and GSM to workspace products. Please check the spelling and specification. I have not substituted company-wide figures.";
@@ -441,7 +441,7 @@ Deno.serve(async (req: Request) => {
       }
       try {
         const questions = multiQuestionParts
-          .map((part) => part.replace(/^[\\s,;]+|[\\s,;]+$/g, "").trim())
+          .map((part) => part.replace(/^[\s,;]+|[\s,;]+$/g, "").trim())
           .filter((part) => part.length > 5)
           .map((part) => part.endsWith("?") || part.endsWith(".") ? part : part + "?");
         const answers: string[] = [];
