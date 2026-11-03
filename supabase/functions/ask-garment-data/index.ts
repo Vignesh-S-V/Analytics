@@ -642,7 +642,7 @@ Deno.serve(async (req: Request) => {
                 return (wantsLowestRank ? 1 : -1) * (left - right);
               });
               if (!rows.length && (periodFilter.kind !== "all" || (requestedCountry && requestedCountry !== "All countries"))) {
-                answers.push((index + 1) + ". " + subQuestion + "\\nNo country records were found for " + periodFilter.label + " and the selected country filter.");
+                answers.push((index + 1) + ". " + subQuestion + "\nNo country records were found for " + periodFilter.label + " and the selected country filter.");
                 continue;
               }
               if (rows.length) {
