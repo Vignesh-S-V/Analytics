@@ -283,7 +283,7 @@ Deno.serve(async (req: Request) => {
       ? body.history.filter((h: any) => h && typeof h.content === "string" && (h.role === "user" || h.role === "assistant")).slice(-6)
       : [];
     const candidateYear = typeof body?.filters?.year === "string" ? body.filters.year.trim() : "";
-    requestedYear = /^20\d{2}$/.test(candidateYear) ? candidateYear : "";
+    requestedYear = /^20\d{2}$/.test(candidateYear) ? candidateYear : (/^FY\s*20\d{2}\s*[-–/]\s*(?:\d{2}|20\d{2})$/i.test(candidateYear) ? candidateYear : "");
     requestedCountry = typeof body?.filters?.country === "string" ? body.filters.country.trim().slice(0, 100) : "";
   } catch (error) {
     if (error instanceof RangeError) return respond({ error: "Request body exceeds the 16 KB limit." }, 413, origin);
@@ -394,23 +394,34 @@ Deno.serve(async (req: Request) => {
             rows.push(...batch);
             if (batch.length < pageSize) break;
           }
-          const explicitYears = [...new Set([...fullQuestionNormalized.matchAll(/\b(20\d{2})\b/g)].map((m) => m[1]))];
-          const asksCurrentYear = /\b(this year|current year|year to date|ytd)\b/.test(fullQuestionNormalized);
-          const effectiveYear = explicitYears.length
+          const fyMatch = fullQuestionNormalized.match(/\\bfy\\s*(20\\d{2})\\s*(?:-|\\s)\\s*(\\d{2}|20\\d{2})\\b/i)
+            || requestedYear.match(/^FY\\s*(20\\d{2})\\s*[-–/]\\s*(\\d{2}|20\\d{2})$/i);
+          const fyStart = fyMatch ? Number(fyMatch[1]) : null;
+          const fyEnd = fyMatch ? (Number(fyMatch[2]) < 100 ? Math.floor(fyStart! / 100) * 100 + Number(fyMatch[2]) : Number(fyMatch[2])) : null;
+          const explicitYears = [...new Set([...fullQuestionNormalized.matchAll(/\\b(20\\d{2})\\b/g)].map((m) => m[1]))];
+          const asksCurrentYear = /\\b(this year|current year|year to date|ytd)\\b/.test(fullQuestionNormalized);
+          const effectiveYear = !fyMatch && explicitYears.length
             ? explicitYears[explicitYears.length - 1]
-            : asksCurrentYear ? String(new Date().getUTCFullYear()) : requestedYear;
+            : !fyMatch && asksCurrentYear ? String(new Date().getUTCFullYear()) : (!fyMatch && /^20\\d{2}$/.test(requestedYear) ? requestedYear : "");
+          const periodLabel = fyMatch
+            ? "FY " + fyStart + "–" + String(fyEnd).slice(-2)
+            : effectiveYear || (requestedYear && /^FY/i.test(requestedYear) ? requestedYear.replace(/[-/]/g, "–") : "All available years");
           const selectedRows = rows.filter((row) => {
             const date = txt(row.order_date).slice(0, 10);
-            const yearFilter = !effectiveYear || date.startsWith(effectiveYear + "-");
+            const yearFilter = fyMatch
+              ? date >= fyStart + "-04-01" && date <= fyEnd + "-03-31"
+              : !effectiveYear || date.startsWith(effectiveYear + "-");
             const countryFilter = !requestedCountry || requestedCountry === "All countries"
               || txt(row.country).trim().toLowerCase() === requestedCountry.toLowerCase();
             return yearFilter && countryFilter;
           });
           if (!selectedRows.length) {
-            const availableYears = [...new Set(rows.map((row) => txt(row.order_date).slice(0, 4)).filter((year) => /^20\d{2}$/.test(year)))].sort();
-            const periodMessage = effectiveYear
-              ? "No sales were recorded for " + selectedFabric + " in " + effectiveYear + ". Available data years: " + (availableYears.join(", ") || "none") + "."
-              : "No matching records were found for " + selectedFabric + " under the selected filters.";
+            const availableYears = [...new Set(rows.map((row) => txt(row.order_date).slice(0, 4)).filter((year) => /^20\\d{2}$/.test(year)))].sort();
+            const periodMessage = fyMatch
+              ? "No sales were recorded for " + selectedFabric + " in " + periodLabel + ". Available data years: " + (availableYears.join(", ") || "none") + "."
+              : effectiveYear
+                ? "No sales were recorded for " + selectedFabric + " in " + effectiveYear + ". Available data years: " + (availableYears.join(", ") || "none") + "."
+                : "No matching records were found for " + selectedFabric + " under the selected filters.";
             return respond({ answer: periodMessage, unavailable: true, question }, 200, origin);
           }
           const revenue = sum(selectedRows, "revenue_inr");
@@ -438,7 +449,7 @@ Deno.serve(async (req: Request) => {
           if (!metrics.length) metrics.push("Total revenue / sales: " + formatINR(revenue), "Total cost: " + formatINR(totalCost), "Total orders: " + orderCount.toLocaleString("en-IN"),
             "Gross profit (GP): " + formatINR(grossProfit) + "; GP%: " + (gpPct === null ? "N/A" : gpPct.toFixed(2) + "%"),
             "Net profit (NP): " + formatINR(netProfit) + "; NP%: " + (npPct === null ? "N/A" : npPct.toFixed(2) + "%"));
-          const period = effectiveYear || "All available years";
+          const period = periodLabel;
           return respond({
             answer: selectedFabric + " · " + period + "\n" + metrics.join("\n"),
             sources: [{ name: "workspace data", records: selectedRows.length, note: "Exact fabric match after typo-tolerant product resolution; requested metrics calculated from matching orders." }],
