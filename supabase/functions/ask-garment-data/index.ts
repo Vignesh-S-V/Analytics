@@ -1,5 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { aggregateProductGroups, detectProductRankingIntent, isCountryComparisonQuestion } from "./analytics-utils.mjs";
+import { aggregateProductGroups, detectProductRankingIntent, isCountryComparisonQuestion, matchFabricFromQuestion, resolveFiscalPeriod } from "./analytics-utils.mjs";
 
 const allowedOrigins = new Set([
   "https://analytics.vigneshw-5416.workers.dev",
@@ -333,22 +333,6 @@ Deno.serve(async (req: Request) => {
     const fullQuestionNormalized = question.toLowerCase().normalize("NFKD")
       .replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
     const hasRequestedBusinessMetrics = /\b(revenue|sales|turnover|orders?|gp|gross profit|np|net profit|profit)\b/.test(fullQuestionNormalized);
-    const editDistance = (a: string, b: string) => {
-      const prev = Array.from({ length: b.length + 1 }, (_, i) => i);
-      for (let i = 1; i <= a.length; i++) {
-        const curr = [i];
-        for (let j = 1; j <= b.length; j++) {
-          curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
-        }
-        for (let j = 0; j <= b.length; j++) prev[j] = curr[j];
-      }
-      return prev[b.length];
-    };
-    const tokenSimilarity = (a: string, b: string) => {
-      if (a === b) return 1;
-      if (a.length < 3 || b.length < 3) return 0;
-      return 1 - editDistance(a, b) / Math.max(a.length, b.length);
-    };
     if (hasRequestedBusinessMetrics) {
       const fabricOptions: Record<string, unknown>[] = [];
       let fabricOptionsError: { message: string } | null = null;
@@ -366,18 +350,9 @@ Deno.serve(async (req: Request) => {
         console.error("Product fabric lookup failed:", fabricOptionsError.message);
       } else {
         const fabrics = [...new Set(fabricOptions.map((row: any) => txt(row.fabric).trim()).filter(Boolean))];
-        const queryTokens = fullQuestionNormalized.split(" ").filter(Boolean);
-        const scoredFabrics = fabrics.map((fabric) => {
-          const fabricTokens = fabric.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, " ").split(" ").filter(Boolean);
-          const tokenScores = fabricTokens.map((target) => Math.max(0, ...queryTokens.map((token) => tokenSimilarity(token, target))));
-          const numericTokens = fabricTokens.filter((token) => /^\d+$/.test(token));
-          const numericMatch = numericTokens.every((token) => queryTokens.includes(token));
-          const score = tokenScores.length ? tokenScores.reduce((a, b) => a + b, 0) / tokenScores.length : 0;
-          return { fabric, score, numericMatch, tokenScores };
-        }).filter((item) => item.numericMatch && item.score >= 0.78 && item.tokenScores.every((score) => score >= 0.60))
-          .sort((a, b) => b.score - a.score);
-        if (scoredFabrics.length && (!scoredFabrics[1] || scoredFabrics[0].score - scoredFabrics[1].score >= 0.04 || scoredFabrics[0].fabric === scoredFabrics[1].fabric)) {
-          const selectedFabric = scoredFabrics[0].fabric;
+        const fabricMatch = matchFabricFromQuestion(question, fabrics);
+        if (fabricMatch.fabric) {
+          const selectedFabric = fabricMatch.fabric;
           const rows: Record<string, unknown>[] = [];
           const pageSize = 1000;
           for (let offset = 0; ; offset += pageSize) {
@@ -394,34 +369,20 @@ Deno.serve(async (req: Request) => {
             rows.push(...batch);
             if (batch.length < pageSize) break;
           }
-          const fyMatch = fullQuestionNormalized.match(/\\bfy\\s*(20\\d{2})\\s*(?:-|\\s)\\s*(\\d{2}|20\\d{2})\\b/i)
-            || requestedYear.match(/^FY\\s*(20\\d{2})\\s*[-–/]\\s*(\\d{2}|20\\d{2})$/i);
-          const fyStart = fyMatch ? Number(fyMatch[1]) : null;
-          const fyEnd = fyMatch ? (Number(fyMatch[2]) < 100 ? Math.floor(fyStart! / 100) * 100 + Number(fyMatch[2]) : Number(fyMatch[2])) : null;
-          const explicitYears = [...new Set([...fullQuestionNormalized.matchAll(/\\b(20\\d{2})\\b/g)].map((m) => m[1]))];
-          const asksCurrentYear = /\\b(this year|current year|year to date|ytd)\\b/.test(fullQuestionNormalized);
-          const effectiveYear = !fyMatch && explicitYears.length
-            ? explicitYears[explicitYears.length - 1]
-            : !fyMatch && asksCurrentYear ? String(new Date().getUTCFullYear()) : (!fyMatch && /^20\\d{2}$/.test(requestedYear) ? requestedYear : "");
-          const periodLabel = fyMatch
-            ? "FY " + fyStart + "–" + String(fyEnd).slice(-2)
-            : effectiveYear || (requestedYear && /^FY/i.test(requestedYear) ? requestedYear.replace(/[-/]/g, "–") : "All available years");
+          const periodFilter = resolveFiscalPeriod(question, requestedYear);
           const selectedRows = rows.filter((row) => {
             const date = txt(row.order_date).slice(0, 10);
-            const yearFilter = fyMatch
-              ? date >= fyStart + "-04-01" && date <= fyEnd + "-03-31"
-              : !effectiveYear || date.startsWith(effectiveYear + "-");
+            const periodMatch = !periodFilter.startDate
+              || (date >= periodFilter.startDate && date < String(periodFilter.endDateExclusive));
             const countryFilter = !requestedCountry || requestedCountry === "All countries"
               || txt(row.country).trim().toLowerCase() === requestedCountry.toLowerCase();
-            return yearFilter && countryFilter;
+            return periodMatch && countryFilter;
           });
           if (!selectedRows.length) {
             const availableYears = [...new Set(rows.map((row) => txt(row.order_date).slice(0, 4)).filter((year) => /^20\\d{2}$/.test(year)))].sort();
-            const periodMessage = fyMatch
-              ? "No sales were recorded for " + selectedFabric + " in " + periodLabel + ". Available data years: " + (availableYears.join(", ") || "none") + "."
-              : effectiveYear
-                ? "No sales were recorded for " + selectedFabric + " in " + effectiveYear + ". Available data years: " + (availableYears.join(", ") || "none") + "."
-                : "No matching records were found for " + selectedFabric + " under the selected filters.";
+            const periodMessage = periodFilter.kind !== "all"
+              ? "No sales were recorded for " + selectedFabric + " in " + periodFilter.label + ". Available data years: " + (availableYears.join(", ") || "none") + "."
+              : "No matching records were found for " + selectedFabric + " under the selected filters.";
             return respond({ answer: periodMessage, unavailable: true, question }, 200, origin);
           }
           const revenue = sum(selectedRows, "revenue_inr");
@@ -449,14 +410,17 @@ Deno.serve(async (req: Request) => {
           if (!metrics.length) metrics.push("Total revenue / sales: " + formatINR(revenue), "Total cost: " + formatINR(totalCost), "Total orders: " + orderCount.toLocaleString("en-IN"),
             "Gross profit (GP): " + formatINR(grossProfit) + "; GP%: " + (gpPct === null ? "N/A" : gpPct.toFixed(2) + "%"),
             "Net profit (NP): " + formatINR(netProfit) + "; NP%: " + (npPct === null ? "N/A" : npPct.toFixed(2) + "%"));
-          const period = periodLabel;
+          const period = periodFilter.label;
           return respond({
             answer: selectedFabric + " · " + period + "\n" + metrics.join("\n"),
             sources: [{ name: "workspace data", records: selectedRows.length, note: "Exact fabric match after typo-tolerant product resolution; requested metrics calculated from matching orders." }],
             question
           }, 200, origin);
-        } else if (/\\bsingle\\b/.test(fullQuestionNormalized) && /\\b\\d{2,3}\\b/.test(fullQuestionNormalized) && /\\bgsm\\b/.test(fullQuestionNormalized)) {
-          return respond({ answer: "I could not confidently match that product specification. Please check the fabric name and GSM. I have not substituted company-wide figures.", unavailable: true, question }, 200, origin);
+        } else if (/\\b\\d{2,3}\\s*gsm\\b/i.test(question)) {
+          const message = fabricMatch.ambiguous
+            ? "The product name is ambiguous. Please choose the exact fabric variant: " + (fabricMatch.candidates ?? []).join(", ") + "."
+            : "I could not match the requested fabric and GSM to workspace products. Please check the spelling and specification. I have not substituted company-wide figures.";
+          return respond({ answer: message, unavailable: true, question }, 200, origin);
         }
       }
     }
