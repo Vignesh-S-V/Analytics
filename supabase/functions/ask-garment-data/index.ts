@@ -602,7 +602,7 @@ Deno.serve(async (req: Request) => {
               : wantsAllRankRows ? Number.POSITIVE_INFINITY : 1;
             const wantsLowestRank = /\b(?:lowest|worst|least|minimum|bottom)\b/.test(normalizedSubQuestion)
               && !/\b(?:highest to lowest|descending|high to low)\b/.test(normalizedSubQuestion);
-            const rankLabel = requestedRankCount ? "Top " + rankLimit : wantsAllRankRows ? "Complete available ranking" : wantsLowestRank ? "Lowest-ranked result" : "Highest-ranked result";
+            const rankLabel = requestedRankCount ? (wantsLowestRank ? "Bottom " : "Top ") + rankLimit : wantsAllRankRows ? "Complete available ranking" : wantsLowestRank ? "Lowest-ranked result" : "Highest-ranked result";
 
             if (/\b(?:country|countries|market|markets)\b/.test(normalizedSubQuestion)
               && /\b(?:revenue|sales|profit|margin|orders|performance|performing)\b/.test(normalizedSubQuestion)
