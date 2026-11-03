@@ -5,9 +5,6 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
-    labels:
-      - dependencies
-      - security
     ignore:
       - dependency-name: "react"
         update-types: ["version-update:semver-major"]
@@ -24,6 +21,3 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
-    labels:
-      - dependencies
-      - security
