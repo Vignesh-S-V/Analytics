@@ -7,6 +7,8 @@ import {
   isMultiQuestionPrompt,
   rankBuyerRows,
   splitQuestions,
+  matchFabricFromQuestion,
+  resolveFiscalPeriod,
 } from "./analytics-utils.mjs";
 
 test("routes product-group recorded-profit questions to group-level profit ranking", () => {
@@ -123,4 +125,51 @@ test("ranks buyer records by the requested metric, not the other metric", () => 
 
 test("rejects unsupported buyer ranking metrics", () => {
   assert.throws(() => rankBuyerRows([], "order_count"), /metric must be/);
+});
+
+
+test("matches common Single Jersey spelling mistakes while preserving exact GSM", () => {
+  const result = matchFabricFromQuestion(
+    "single jercy 150 gsm total revenue total cost total orders gp and np",
+    ["Single Jersey 140 GSM", "Single Jersey 150 GSM", "Single Jersey 160 GSM"],
+  );
+  assert.equal(result.fabric, "Single Jersey 150 GSM");
+  assert.equal(result.ambiguous, false);
+});
+
+test("does not match a different GSM when the requested numeric specification differs", () => {
+  const result = matchFabricFromQuestion("single jersey 150 gsm revenue", [
+    "Single Jersey 140 GSM", "Single Jersey 160 GSM",
+  ]);
+  assert.equal(result.fabric, null);
+});
+
+test("rejects ambiguous fuzzy fabric matches instead of selecting an arbitrary variant", () => {
+  const result = matchFabricFromQuestion("single jersy 150 gsm revenue", [
+    "Single Jersey 150 GSM", "Single Jersy 150 GSM",
+  ]);
+  assert.equal(result.fabric, null);
+  assert.equal(result.ambiguous, true);
+});
+
+test("parses explicit FY 2023-24 into the complete April-to-March range", () => {
+  assert.deepEqual(resolveFiscalPeriod("Single Jersey GP and NP in FY 2023-24", "", new Date("2026-11-03T00:00:00Z")), {
+    kind: "fiscal", startDate: "2023-04-01", endDateExclusive: "2024-04-01", label: "FY 2023–24",
+  });
+});
+
+test("treats dashboard filter value 2023 as FY 2023-24, not calendar 2023", () => {
+  assert.deepEqual(resolveFiscalPeriod("Single Jersey GP and NP", "2023", new Date("2026-11-03T00:00:00Z")), {
+    kind: "fiscal", startDate: "2023-04-01", endDateExclusive: "2024-04-01", label: "FY 2023–24",
+  });
+});
+
+test("explicit question FY overrides dashboard selection", () => {
+  assert.equal(resolveFiscalPeriod("Single Jersey sales FY 2023-24", "2024").label, "FY 2023–24");
+});
+
+test("current year resolves to the current Indian financial year when no UI period is selected", () => {
+  assert.deepEqual(resolveFiscalPeriod("Single Jersey sales in current year", "", new Date("2026-11-03T00:00:00Z")), {
+    kind: "fiscal", startDate: "2026-04-01", endDateExclusive: "2027-04-01", label: "FY 2026–27",
+  });
 });
