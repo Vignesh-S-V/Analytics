@@ -610,16 +610,17 @@ Deno.serve(async (req: Request) => {
               const metric = /\b(?:profit margin|margin)\b/.test(normalizedSubQuestion) ? "profit_margin_pct"
                 : /\b(?:profit|net profit|recorded profit)\b/.test(normalizedSubQuestion) ? "profit_inr" : "revenue_inr";
               const { data, error } = await db.from("vw_sales_by_country")
-                .select("country,revenue_inr,profit_inr,order_count")
-                .order(metric === "profit_margin_pct" ? "profit_margin_pct" : metric, { ascending: wantsLowestRank, nullsFirst: false });
+                .select("country,revenue_inr,profit_inr,profit_margin_pct,order_count")
+                .order(metric, { ascending: wantsLowestRank, nullsFirst: false });
               if (error) throw new Error("Country ranking query failed: " + error.message);
               const rows = (data ?? []) as Record<string, unknown>[];
               if (rows.length) {
                 const shown = rows.slice(0, rankLimit);
                 const metricLabel = metric === "profit_inr" ? "recorded profit" : metric === "profit_margin_pct" ? "weighted profit margin" : "revenue";
                 const answer = shown.map((row, i) => (i + 1) + ". " + txt(row.country)
-                  + " — Revenue: " + formatINR(num(row.revenue_inr))
-                  + "; profit: " + formatINR(num(row.profit_inr))
+                  + " — " + metricLabel + ": " + (metric === "profit_margin_pct" ? num(row.profit_margin_pct).toFixed(2) + "%" : formatINR(num(row[metric])))
+                  + "; revenue: " + formatINR(num(row.revenue_inr))
+                  + "; recorded profit: " + formatINR(num(row.profit_inr))
                   + "; orders: " + num(row.order_count).toLocaleString("en-IN")).join("\n");
                 answers.push((index + 1) + ". " + subQuestion + "\n" + rankLabel + " countries by " + metricLabel + ":\n" + answer);
                 allSources.set("vw_sales_by_country", { name: "vw_sales_by_country", records: rows.length, note: "complete country summary ordered by requested metric; displayed row count follows user intent" });
