@@ -1047,3 +1047,20 @@ html{background:#f7f8fa;scroll-behavior:smooth}body{min-width:320px;background:#
  .table-scroll thead th,.adv-table-wrap thead th,.ask-supplier-table thead th,.ask-benchmark-table-wrap thead th{font-size:11px!important;padding:10px!important}
  .table-scroll tbody td,.adv-table-wrap tbody td,.ask-supplier-table tbody td,.ask-benchmark-table-wrap tbody td{font-size:12px!important;padding:10px!important}
 }
+
+/* High-specificity readability overrides for tables whose component CSS sets tiny type */
+#root .table-scroll table,#root .adv-table-wrap table,#root .ask-supplier-table,#root .ask-benchmark-table-wrap table{font-size:14px!important}
+#root .table-scroll thead th,#root .adv-table-wrap thead th,#root .ask-supplier-table thead th,#root .ask-benchmark-table-wrap thead th{font-size:12px!important;line-height:1.5!important;padding:12px 14px!important;letter-spacing:.15px!important}
+#root .table-scroll tbody td,#root .adv-table-wrap tbody td,#root .ask-supplier-table tbody td,#root .ask-benchmark-table-wrap tbody td{font-size:13px!important;line-height:1.55!important;padding:12px 14px!important}
+#root .table-scroll tbody td b,#root .adv-table-wrap tbody td b,#root .ask-supplier-table tbody td b{font-size:13px!important}
+#root .table-scroll tbody td small,#root .adv-table-wrap tbody td small,#root .ask-supplier-table tbody td small{font-size:11px!important;line-height:1.45!important}
+#root .kpi-label{font-size:12px!important}
+#root .kpi-change,#root .kpi-change b{font-size:11px!important;line-height:1.5!important}
+#root .panel-top p,#root .adv-note,#root .table-bottom{font-size:12px!important;line-height:1.55!important}
+#root .panel-kicker{font-size:10px!important;letter-spacing:1.25px!important}
+@media(max-width:700px){
+ #root .table-scroll thead th,#root .adv-table-wrap thead th,#root .ask-supplier-table thead th,#root .ask-benchmark-table-wrap thead th{font-size:11px!important;padding:10px!important}
+ #root .table-scroll tbody td,#root .adv-table-wrap tbody td,#root .ask-supplier-table tbody td,#root .ask-benchmark-table-wrap tbody td{font-size:12px!important;padding:10px!important}
+ #root .kpi-label{font-size:10px!important}
+ #root .kpi-change,#root .kpi-change b{font-size:10px!important}
+}
