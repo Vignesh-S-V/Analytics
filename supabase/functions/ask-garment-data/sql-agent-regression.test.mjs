@@ -99,3 +99,14 @@ test("country rankings apply the same fiscal period and selected country filters
   assert.match(route, /requestedCountry/);
   assert.match(route, /isLowest\?1:-1/);
 });
+
+
+test("multi-question country ranking uses monthly rows and the requested fiscal period", () => {
+  const start = edge.indexOf("const wantsLowestRank =");
+  const end = edge.indexOf("if (/\\b(?:buyer|buyers|customer|customers)\\b/", start);
+  const route = edge.slice(start, end);
+  assert.match(route, /resolveFiscalPeriod\(subQuestion,\s*requestedYear\)/);
+  assert.match(route, /monthDate >= periodFilter\.startDate/);
+  assert.match(route, /requestedCountry/);
+  assert.match(route, /No country records were found/);
+});
