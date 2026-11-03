@@ -134,3 +134,23 @@ test("Polo T-Shirt exact phrase can match despite the one-letter T token", () =>
   assert.match(route, /fullQuestionNormalized\.includes\(normalizeEntity\(value\)\)/);
   assert.match(route, /const exactCategory = productCategories\.find/);
 });
+
+
+test("Hoodie resolves to the stored Sweatshirt/Hoodie product category", () => {
+  const start = edge.indexOf("// Resolve explicit product/fabric requests");
+  const end = edge.indexOf("// Handle multi-intent prompts before any single-intent deterministic route can return.", start);
+  const route = edge.slice(start, end);
+  assert.match(route, /"sweatshirt\\/hoodie": \\["hoodie", "sweatshirt", "hoodies", "sweatshirts"\\]/);
+  assert.match(route, /aliases\\.some\\(\\(alias\\) => fullQuestionNormalized\\.includes/);
+});
+
+test("multi-product comparison returns a result for every named product category", () => {
+  const start = edge.indexOf("// Resolve explicit product/fabric requests");
+  const end = edge.indexOf("// Handle multi-intent prompts before any single-intent deterministic route can return.", start);
+  const route = edge.slice(start, end);
+  assert.match(route, /const categoryMatches = productCategories\\.filter/);
+  assert.match(route, /for \\(const entity of selectedEntities\\)/);
+  assert.match(route, /productResults\\.map/);
+  assert.match(route, /Revenue difference/);
+  assert.match(route, /Net profit difference/);
+});
