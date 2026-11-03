@@ -40,3 +40,26 @@ test("Current retrieval fallback remains after SQL agent", () => {
   assert.match(edge, /SQL agent failed; (?:using existing retrieval fallback|falling back to current retrieval)/);
   assert.ok(edge.indexOf("const compactRelevance =") > edge.indexOf("const agent = await runSqlAgent"));
 });
+
+
+test("product-specific KPI route runs before multi-intent and company-wide KPI fallbacks", () => {
+  const product = edge.indexOf("// Resolve explicit product/fabric requests");
+  const multiIntent = edge.indexOf("// Handle multi-intent prompts");
+  const companyKpi = edge.indexOf("// Deterministic KPI and country comparison route");
+  assert.ok(product > 0 && product < multiIntent && product < companyKpi);
+  assert.match(edge, /matchFabricFromQuestion\(question, fabrics\)/);
+  assert.match(edge, /resolveFiscalPeriod\(question, requestedYear\)/);
+  assert.match(edge, /\d\{2,3\}\\s\*gsm/);
+});
+
+test("product specification mismatch returns a clarification instead of company totals", () => {
+  const product = edge.indexOf("// Resolve explicit product/fabric requests");
+  const multiIntent = edge.indexOf("// Handle multi-intent prompts");
+  const route = edge.slice(product, multiIntent);
+  assert.match(route, /I have not substituted company-wide figures/);
+  assert.match(route, /unavailable: true/);
+});
+
+test("product-specific period filter uses inclusive start and exclusive end dates", () => {
+  assert.match(edge, /date >= periodFilter\.startDate && date < String\(periodFilter\.endDateExclusive\)/);
+});
