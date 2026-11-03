@@ -175,6 +175,10 @@ test("explicit question FY overrides dashboard selection", () => {
   assert.equal(resolveFiscalPeriod("Single Jersey sales FY 2023-24", "2024").label, "FY 2023–24");
 });
 
+test("explicit current-year wording overrides a stale dashboard period", () => {
+  assert.equal(resolveFiscalPeriod("Single Jersey GP in current year", "2023", new Date("2026-11-03T00:00:00Z")).label, "FY 2026–27");
+});
+
 test("current year resolves to the current Indian financial year when no UI period is selected", () => {
   assert.deepEqual(resolveFiscalPeriod("Single Jersey sales in current year", "", new Date("2026-11-03T00:00:00Z")), {
     kind: "fiscal", startDate: "2026-04-01", endDateExclusive: "2027-04-01", label: "FY 2026–27",
