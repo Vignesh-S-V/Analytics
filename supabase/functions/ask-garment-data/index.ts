@@ -1022,8 +1022,9 @@ Deno.serve(async (req: Request) => {
     const normalizedQ = rawQ.replace(/[^a-z0-9 ]+/g, " ").replace(/  +/g, " ").trim();
     const qYear = question.match(/20[0-9]{2}/)?.[0] ?? requestedYear;
     const qMonths: Record<string,string> = { january:"01",jan:"01",february:"02",feb:"02",march:"03",mar:"03",april:"04",apr:"04",may:"05",june:"06",jun:"06",july:"07",jul:"07",august:"08",aug:"08",september:"09",sep:"09",sept:"09",october:"10",oct:"10",november:"11",nov:"11",december:"12",dec:"12" };
-    const asksStatePerformance = /\bstate(?:s|wise)?\b/i.test(normalizedQ)
-      && /\b(?:performance|perform|sales|revenue|profit|worst|lowest|best|highest|rank|ranking|behave|behaving|video)\b/i.test(normalizedQ);
+    const asksStatePerformance = (/\bstate(?:s|wise)?\b/i.test(normalizedQ) || /ஸ்டேட்|மாநிலம்|மாநில/.test(question))
+      && (/\b(?:performance|perform|sales|revenue|profit|worst|lowest|best|highest|rank|ranking|behave|behaving|video)\b/i.test(normalizedQ)
+        || /வீடியோ|மோசமான|மோசமாக|செயல்திறன்|செயல்பாடு/.test(question));
     if (asksStatePerformance) {
       return respond({ answer: "I can’t identify the worst-performing state because this workspace currently contains country-level sales data, not state-level records. I can compare countries by revenue, recorded profit, or profit margin. State-wise analysis requires state-level data to be added.", question }, 200, origin);
     }
