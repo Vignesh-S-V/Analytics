@@ -155,3 +155,14 @@
 @media(max-width:700px){.pi-evidence{padding:9px}.pi-evidence-head{align-items:flex-start;flex-direction:column}.pi-evidence-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 .pi-evidence-table-wrap{max-height:420px;overflow:auto}.pi-evidence-table thead{position:sticky;top:0;z-index:1}
+
+/* Full-width portfolio decision support; the what-if simulator is intentionally removed */
+.pi-recommendations-section{display:block;width:100%;min-width:0;max-width:100%}
+.pi-recommendations-section>.adv-panel{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+.pi-recommendations-section .pi-recommendations,.pi-recommendations-section .pi-recommendations article,.pi-recommendations-section .pi-rec-playbook,.pi-recommendations-section .pi-evidence{min-width:0;max-width:100%;box-sizing:border-box}
+.pi-recommendations-section .pi-rec-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}
+.pi-recommendations-section .pi-rec-metrics>div{min-width:0;overflow-wrap:anywhere}
+.pi-recommendations-section .pi-rec-metrics strong{white-space:normal;overflow-wrap:anywhere;word-break:normal}
+.pi-recommendations-section .pi-evidence-table-wrap{max-width:100%;overflow:auto}
+@media(max-width:760px){.pi-recommendations-section .pi-rec-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.pi-recommendations-section .pi-rec-metrics{grid-template-columns:1fr}}
