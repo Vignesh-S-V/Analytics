@@ -71,7 +71,6 @@ function ProductPortfolio({orders=[]}){
  const {revenue,profit,cost,fabricCost,missingCostRows,cats,products,pareto,trend,topCats,lifecycle,avgMargin,top3Share}=model;
  const totalDirect=model.direct,otherCost=model.other;
  const costData=[{name:'Fabric',value:model.fabricCost},{name:'Trims',value:model.trimsCost},{name:'CMT',value:model.cmtCost},{name:'Unallocated Expenses',value:otherCost}].filter(x=>x.value!==0);
- const scenarioRevenue=revenue*(1+price/100)*(1+volume/100),scenarioCost=cost*(1+volume/100)+fabricCost*(fabric/100)*(1+volume/100),scenarioProfit=profit+(scenarioRevenue-revenue)-(scenarioCost-cost);
  const recommendations=[];
  const addRecommendation=(r)=>recommendations.push(r);
  if(cats.length){
