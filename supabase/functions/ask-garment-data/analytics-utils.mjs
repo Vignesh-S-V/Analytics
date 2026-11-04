@@ -62,7 +62,7 @@ export function detectProductRankingIntent(input) {
 
   // Match explicit metric-selection phrases, not any metric anywhere in the
   // prompt. This prevents validation clauses from overriding the user's intent.
-  const profitRankPattern = /\b(?:by\s+(?:total\s+)?(?:actual\s+)?(?:profit|net profit|np)|most profitable|highest (?:actual )?profit|maximum profit|top profit|profit highest|generated the highest net profit|generated highest profit)\b/;
+  const profitRankPattern = /\b(?:by\s+(?:total\s+)?(?:recorded\s+)?(?:profit|net profit|np)|most profitable|highest (?:recorded )?profit|maximum profit|top profit|profit highest|generated the highest recorded profit|generated highest profit)\b/;
   const revenueRankPattern = /\b(?:by\s+(?:total\s+)?(?:revenue|sales)|highest (?:total )?(?:revenue|sales)|top (?:revenue|sales))\b/;
   const profitRankMatch = profitRankPattern.exec(normalizedQ);
   const revenueRankMatch = revenueRankPattern.exec(normalizedQ);
