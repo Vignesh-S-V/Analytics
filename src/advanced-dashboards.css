@@ -153,3 +153,5 @@
 .pi-evidence-status.ok{background:#eaf7f1;color:#287b5c}
 .pi-evidence-foot{display:block;margin-top:7px;color:#8995a5;font-size:9px;line-height:1.45}
 @media(max-width:700px){.pi-evidence{padding:9px}.pi-evidence-head{align-items:flex-start;flex-direction:column}.pi-evidence-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.pi-evidence-table-wrap{max-height:420px;overflow:auto}.pi-evidence-table thead{position:sticky;top:0;z-index:1}
