@@ -1064,3 +1064,5 @@ html{background:#f7f8fa;scroll-behavior:smooth}body{min-width:320px;background:#
  #root .kpi-label{font-size:10px!important}
  #root .kpi-change,#root .kpi-change b{font-size:10px!important}
 }
+
+.table-page-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.table-page-controls>span{color:#73819a}.table-bottom .table-page-controls button{padding:6px 9px;border:1px solid #34435b;border-radius:7px;background:#172238;color:#dce5f2;font-size:9px}.table-bottom .table-page-controls button:disabled{opacity:.35;cursor:not-allowed}
