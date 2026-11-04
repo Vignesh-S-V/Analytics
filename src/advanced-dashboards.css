@@ -132,3 +132,24 @@
 .pi-rec-playbook>div{padding:9px 10px;border-radius:7px;background:#edf3fa;color:#405772;font-size:11px;line-height:1.55}
 .pi-rec-playbook>small{display:block;margin-top:8px;color:#8995a4;font-size:10px;line-height:1.5}
 .pi-rec-expanded{border-color:#b9cce1!important;background:#fff!important}
+
+.pi-evidence{margin-top:12px;padding:12px;border:1px solid #dbe5f0;border-radius:9px;background:#fff}
+.pi-evidence-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:9px;color:#2c405a;font-size:11px}
+.pi-evidence-head span{color:#8492a4;font-size:10px}
+.pi-evidence-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:7px;margin:8px 0}
+.pi-evidence-summary>div{padding:9px;background:#f4f7fb;border-radius:7px;min-width:0}
+.pi-evidence-summary small{display:block;color:#77869a;font-size:9px;line-height:1.4}
+.pi-evidence-summary strong{display:block;margin-top:4px;color:#243852;font-size:14px}
+.pi-evidence-note{margin:8px 0;color:#718198;font-size:10px;line-height:1.5}
+.pi-evidence-table-wrap{width:100%;overflow-x:auto;border:1px solid #e6ebf2;border-radius:7px}
+.pi-evidence-table{width:100%;min-width:760px;border-collapse:collapse;font-size:10px;text-align:left}
+.pi-evidence-table th{padding:8px;background:#f5f7fa;color:#697b90;font-weight:750;white-space:nowrap}
+.pi-evidence-table td{padding:8px;border-top:1px solid #edf0f4;color:#40536b;white-space:nowrap;vertical-align:top}
+.pi-evidence-table td b{display:block;color:#293e59}
+.pi-evidence-table td small{display:block;margin-top:3px;color:#8995a5;font-size:9px}
+.pi-evidence-status{display:inline-block;padding:4px 6px;border-radius:5px;font-size:9px;font-weight:700}
+.pi-evidence-status.risk{background:#fff0ed;color:#b94b37}
+.pi-evidence-status.watch{background:#fff7e8;color:#986a1d}
+.pi-evidence-status.ok{background:#eaf7f1;color:#287b5c}
+.pi-evidence-foot{display:block;margin-top:7px;color:#8995a5;font-size:9px;line-height:1.45}
+@media(max-width:700px){.pi-evidence{padding:9px}.pi-evidence-head{align-items:flex-start;flex-direction:column}.pi-evidence-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
