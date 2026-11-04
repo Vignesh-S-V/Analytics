@@ -103,3 +103,8 @@
 .pi-stage.dormant{background:#eef1f5;color:#657386}
 @media(max-width:900px){.pi-trend-chart{height:270px}.pi-lifecycle-header{align-items:flex-start;flex-direction:column}.pi-lifecycle-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));width:100%}.pi-lifecycle-summary>div{min-width:0}}
 @media(max-width:560px){.pi-trend-chart{height:240px}.pi-lifecycle-summary{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+/* Product Portfolio: let the cost structure chart use the full row and reduce left-side label gutter. */
+.pi-cost-structure-panel{grid-column:1/-1;}
+.pi-cost-structure-chart{height:320px;width:100%;}
+@media(max-width:680px){.pi-cost-structure-chart{height:280px;}}
