@@ -458,3 +458,8 @@
  .exec-two-col>.adv-panel>.exec-category-chart{flex-basis:350px;height:350px;min-height:350px}
  .exec-category-chart .recharts-responsive-container{min-height:350px}
 }
+
+/* Give the forecast chart the full row width; keep the backtest panel below it. */
+.exec-forecast-row{grid-template-columns:minmax(0,1fr)}
+.exec-forecast-row>.adv-panel:first-child .exec-forecast-chart{min-height:420px}
+@media(max-width:680px){.exec-forecast-row>.adv-panel:first-child .exec-forecast-chart{min-height:300px}}
