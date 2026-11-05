@@ -13,13 +13,13 @@
 .proc-metric span{font-size:9px;color:#788394;font-weight:700;line-height:1.35}
 .proc-metric strong{font-size:clamp(16px,1.5vw,21px);line-height:1.2;color:#243b53;overflow-wrap:anywhere}
 .proc-metric small{font-size:9px;line-height:1.35;color:#8994a2}
-.proc-grid{columns:2;column-gap:14px;column-fill:balance;width:100%;min-width:0}
-.proc-panel{display:inline-block;vertical-align:top;width:100%;min-width:0;margin:0 0 14px;padding:15px;border:1px solid #e8eaf0;border-radius:14px;background:#fff;box-shadow:0 3px 10px rgba(34,48,64,.03);break-inside:avoid;page-break-inside:avoid}
+.proc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;width:100%;min-width:0;align-items:start;overflow:hidden}
+.proc-panel{display:block;width:100%;min-width:0;margin:0;padding:15px;border:1px solid #e8eaf0;border-radius:14px;background:#fff;box-shadow:0 3px 10px rgba(34,48,64,.03);break-inside:avoid;page-break-inside:avoid}
 .proc-panel-head{margin-bottom:10px}
 .proc-panel-head h3{margin:4px 0 0;color:#243b53;font-size:15px;line-height:1.3}
-.proc-chart{height:250px;width:100%;min-width:0}
+.proc-chart{height:230px;width:100%;min-width:0}
 .proc-chart.compact{height:205px}
-.proc-concentration-chart{height:215px;max-width:440px;margin:0 auto 8px}
+.proc-concentration-chart{height:230px;max-width:100%;margin:0}
 .proc-two-charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .proc-two-charts>div{min-width:0}
 .proc-two-charts h4{margin:0 0 6px;color:#59697d;font-size:10px;line-height:1.4;min-height:28px}
@@ -30,10 +30,10 @@
 .proc-summary-strip b,.proc-inline-kpis b,.proc-risk-kpis b{font-size:13px;line-height:1.3;color:#243b53;overflow-wrap:anywhere}
 .proc-up{color:#27805c!important}.proc-down{color:#bd493c!important}
 .proc-note{margin:8px 0 0;color:#7d8794;font-size:9px;line-height:1.5}
-.proc-table-wrap{max-width:100%;overflow:auto;overscroll-behavior-inline:contain}
-.proc-table{width:100%;min-width:650px;border-collapse:collapse;table-layout:auto;font-size:10px;white-space:nowrap}
-.proc-table th{padding:8px 7px;text-align:left;color:#788394;font-size:8px;font-weight:700;letter-spacing:.02em;border-bottom:1px solid #e9edf2}
-.proc-table td{padding:8px 7px;color:#405168;border-bottom:1px solid #eef0f3;line-height:1.35}
+.proc-table-wrap{width:100%;max-width:100%;overflow-x:hidden;overscroll-behavior-inline:contain}
+.proc-table{width:100%;min-width:0;border-collapse:collapse;table-layout:fixed;font-size:10px;white-space:normal}
+.proc-table th{padding:8px 6px;overflow-wrap:anywhere;text-align:left;color:#788394;font-size:8px;font-weight:700;letter-spacing:.02em;border-bottom:1px solid #e9edf2}
+.proc-table td{padding:8px 6px;overflow-wrap:anywhere;color:#405168;border-bottom:1px solid #eef0f3;line-height:1.35}
 .proc-table tbody tr:hover{background:#fff8f2}
 .proc-table td:first-child{font-weight:600;color:#334960}
 .proc-empty{text-align:center;color:#8a94a2!important;padding:18px!important}
@@ -45,7 +45,7 @@
 .proc-required-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:9px}
 .proc-required-grid>div{display:flex;align-items:center;gap:7px;padding:8px;border-radius:8px;background:#f7f9fc;color:#607087;font-size:9px;line-height:1.35;min-width:0}
 .proc-required-grid svg{flex:none;color:#e07842}
-.proc-actions{display:grid;gap:8px}
+.proc-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .proc-actions article{padding:10px 11px;border:1px solid #e9edf2;border-radius:10px;background:#fcfdff}
 .proc-actions article>div{display:flex;align-items:center;gap:7px;margin-bottom:6px;flex-wrap:wrap}
 .proc-actions article>div span{padding:3px 7px;border-radius:15px;background:#fff3e9;color:#b65e2c;font-size:8px;font-weight:800;text-transform:uppercase}
@@ -54,5 +54,10 @@
 .proc-actions article>small{display:block;margin-top:4px;color:#7c8795;font-size:8px}
 .proc-actions article>p{margin:5px 0 0;color:#7d8794;font-size:9px;line-height:1.45}
 @media(max-width:1200px){.proc-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media(max-width:900px){.proc-grid{columns:1}.proc-two-charts{grid-template-columns:1fr}.proc-two-charts h4{min-height:0}.proc-source-status{margin-left:56px}}
-@media(max-width:600px){.proc-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.proc-metric{padding:11px 9px 10px 13px}.proc-summary-strip,.proc-inline-kpis,.proc-risk-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.proc-required-grid{grid-template-columns:1fr}.proc-panel{padding:12px;margin-bottom:10px}.proc-hero{padding:13px;align-items:flex-start;flex-wrap:wrap}.proc-hero h2{font-size:18px}.proc-source-status{margin-left:55px}.proc-chart{height:220px}.proc-concentration-chart{height:200px}.proc-table{min-width:620px}}
+@media(max-width:900px){.proc-grid{grid-template-columns:1fr}.proc-two-charts{grid-template-columns:1fr}.proc-two-charts h4{min-height:0}.proc-actions{grid-template-columns:1fr}.proc-concentration-layout{grid-template-columns:1fr}.proc-source-status{margin-left:56px}}
+.proc-panel-01,.proc-panel-06,.proc-panel-08{grid-column:1/-1}.proc-concentration-layout{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:12px;align-items:center}.proc-panel-01 .proc-table th,.proc-panel-01 .proc-table td{font-size:9px;padding:7px 5px}.proc-panel-01 .proc-table th:first-child,.proc-panel-01 .proc-table td:first-child{width:25%}.proc-panel-06 .proc-table{font-size:9px}.proc-panel-06 .proc-table th,.proc-panel-06 .proc-table td{padding:7px 5px}
+@media(max-width:600px){.proc-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.proc-metric{padding:11px 9px 10px 13px}.proc-summary-strip,.proc-inline-kpis,.proc-risk-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.proc-required-grid{grid-template-columns:1fr}.proc-panel{padding:12px}.proc-hero{padding:13px;align-items:flex-start;flex-wrap:wrap}.proc-hero h2{font-size:18px}.proc-source-status{margin-left:55px}.proc-chart{height:210px}.proc-concentration-chart{height:190px}.proc-concentration-layout{grid-template-columns:1fr}.proc-panel-01 .proc-table{font-size:8px}.proc-panel-01 .proc-table th,.proc-panel-01 .proc-table td{padding:6px 3px}}
+
+.proc-workspace,.proc-grid,.proc-panel{box-sizing:border-box;max-width:100%;}
+.proc-panel-01{grid-column:1/-1}.proc-panel-06,.proc-panel-08{grid-column:1/-1}
+.proc-panel-02 .proc-note,.proc-panel-03 .proc-note,.proc-panel-04 .proc-note,.proc-panel-05 .proc-note{display:none}
