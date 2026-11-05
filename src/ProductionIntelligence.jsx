@@ -54,8 +54,7 @@ export default function ProductionIntelligence({orders=[],live=false}){
   const overtimeRows=rows.filter(r=>num(r.overtime_hours)>0).length;
   return {rows,ordered,shipped,rejected,revenue,profit,totalCost,rework,overtime,workers,dated,onTime,actual,target,ar,costMix,styleRows,risk,orders:new Set(rows.map(r=>r.order_id).filter(Boolean)).size,latePenalty:sum(rows,'late_penalty_inr'),delayRows:rows.filter(r=>r.delay_days!=null&&r.delay_days!==''),overtimeRows};
  },[orders]);
- const topStyles=d.styleRows.slice(0,6);
- const riskRows=d.risk.slice(0,6);
+ const topStyles=d.styleRows.slice(0,5);
  const efficiencyAttainment=d.target>0&&d.actual!=null?Math.min(d.actual/d.target*100,100):0;
  const onTimePct=d.dated.length?d.onTime.length/d.dated.length*100:0;
  const overtimePct=d.rows.length?d.overtimeRows/d.rows.length*100:0;
@@ -112,7 +111,6 @@ export default function ProductionIntelligence({orders=[],live=false}){
      </div>
      <Donut centerValue={fmt(d.risk.length)} centerLabel="Flagged rows" data={[{name:'Flagged',value:d.risk.length,color:COLORS[0],display:pct(flaggedPct)},{name:'No flags',value:Math.max(0,d.rows.length-d.risk.length),color:COLORS[1],display:pct(100-flaggedPct)}]}/>
     </div>
-    <Table columns={[{k:'order_id',t:'Order'},{k:'style_id',t:'Style'},{k:'gap',t:'Efficiency gap',f:v=>v==null?'—':v.toFixed(1)+' pp'},{k:'reject',t:'Reject proxy',f:pct},{k:'late',t:'Late',f:v=>v?'Yes':'No'},{k:'score',t:'Risk'}]} rows={riskRows}/>
    </Section>
   </div>
  </div>;
