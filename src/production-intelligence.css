@@ -45,3 +45,6 @@
 @media(max-width:1250px){.pi-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.pi-panel-body{grid-template-columns:minmax(0,1fr) minmax(270px,1fr)}.pi-donut-layout{grid-template-columns:125px minmax(135px,1fr);gap:8px}.pi-legend{gap:10px}.pi-legend span{font-size:13px!important}.pi-legend b{font-size:12px!important}}
 @media(max-width:900px){.pi-grid{grid-template-columns:1fr}.pi-section{min-height:unset}}
 @media(max-width:600px){.pi-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.pi-metric{padding:10px;min-height:70px}.pi-section{padding:12px;min-height:unset}.pi-panel-body{grid-template-columns:1fr}.pi-donut-layout{grid-template-columns:125px minmax(135px,1fr);justify-content:start;padding:4px 0;gap:12px}.pi-donut-chart{width:120px;height:120px}.pi-legend span{font-size:13px!important}.pi-cost-layout{grid-template-columns:minmax(0,1fr) 96px}.pi-cost-total strong{font-size:16px}.pi-table-wrap th,.pi-table-wrap td{padding:7px 6px}}
+
+.pi-metric-note{display:block;margin-top:5px;color:#687B91;font-size:10px;font-weight:500;line-height:1.35;white-space:normal}
+.pi-workforce .pi-metric{min-height:104px}
