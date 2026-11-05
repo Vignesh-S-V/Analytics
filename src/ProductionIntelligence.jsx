@@ -41,12 +41,13 @@ export default function ProductionIntelligence({orders=[],live=false}){
    <Metric label="Rework cost / shipped pc" value={d.shipped?money(d.rework/d.shipped):'—'} note={money(d.rework)+' recorded rework cost'} tone={5} icon={Wallet}/>
   </div>
   <div className="pi-grid">
+   <div className="pi-column">
    <Section no="01" title="Production Efficiency" desc="Actual vs target efficiency and order-level performance.">
-    {d.ar.length?<><div className="pi-inline"><Metric label="Actual average" value={pct(d.actual)} note={d.ar.length+' populated rows'} tone={1}/><Metric label="Target average" value={d.target==null?'—':pct(d.target)} note={d.target==null?'No target values':'Populated target rows'} tone={2}/><Metric label="Efficiency gap" value={d.target==null?'—':(d.actual-d.target).toFixed(1)+' pp'} note="Actual less target · percentage points" tone={3}/></div><Chart><ComposedChart data={d.trend}><CartesianGrid strokeDasharray="3 4" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis/><Tooltip/><Line dataKey="actualEff" name="Actual efficiency" stroke={COLORS[0]} dot={false}/><Line dataKey="targetEff" name="Target efficiency" stroke={COLORS[2]} dot={false}/></ComposedChart></Chart></>:<Empty>Actual efficiency is not populated for these rows.</Empty>}
+    {d.ar.length?<><div className="pi-inline"><Metric label="Actual average" value={pct(d.actual)} note={d.ar.length+' populated rows'} tone={1}/><Metric label="Target average" value={d.target==null?'—':pct(d.target)} note={d.target==null?'No target values':'Populated target rows'} tone={2}/><Metric label="Efficiency gap" value={d.target==null?'—':(d.actual-d.target).toFixed(1)+' pp'} note="Actual less target · percentage points" tone={3}/></div><Chart><ComposedChart data={d.trend}><CartesianGrid strokeDasharray="3 4" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis/><Tooltip/><Line dataKey="actualEff" name="Actual efficiency" stroke={COLORS[0]} dot={false}/><Line dataKey="targetEff" name="Target efficiency" stroke={COLORS[2]} dot={false}/></ComposedChart></Chart>:null}</>:<Empty>Actual efficiency is not populated for these rows.</Empty>}
    </Section>
    <Section no="02" title="Quality & Defect Intelligence" desc="Rejection trend and rework exposure; order quantity is a proxy denominator.">
     <div className="pi-inline"><Metric label="Rejected quantity" value={fmt(d.rejected)} note="rejection_qty" tone={3}/><Metric label="Rejected / ordered qty" value={d.ordered?pct(d.rejected/d.ordered*100):'—'} note="Proxy, not inspected-unit defect rate" tone={4}/><Metric label="Rework cost" value={money(d.rework)} note="Recorded rework_cost_inr" tone={0}/></div>
-    {d.trend.length?<Chart><ComposedChart data={d.trend}><CartesianGrid strokeDasharray="3 4" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis/><YAxis yAxisId="r" orientation="right" tickFormatter={v=>v+'%'}/><Tooltip/><Bar dataKey="rejected" name="Rejected qty" fill={COLORS[0]}/><Line yAxisId="r" dataKey="reject" name="Rejected / ordered %" stroke={COLORS[2]} dot={false}/></ComposedChart></Chart>:<Empty/>}
+    {d.trend.length?<Chart><ComposedChart data={d.trend}><CartesianGrid strokeDasharray="3 4" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis/><YAxis yAxisId="r" orientation="right" tickFormatter={v=>v+'%'}/><Tooltip/><Bar dataKey="rejected" name="Rejected qty" fill={COLORS[0]}/><Line yAxisId="r" dataKey="reject" name="Rejected / ordered %" stroke={COLORS[2]} dot={false}/></ComposedChart></Chart>:null}
    </Section>
    <Section no="03" title="Delivery & Lead Time" desc="On-time shipment, late-order trend and recorded delay values.">
     <div className="pi-inline"><Metric label="On-time shipments" value={d.dated.length?pct(d.onTime.length/d.dated.length*100):'—'} note={d.onTime.length+' of '+d.dated.length+' dated orders'} tone={2}/><Metric label="Average delay days" value={d.delayRows.length?(sum(d.delayRows,'delay_days')/d.delayRows.length).toFixed(1)+' d':'—'} note="delay_days average" tone={3}/></div>
@@ -57,8 +58,10 @@ export default function ProductionIntelligence({orders=[],live=false}){
    </Section>
    <Section no="05" title="Workforce & Overtime" desc="Order-linked worker and overtime fields; not attendance or unique headcount.">
     <div className="pi-inline"><Metric label="Worker records summed" value={fmt(d.workers)} note="May repeat workers across orders" tone={1}/><Metric label="Overtime hours" value={fmt(d.overtime)} note="Order-linked overtime_hours" tone={3}/></div>
-    {d.trend.length?<Chart><BarChart data={d.trend}><CartesianGrid strokeDasharray="3 4" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis/><Tooltip/><Bar dataKey="overtime" name="Overtime hours" fill={COLORS[1]}/></BarChart></Chart>:<Empty/>}
+    {d.trend.length?<Chart><BarChart data={d.trend}><CartesianGrid strokeDasharray="3 4" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis/><Tooltip/><Bar dataKey="overtime" name="Overtime hours" fill={COLORS[1]}/></BarChart></Chart>:null}
    </Section>
+   </div>
+   <div className="pi-column">
    <Section no="06" title="Style & Product Production" desc="Style/category comparison across ordered quantity, fulfilment, rejection proxy and margin.">
     {topStyles.length?<Chart><BarChart data={topStyles} layout="vertical" margin={{left:8,right:18}}><CartesianGrid strokeDasharray="3 4" horizontal={false}/><XAxis type="number"/><YAxis type="category" dataKey="styleLabel" width={100} tick={{fontSize:9}}/><Tooltip/><Bar dataKey="ordered" name="Ordered quantity" fill={COLORS[1]}/></BarChart></Chart>:<Empty/>}
     <Table columns={[{k:'styleLabel',t:'Style / category'},{k:'ordered',t:'Ordered',f:fmt},{k:'fill',t:'Fill rate',f:pct},{k:'reject',t:'Reject proxy',f:pct},{k:'margin',t:'Margin',f:pct}]} rows={topStyles}/>
@@ -76,6 +79,7 @@ export default function ProductionIntelligence({orders=[],live=false}){
     {d.trend.length?<Chart><ComposedChart data={d.trend}><CartesianGrid strokeDasharray="3 4" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis/><Tooltip/><Bar dataKey="ordered" name="Ordered qty" fill={COLORS[1]}/><Bar dataKey="shipped" name="Shipped qty" fill={COLORS[0]}/></ComposedChart></Chart>:<Empty/>}
     <Table columns={[{k:'country',t:'Country'},{k:'orders',t:'Orders',f:fmt},{k:'ordered',t:'Ordered qty',f:fmt},{k:'shipped',t:'Shipped qty',f:fmt},{k:'fill',t:'Fulfilment',f:pct}]} rows={d.countryRows}/>
    </Section>
+   </div>
    </div>
  </div>;
 }
