@@ -1,10 +1,9 @@
 import React, { useMemo } from 'react';
-import { AlertTriangle, CheckCircle2, Clock3, Factory, PackageSearch, ShieldAlert, TrendingUp } from 'lucide-react';
-import { Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { CheckCircle2, PackageSearch } from 'lucide-react';
+import { Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import './procurement-intelligence.css';
 
 const PALETTE=['#E07842','#243B53','#2A9D8F','#8A5A83','#E9C46A','#577590','#B85C38','#6D9773'];
-const total=(rows,key)=>rows.reduce((s,r)=>s+Number(r?.[key]||0),0);
 const money=v=>{const n=Number(v||0),a=Math.abs(n),f=x=>Number(x.toFixed(1)).toLocaleString('en-IN',{maximumFractionDigits:1});return '₹'+(a>=1e7?f(n/1e7)+' Cr':a>=1e5?f(n/1e5)+' Lakh':a>=1e3?f(n/1e3)+' Thousand':n.toLocaleString('en-IN',{maximumFractionDigits:1}))};
 const percent=v=>Number.isFinite(v)?v.toFixed(1)+'%':'—';
 const monthKey=v=>String(v||'').slice(0,7);
