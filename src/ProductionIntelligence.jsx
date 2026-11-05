@@ -43,41 +43,32 @@ export default function ProductionIntelligence({orders=[],live=false}){
   <div className="pi-grid">
    <div className="pi-column">
    <Section no="01" title="Production Efficiency" desc="Actual vs target efficiency and order-level performance.">
-    {d.ar.length?<><div className="pi-inline"><Metric label="Actual average" value={pct(d.actual)} note={d.ar.length+' populated rows'} tone={1}/><Metric label="Target average" value={d.target==null?'—':pct(d.target)} note={d.target==null?'No target values':'Populated target rows'} tone={2}/><Metric label="Efficiency gap" value={d.target==null?'—':(d.actual-d.target).toFixed(1)+' pp'} note="Actual less target · percentage points" tone={3}/></div><Chart><ComposedChart data={d.trend}><CartesianGrid strokeDasharray="3 4" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis/><Tooltip/><Line dataKey="actualEff" name="Actual efficiency" stroke={COLORS[0]} dot={false}/><Line dataKey="targetEff" name="Target efficiency" stroke={COLORS[2]} dot={false}/></ComposedChart></Chart>:null}</>:<Empty>Actual efficiency is not populated for these rows.</Empty>}
+    {d.ar.length?<><div className="pi-inline"><Metric label="Actual average" value={pct(d.actual)} note={d.ar.length+' populated rows'} tone={1}/><Metric label="Target average" value={d.target==null?'—':pct(d.target)} note={d.target==null?'No target values':'Populated target rows'} tone={2}/><Metric label="Efficiency gap" value={d.target==null?'—':(d.actual-d.target).toFixed(1)+' pp'} note="Actual less target · percentage points" tone={3}/></div>{d.trend.length?<Chart><ComposedChart data={d.trend}><CartesianGrid strokeDasharray="3 4" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis/><Tooltip/><Line dataKey="actualEff" name="Actual efficiency" stroke={COLORS[0]} dot={false}/><Line dataKey="targetEff" name="Target efficiency" stroke={COLORS[2]} dot={false}/></ComposedChart></Chart>:null}</>:null}}
    </Section>
+   <Section no="03" title="Delivery & Lead Time" desc="On-time shipment, late-order trend and recorded delay values.">
+    <div className="pi-inline"><Metric label="On-time shipments" value={d.dated.length?pct(d.onTime.length/d.dated.length*100):'—'} note={d.onTime.length+' of '+d.dated.length+' dated orders'} tone={2}/><Metric label="Average delay days" value={d.delayRows.length?(sum(d.delayRows,'delay_days')/d.delayRows.length).toFixed(1)+' d':'—'} note="delay_days average" tone={3}/></div>
+    {d.trend.length?<Chart><ComposedChart data={d.trend}><CartesianGrid strokeDasharray="3 4" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis/><YAxis yAxisId="r" orientation="right" tickFormatter={v=>v+'%'}/><Tooltip/><Bar dataKey="late" name="Late dated shipments" fill={COLORS[0]}/><Line yAxisId="r" dataKey="latePct" name="Late share" stroke={COLORS[2]} dot={false}/></ComposedChart></Chart>:null}
+   </Section>
+   <Section no="05" title="Workforce & Overtime" desc="Order-linked worker and overtime fields; not attendance or unique headcount.">
+    <div className="pi-inline"><Metric label="Worker records summed" value={fmt(d.workers)} note="May repeat workers across orders" tone={1}/><Metric label="Overtime hours" value={fmt(d.overtime)} note="Order-linked overtime_hours" tone={3}/></div>
+    
+   </Section>
+   </div>
+   <div className="pi-column">
    <Section no="02" title="Quality & Defect Intelligence" desc="Rejection trend and rework exposure; order quantity is a proxy denominator.">
     <div className="pi-inline"><Metric label="Rejected quantity" value={fmt(d.rejected)} note="rejection_qty" tone={3}/><Metric label="Rejected / ordered qty" value={d.ordered?pct(d.rejected/d.ordered*100):'—'} note="Proxy, not inspected-unit defect rate" tone={4}/><Metric label="Rework cost" value={money(d.rework)} note="Recorded rework_cost_inr" tone={0}/></div>
     {d.trend.length?<Chart><ComposedChart data={d.trend}><CartesianGrid strokeDasharray="3 4" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis/><YAxis yAxisId="r" orientation="right" tickFormatter={v=>v+'%'}/><Tooltip/><Bar dataKey="rejected" name="Rejected qty" fill={COLORS[0]}/><Line yAxisId="r" dataKey="reject" name="Rejected / ordered %" stroke={COLORS[2]} dot={false}/></ComposedChart></Chart>:null}
    </Section>
-   <Section no="03" title="Delivery & Lead Time" desc="On-time shipment, late-order trend and recorded delay values.">
-    <div className="pi-inline"><Metric label="On-time shipments" value={d.dated.length?pct(d.onTime.length/d.dated.length*100):'—'} note={d.onTime.length+' of '+d.dated.length+' dated orders'} tone={2}/><Metric label="Average delay days" value={d.delayRows.length?(sum(d.delayRows,'delay_days')/d.delayRows.length).toFixed(1)+' d':'—'} note="delay_days average" tone={3}/></div>
-    {d.trend.length?<Chart><ComposedChart data={d.trend}><CartesianGrid strokeDasharray="3 4" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis/><YAxis yAxisId="r" orientation="right" tickFormatter={v=>v+'%'}/><Tooltip/><Bar dataKey="late" name="Late dated shipments" fill={COLORS[0]}/><Line yAxisId="r" dataKey="latePct" name="Late share" stroke={COLORS[2]} dot={false}/></ComposedChart></Chart>:<Empty/>}
-   </Section>
    <Section no="04" title="Manufacturing Cost Intelligence" desc="Extended unit-cost components weighted by shipped quantity, with order quantity fallback.">
     {d.costMix.length?<><Chart height={210}><BarChart data={d.costMix} layout="vertical" margin={{left:8,right:20}}><CartesianGrid strokeDasharray="3 4" horizontal={false}/><XAxis type="number" tickFormatter={money}/><YAxis type="category" dataKey="name" width={75}/><Tooltip formatter={money}/><Bar dataKey="value" name="Extended component cost" radius={[0,4,4,0]}>{d.costMix.map((x,i)=><Cell key={x.name} fill={COLORS[i%COLORS.length]}/>)}</Bar></BarChart></Chart><div className="pi-cost-total"><span>Extended component cost</span><b>{money(d.costMix.reduce((a,x)=>a+x.value,0))}</b></div></>:<Empty>Cost-per-piece components are not populated.</Empty>}
    </Section>
-   <Section no="05" title="Workforce & Overtime" desc="Order-linked worker and overtime fields; not attendance or unique headcount.">
-    <div className="pi-inline"><Metric label="Worker records summed" value={fmt(d.workers)} note="May repeat workers across orders" tone={1}/><Metric label="Overtime hours" value={fmt(d.overtime)} note="Order-linked overtime_hours" tone={3}/></div>
-    {d.trend.length?<Chart><BarChart data={d.trend}><CartesianGrid strokeDasharray="3 4" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis/><Tooltip/><Bar dataKey="overtime" name="Overtime hours" fill={COLORS[1]}/></BarChart></Chart>:null}
-   </Section>
-   </div>
-   <div className="pi-column">
    <Section no="06" title="Style & Product Production" desc="Style/category comparison across ordered quantity, fulfilment, rejection proxy and margin.">
     {topStyles.length?<Chart><BarChart data={topStyles} layout="vertical" margin={{left:8,right:18}}><CartesianGrid strokeDasharray="3 4" horizontal={false}/><XAxis type="number"/><YAxis type="category" dataKey="styleLabel" width={100} tick={{fontSize:9}}/><Tooltip/><Bar dataKey="ordered" name="Ordered quantity" fill={COLORS[1]}/></BarChart></Chart>:<Empty/>}
     <Table columns={[{k:'styleLabel',t:'Style / category'},{k:'ordered',t:'Ordered',f:fmt},{k:'fill',t:'Fill rate',f:pct},{k:'reject',t:'Reject proxy',f:pct},{k:'margin',t:'Margin',f:pct}]} rows={topStyles}/>
    </Section>
-   <Section no="07" title="Production Profitability" desc="Recorded revenue, cost and profit; margin is weighted by revenue.">
-    <div className="pi-inline"><Metric label="Revenue" value={money(d.revenue)} note="Selected order rows" tone={0}/><Metric label="Recorded profit" value={money(d.profit)} note={d.revenue?pct(d.profit/d.revenue*100)+' margin':'Margin unavailable'} tone={2}/><Metric label="Total cost" value={money(d.totalCost)} note="total_cost_inr" tone={3}/></div>
-    <Chart height={205}><BarChart data={[{name:'Revenue',value:d.revenue},{name:'Cost',value:d.totalCost},{name:'Profit',value:d.profit}]}><CartesianGrid strokeDasharray="3 4" vertical={false}/><XAxis dataKey="name"/><YAxis tickFormatter={money}/><Tooltip formatter={money}/><Bar dataKey="value" name="INR" radius={[4,4,0,0]}>{[0,1,2].map(i=><Cell key={i} fill={COLORS[i]}/>)}</Bar></BarChart></Chart>
-   <Table columns={[{k:'order_id',t:'Order'},{k:'style_id',t:'Style'},{k:'revenue_inr',t:'Revenue',f:money},{k:'total_cost_inr',t:'Cost',f:money},{k:'profit_inr',t:'Profit',f:money}]} rows={[...d.rows].sort((a,b)=>num(a.profit_inr)-num(b.profit_inr))}/>
-   </Section>
    <Section no="08" title="Production Risk & Exceptions" desc="Transparent rule-based flags: delay, below-target efficiency, rejection proxy and recorded penalty.">
     <div className="pi-inline"><Metric label="Flagged orders" value={fmt(d.risk.length)} note="One or more rules triggered" tone={3}/><Metric label="Late penalty exposure" value={money(d.latePenalty)} note="Recorded late_penalty_inr" tone={4}/></div>
     <Table columns={[{k:'order_id',t:'Order'},{k:'style_id',t:'Style'},{k:'gap',t:'Efficiency gap',f:v=>v==null?'—':v.toFixed(1)+' pp'},{k:'reject',t:'Reject proxy',f:pct},{k:'late',t:'Late',f:v=>v?'Yes':'No'},{k:'score',t:'Risk score'}]} rows={risk}/>
-   </Section>
-   <Section no="09" title="Production Volume & Fulfilment" desc="Ordered vs shipped quantity over time and fulfilment by country.">
-    {d.trend.length?<Chart><ComposedChart data={d.trend}><CartesianGrid strokeDasharray="3 4" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis/><Tooltip/><Bar dataKey="ordered" name="Ordered qty" fill={COLORS[1]}/><Bar dataKey="shipped" name="Shipped qty" fill={COLORS[0]}/></ComposedChart></Chart>:<Empty/>}
-    <Table columns={[{k:'country',t:'Country'},{k:'orders',t:'Orders',f:fmt},{k:'ordered',t:'Ordered qty',f:fmt},{k:'shipped',t:'Shipped qty',f:fmt},{k:'fill',t:'Fulfilment',f:pct}]} rows={d.countryRows}/>
    </Section>
    </div>
    </div>
