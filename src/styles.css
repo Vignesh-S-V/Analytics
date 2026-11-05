@@ -1125,3 +1125,54 @@ html{background:#f7f8fa;scroll-behavior:smooth}body{min-width:320px;background:#
 }
 #root .marketing-table-wrap .marketing-table tbody tr{height:38px;}
 @media(max-width:680px){#root .marketing-table-wrap{max-height:420px;}}
+
+
+/* Marketing ROI Action Centre — larger, decision-oriented typography and controls */
+#root .marketing-section-head h2{font-size:22px;line-height:1.3}
+#root .marketing-section-head p{font-size:13px;line-height:1.6}
+#root .marketing-action-centre{display:grid;gap:17px;padding:19px}
+#root .marketing-action-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+#root .marketing-action-summary>div{display:grid;gap:6px;min-width:0;padding:15px 16px;border:1px solid #e1e9f3;border-radius:12px;background:#f8fafd}
+#root .marketing-action-summary span{font-size:13px;font-weight:750;color:#52647e}
+#root .marketing-action-summary strong{font-size:25px;line-height:1.2;color:#1d3150;overflow-wrap:anywhere}
+#root .marketing-action-summary small{font-size:12px;line-height:1.5;color:#7a899e}
+#root .marketing-action-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:2px 1px}
+#root .marketing-action-toolbar>div:first-child{display:grid;gap:4px}
+#root .marketing-action-toolbar>div:first-child b{font-size:15px;color:#263b57}
+#root .marketing-action-toolbar>div:first-child span{font-size:12px;color:#78889e}
+#root .marketing-action-filters{display:flex;gap:7px;flex-wrap:wrap}
+#root .marketing-action-filters button{border:1px solid #d9e3ef;border-radius:9px;background:#fff;padding:9px 13px;color:#52647e;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+#root .marketing-action-filters button:hover{border-color:#ed9a6c;color:#ad552b}
+#root .marketing-action-filters button.active{background:#fff1e8;border-color:#f1b28d;color:#b85c2c}
+#root .marketing-action-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:14px;align-items:stretch}
+#root .marketing-action-card{display:flex;flex-direction:column;gap:12px;min-width:0;padding:18px;border:1px solid #dfe7f1;border-left:5px solid #93a4b8;border-radius:13px;background:#fff;box-shadow:0 3px 12px rgba(31,53,79,.045)}
+#root .marketing-action-card.is-p1{border-left-color:#d65c51}
+#root .marketing-action-card.is-p2{border-left-color:#e39a42}
+#root .marketing-action-card.is-opportunity{border-left-color:#2a9d8f}
+#root .marketing-action-card-top{display:flex;align-items:center;justify-content:space-between;gap:9px;flex-wrap:wrap}
+#root .marketing-action-category{font-size:12px;font-weight:800;letter-spacing:.2px;color:#63748c}
+#root .marketing-priority{padding:6px 9px;border-radius:7px;font-size:11px;font-weight:850;letter-spacing:.35px}
+#root .marketing-priority.p1{background:#fff0ef;color:#b53d36}
+#root .marketing-priority.p2{background:#fff6e9;color:#9d641b}
+#root .marketing-priority.opportunity{background:#eaf8f4;color:#187b6c}
+#root .marketing-action-card h3{margin:0;color:#213751;font-size:17px;line-height:1.45}
+#root .marketing-action-evidence-value{display:block;color:#315f8e;font-size:15px;line-height:1.55}
+#root .marketing-action-evidence,#root .marketing-action-next{padding:11px 12px;border-radius:9px;background:#f7f9fc}
+#root .marketing-action-evidence b,#root .marketing-action-next b{display:block;margin-bottom:5px;color:#52647e;font-size:12px;text-transform:uppercase;letter-spacing:.45px}
+#root .marketing-action-evidence p,#root .marketing-action-next p{margin:0;color:#566982;font-size:13px;line-height:1.65}
+#root .marketing-action-next{background:#f2f7fb}
+#root .marketing-action-next b{color:#315f8e}
+#root .marketing-action-empty{grid-column:1/-1;padding:25px;text-align:center;border:1px dashed #d7e1ed;border-radius:11px;color:#71819a;font-size:14px}
+#root .marketing-action-footnote{margin:0;padding:13px 14px;border-radius:9px;background:#fbf8f4;color:#7d6a58;font-size:12px;line-height:1.7}
+@media(max-width:900px){#root .marketing-action-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){
+ #root .marketing-action-centre{padding:13px}
+ #root .marketing-action-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+ #root .marketing-action-summary>div{padding:12px}
+ #root .marketing-action-summary strong{font-size:21px}
+ #root .marketing-action-toolbar{align-items:flex-start}
+ #root .marketing-action-filters{width:100%}
+ #root .marketing-action-filters button{flex:1;padding:9px 7px;font-size:12px}
+ #root .marketing-action-card{padding:14px}
+ #root .marketing-action-card h3{font-size:16px}
+}
