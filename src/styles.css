@@ -1176,3 +1176,54 @@ html{background:#f7f8fa;scroll-behavior:smooth}body{min-width:320px;background:#
  #root .marketing-action-card{padding:14px}
  #root .marketing-action-card h3{font-size:16px}
 }
+
+
+/* Marketing ROI — evidence-led channel budget decision cards */
+#root .marketing-budget-panel{display:flex;flex-direction:column;gap:15px}
+#root .marketing-budget-benchmark{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+#root .marketing-budget-benchmark>div{display:grid;gap:6px;min-width:0;padding:13px 14px;border:1px solid #e1e9f3;border-radius:10px;background:#f7f9fc}
+#root .marketing-budget-benchmark span{font-size:12px;font-weight:750;color:#64758d}
+#root .marketing-budget-benchmark strong{font-size:22px;line-height:1.25;color:#203753;overflow-wrap:anywhere}
+#root .marketing-budget-benchmark small{font-size:11px;line-height:1.45;color:#8290a3}
+#root .marketing-budget-legend{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+#root .marketing-budget-legend>b{font-size:15px;color:#263b57}
+#root .marketing-budget-filters{display:flex;gap:7px;flex-wrap:wrap}
+#root .marketing-budget-filters button{padding:8px 11px;border:1px solid #dce5ef;border-radius:8px;background:#fff;color:#596b82;font-size:11px;font-weight:750;cursor:pointer}
+#root .marketing-budget-filters button.active{background:#fff1e8;border-color:#efbd9f;color:#b85c2c}
+#root .marketing-budget-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:stretch}
+#root .marketing-budget-card{display:flex;flex-direction:column;gap:12px;min-width:0;padding:15px;border:1px solid #e2e9f2;border-radius:12px;background:#fff}
+#root .marketing-budget-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+#root .marketing-budget-card-head>div{display:grid;gap:8px;min-width:0}
+#root .marketing-budget-card-head h4{margin:0;color:#243b53;font-size:16px;line-height:1.35;overflow-wrap:anywhere}
+#root .marketing-budget-status{width:max-content;max-width:100%;padding:6px 9px;border-radius:7px;font-size:10px;font-weight:850;line-height:1.25}
+#root .marketing-budget-status.above{background:#e8f7ef;color:#147c50}
+#root .marketing-budget-status.below{background:#fff0e9;color:#b5532d}
+#root .marketing-budget-status.check{background:#fff5e5;color:#9b681d}
+#root .marketing-budget-status.neutral{background:#edf3f8;color:#526981}
+#root .marketing-budget-roas{display:flex;align-items:baseline;gap:5px;flex:none;color:#203753;font-size:24px;line-height:1.1}
+#root .marketing-budget-roas small{font-size:10px;font-weight:800;color:#7b899c}
+#root .marketing-budget-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px 8px;padding:11px 0;border-top:1px solid #edf1f6;border-bottom:1px solid #edf1f6}
+#root .marketing-budget-metrics>div{display:grid;gap:4px;min-width:0}
+#root .marketing-budget-metrics span{font-size:10px;line-height:1.35;color:#7c8ba0}
+#root .marketing-budget-metrics b{font-size:13px;line-height:1.35;color:#2a405c;overflow-wrap:anywhere}
+#root .marketing-budget-share{display:grid;gap:6px}
+#root .marketing-budget-share-label{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#64758d}
+#root .marketing-budget-share-label b{color:#304762}
+#root .marketing-budget-track{height:7px;border-radius:20px;background:#edf2f7;overflow:hidden}
+#root .marketing-budget-track i{display:block;height:100%;border-radius:20px}
+#root .marketing-budget-track i.spend{background:#e07842}
+#root .marketing-budget-track i.value{background:#2a9d8f}
+#root .marketing-budget-vs{display:flex;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:8px;background:#f6f8fb;font-size:12px;color:#65768d}
+#root .marketing-budget-vs b{font-size:13px}
+#root .marketing-budget-next{padding:10px 11px;border-radius:8px;background:#f4f8fc}
+#root .marketing-budget-next b{display:block;margin-bottom:5px;font-size:11px;color:#315f8e;text-transform:uppercase;letter-spacing:.3px}
+#root .marketing-budget-next p{margin:0;font-size:12px;line-height:1.6;color:#566982}
+@media(max-width:850px){#root .marketing-budget-cards{grid-template-columns:1fr}}
+@media(max-width:600px){
+ #root .marketing-budget-benchmark{grid-template-columns:1fr}
+ #root .marketing-budget-benchmark strong{font-size:20px}
+ #root .marketing-budget-filters{width:100%}
+ #root .marketing-budget-filters button{flex:1;padding:8px 6px}
+ #root .marketing-budget-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #root .marketing-budget-card{padding:12px}
+}
