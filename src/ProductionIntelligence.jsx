@@ -8,8 +8,8 @@ const fmt=v=>Number(v||0).toLocaleString('en-IN',{maximumFractionDigits:1});
 const pct=v=>Number.isFinite(v)?v.toFixed(1)+'%':'—';
 const money=v=>{const x=num(v),a=Math.abs(x),f=n=>Number(n.toFixed(1)).toLocaleString('en-IN');return '₹'+(a>=1e7?f(x/1e7)+' Cr':a>=1e5?f(x/1e5)+' Lakh':a>=1e3?f(x/1e3)+' K':fmt(x))};
 const monthLabel=k=>{const [y,m]=k.split('-').map(Number);return new Date(Date.UTC(y,m-1,1)).toLocaleDateString('en-IN',{month:'short',year:'2-digit',timeZone:'UTC'})};
-function Metric({label,value,note,tone=0,icon:Icon}){return <article className="pi-metric" style={{'--tone':COLORS[tone%COLORS.length]}}><div><span>{label}</span>{Icon&&<Icon size={16}/>}</div><strong>{value}</strong><small>{note}</small></article>}
-function Section({no,title,desc,wide=false,children}){return <section className={'pi-section'+(wide?' wide':'')}><header><span>{no} · PRODUCTION INTELLIGENCE</span><h2>{title}</h2><p>{desc}</p></header>{children}</section>}
+function Metric({label,value,note,tone=0,icon:Icon}){return <article className="pi-metric" style={{'--tone':COLORS[tone%COLORS.length]}}><div><span>{label}</span>{Icon&&<Icon size={16}/>}</div><strong>{value}</strong></article>}
+function Section({no,title,desc,wide=false,children}){return <section className={'pi-section'+(wide?' wide':'')}><header><span>{no} · PRODUCTION</span><h2>{title}</h2></header>{children}</section>}
 function Chart({children,height=225}){return <div className="pi-chart" style={{height}}><ResponsiveContainer width="100%" height="100%">{children}</ResponsiveContainer></div>}
 function Empty({children='Not available in the current source data.'}){return <div className="pi-empty">{children}</div>}
 function Table({columns,rows}){return <div className="pi-table-wrap"><table><thead><tr>{columns.map(c=><th key={c.k}>{c.t}</th>)}</tr></thead><tbody>{rows.length?rows.slice(0,8).map((r,i)=><tr key={r.order_id||r.styleLabel||r.country||i}>{columns.map(c=><td key={c.k}>{c.f?c.f(r[c.k],r):(r[c.k]??'—')}</td>)}</tr>):<tr><td colSpan={columns.length}>No matching records.</td></tr>}</tbody></table></div>}
@@ -32,8 +32,7 @@ export default function ProductionIntelligence({orders=[],live=false}){
  },[orders]);
  const topStyles=d.styleRows.slice(0,8),risk=d.risk.slice(0,8),liveData=live&&d.rows.length>0;
  return <div className="production-intel">
-  <section className="pi-hero"><div className="pi-hero-icon"><Factory size={22}/></div><div><span>FACTORY PERFORMANCE · QUALITY · COST · DELIVERY</span><h2>Production Intelligence</h2><p>One-page operational view of production-linked order performance, quality, cost structure and delivery risk.</p></div><div className="pi-live"><i/> {liveData?'Live workspace data':'Awaiting source data'}</div></section>
-  <div className="pi-kpis">
+   <div className="pi-kpis">
    <Metric label="Distinct orders" value={fmt(d.orders)} note={fmt(d.rows.length)+' source rows'} icon={PackageCheck}/>
    <Metric label="Ordered / shipped qty" value={fmt(d.ordered)+' / '+fmt(d.shipped)} note={'Fulfilment '+pct(d.ordered?d.shipped/d.ordered*100:NaN)} tone={1} icon={TrendingUp}/>
    <Metric label="Actual efficiency" value={d.actual==null?'—':pct(d.actual)} note={d.target==null?'Target unavailable':'Target '+pct(d.target)} tone={2} icon={Gauge}/>
@@ -77,11 +76,6 @@ export default function ProductionIntelligence({orders=[],live=false}){
     {d.trend.length?<Chart><ComposedChart data={d.trend}><CartesianGrid strokeDasharray="3 4" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis/><Tooltip/><Bar dataKey="ordered" name="Ordered qty" fill={COLORS[1]}/><Bar dataKey="shipped" name="Shipped qty" fill={COLORS[0]}/></ComposedChart></Chart>:<Empty/>}
     <Table columns={[{k:'country',t:'Country'},{k:'orders',t:'Orders',f:fmt},{k:'ordered',t:'Ordered qty',f:fmt},{k:'shipped',t:'Shipped qty',f:fmt},{k:'fill',t:'Fulfilment',f:pct}]} rows={d.countryRows}/>
    </Section>
-   <Section no="10" title="Factory Executive Command Centre" desc="Management scorecard and priority orders for review." wide>
-    <div className="pi-exec-grid"><div><span>EFFICIENCY</span><b>{d.actual==null?'—':pct(d.actual)}</b><small>{d.target==null?'Target missing':(d.actual>=d.target?'At / above':'Below')+' target '+pct(d.target)}</small></div><div><span>QUALITY PROXY</span><b>{d.ordered?pct(d.rejected/d.ordered*100):'—'}</b><small>Rejected ÷ ordered quantity</small></div><div><span>DELIVERY</span><b>{d.dated.length?pct(d.onTime.length/d.dated.length*100):'—'}</b><small>Dated shipments only</small></div><div><span>PROFIT MARGIN</span><b>{d.revenue?pct(d.profit/d.revenue*100):'—'}</b><small>Recorded profit ÷ revenue</small></div></div>
-    <div className="pi-actions">{risk.slice(0,6).map((r,i)=><article key={r.order_id||i}><AlertTriangle size={15}/><div><b>Review order {r.order_id||'—'}</b><small>{[r.late?'Late shipment':'',r.gap!==null&&r.gap<0?'Below target efficiency':'',r.reject!==null&&r.reject>3?'High rejection proxy':'',num(r.late_penalty_inr)>0?'Penalty recorded':''].filter(Boolean).join(' · ')}</small></div><strong>{money(r.late_penalty_inr)}</strong></article>)}{!risk.length&&<Empty>No active exception rules for this selection.</Empty>}</div>
-   </Section>
-  </div>
-  <aside className="pi-note"><AlertTriangle size={15}/><span><b>Data limitations:</b> Rejection uses order quantity as a proxy because produced/inspected quantity is unavailable. Worker values are summed order-level records, not unique headcount. Efficiency is an unweighted average of populated order rows. OEE, machine utilization, capacity, line output and daily production cannot be calculated without machine, downtime, operation and production-date data.</span></aside>
+   </div>
  </div>;
 }
