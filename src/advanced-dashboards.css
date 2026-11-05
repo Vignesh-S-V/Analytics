@@ -463,3 +463,10 @@
 .exec-forecast-row{grid-template-columns:minmax(0,1fr)}
 .exec-forecast-row>.adv-panel:first-child .exec-forecast-chart{min-height:420px}
 @media(max-width:680px){.exec-forecast-row>.adv-panel:first-child .exec-forecast-chart{min-height:300px}}
+
+/* Executive performance chart: use the complete row and available vertical space. */
+.exec-performance-row{grid-template-columns:minmax(0,1fr)!important;align-items:stretch}
+.exec-performance-row>.adv-panel{width:100%;min-width:0}
+.exec-performance-chart{width:100%;height:440px;min-height:440px}
+.exec-performance-chart .recharts-responsive-container{width:100%!important;height:100%!important}
+@media(max-width:680px){.exec-performance-chart{height:320px;min-height:320px}}
