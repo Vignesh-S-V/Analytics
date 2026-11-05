@@ -401,3 +401,20 @@
 @media(max-width:1100px){.exec-mini-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:850px){.exec-two-col{grid-template-columns:1fr}.exec-mini-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.exec-mini-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.exec-target-kpis,.exec-concentration,.exec-backtest{grid-template-columns:1fr 1fr}.exec-alerts{grid-template-columns:1fr}.exec-section-title h3{font-size:17px}}
+
+
+/* Executive page: fill the available width without stretched empty panels. */
+.exec-metric-grid{width:100%;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.exec-two-col{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+.exec-two-col>.adv-panel{width:100%;height:auto;min-width:0;align-self:start}
+.exec-analytics>.adv-panel{width:100%;min-width:0}
+.exec-analytics .adv-table-wrap{width:100%;max-width:100%;min-width:0;max-height:none;overflow-x:auto!important;overflow-y:visible!important}
+.exec-analytics .adv-table{width:100%!important;min-width:0!important;table-layout:auto!important;white-space:normal!important}
+.exec-analytics .adv-table th,.exec-analytics .adv-table td{white-space:normal!important;overflow-wrap:anywhere;vertical-align:middle}
+.exec-analytics .adv-chart{min-height:250px}
+.exec-analytics .recharts-legend-wrapper{font-size:11px}
+.exec-analytics .recharts-default-legend{display:flex;justify-content:center;flex-wrap:wrap;gap:6px 14px}
+.exec-analytics .adv-panel{min-width:0}
+@media(max-width:1050px){.exec-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:850px){.exec-two-col{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:560px){.exec-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.exec-analytics .adv-panel{padding:14px}.exec-analytics .adv-chart{min-height:230px}}
