@@ -511,9 +511,9 @@ function MarketingROIIntelligence({marketingRows=[]}){
 }
 
 function ModulePage({page,orders=[],live=false,marketingRows=[],supplierRows=[],marketRows=[]}){
- if(page==='Marketing ROI')return <MarketingROIIntelligence marketingRows={marketingRows}/>;
  const d=modules[page]||modules['Sales & Buyers'];
  const [showInterpretation,setShowInterpretation]=useState(false);
+ if(page==='Marketing ROI')return <MarketingROIIntelligence marketingRows={marketingRows}/>;
  const sum=(rows,key)=>rows.reduce((s,r)=>s+Number(r[key]||0),0);
  const revenue=sum(orders,'revenue_inr'),profit=sum(orders,'profit_inr'),orderQty=sum(orders,'order_qty'),shippedQty=sum(orders,'shipped_qty');
  const buyers=new Set(orders.map(r=>r.buyer_id).filter(Boolean)),firstOrderByBuyer={};
