@@ -20,7 +20,7 @@
 .pi-metric-grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
 .pi-donut-layout{display:grid;grid-template-columns:140px minmax(140px,1fr);align-items:center;justify-content:center;gap:14px;min-width:0;width:100%}
 .pi-donut-chart{position:relative;width:clamp(118px,10vw,150px);height:clamp(118px,10vw,150px);flex:none}
-.pi-donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+.pi-donut-center{display:none}
 .pi-donut-center strong{font-size:22px;font-weight:800;color:#172F4D;line-height:1.1}
 .pi-donut-center span{margin-top:5px;color:#52657C;font-size:11px;font-weight:700;text-align:center;line-height:1.25}
 .pi-legend{display:grid;gap:14px;min-width:0;width:100%;align-content:center}
@@ -40,8 +40,8 @@
 .pi-table-wrap tr:last-child td{border-bottom:0}
 .pi-table-wrap tr>td[colspan]{text-align:center;color:#8995A4;padding:15px}
 .pi-data-note{display:grid;place-items:center;min-height:90px;padding:12px;border:1px dashed #DCE4ED;border-radius:10px;background:#FAFBFD;color:#8391A2;font-size:11px;text-align:center}
-.pi-risk .pi-donut-chart{width:112px;height:112px}
-.pi-risk .pi-donut-center strong{font-size:20px}
+.pi-risk .pi-donut-chart{width:clamp(118px,10vw,150px);height:clamp(118px,10vw,150px)}
+
 @media(max-width:1250px){.pi-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.pi-panel-body{grid-template-columns:minmax(0,1fr) minmax(270px,1fr)}.pi-donut-layout{grid-template-columns:125px minmax(135px,1fr);gap:8px}.pi-legend{gap:10px}.pi-legend span{font-size:13px!important}.pi-legend b{font-size:12px!important}}
 @media(max-width:900px){.pi-grid{grid-template-columns:1fr}.pi-section{min-height:unset}}
 @media(max-width:600px){.pi-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.pi-metric{padding:10px;min-height:70px}.pi-section{padding:12px;min-height:unset}.pi-panel-body{grid-template-columns:1fr}.pi-donut-layout{grid-template-columns:125px minmax(135px,1fr);justify-content:start;padding:4px 0;gap:12px}.pi-donut-chart{width:120px;height:120px}.pi-legend span{font-size:13px!important}.pi-cost-layout{grid-template-columns:minmax(0,1fr) 96px}.pi-cost-total strong{font-size:16px}.pi-table-wrap th,.pi-table-wrap td{padding:7px 6px}}
