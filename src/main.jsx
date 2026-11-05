@@ -483,7 +483,7 @@ function MarketingROIIntelligence({marketingRows=[]}){
   return {...x,spendShare,attributedShare,roasGapPct,decision,nextStep};
  }).sort((a,b)=>(b.roas??-1)-(a.roas??-1));
  const exceptions=monthly.slice(1).map((v,i)=>{const p=monthly[i],sc=p.spend>0?(v.spend-p.spend)/p.spend*100:null,rc=p.roas!==null&&p.roas>0&&v.roas!==null?(v.roas-p.roas)/p.roas*100:null;return {...v,previous:p.month,sc,rc,flags:[sc!==null&&sc>=30?'Spend increased ≥30%':null,rc!==null&&rc<=-20?'ROAS declined ≥20%':null].filter(Boolean)}}).filter(x=>x.flags.length);
- const [actionFilter,setActionFilter]=useState('All'),[budgetFilter,setBudgetFilter]=useState('All'),fmt=n=>Number(n||0).toLocaleString('en-IN'),cash=n=>inr(n),percent=n=>n===null?'—':n.toFixed(1)+'%',multiple=n=>n===null?'—':n.toFixed(2)+'×',hasData=rows.length>0;
+ const [selectedActionGroup,setSelectedActionGroup]=useState(null),[budgetFilter,setBudgetFilter]=useState('All'),fmt=n=>Number(n||0).toLocaleString('en-IN'),cash=n=>inr(n),percent=n=>n===null?'—':n.toFixed(1)+'%',multiple=n=>n===null?'—':n.toFixed(2)+'×',hasData=rows.length>0;
  const filteredBudgets=budgetFilter==='All'?budgets:budgets.filter(x=>budgetFilter==='Above benchmark'?x.decision==='Above benchmark':budgetFilter==='Below benchmark'?x.decision==='Below benchmark':x.decision==='Check attribution');
  const portfolioWonRate=pct(won,samples);
  const zeroWinSegments=combos.filter(x=>x.spend>0&&x.won===0);
@@ -503,7 +503,8 @@ function MarketingROIIntelligence({marketingRows=[]}){
   ...(exceptions.length?[{id:'exceptions',priority:'P2',label:'Review',category:'Monthly anomaly',title:'Investigate month-on-month exceptions',detail:exceptions.length+' month(s) crossed screening thresholds',evidence:'The screening detects spend growth of at least 30% or ROAS decline of at least 20% month-on-month.',next:'Compare invoices, campaign activity, attribution timing and order booking dates for flagged months.'}]:[]),
   ...(best?[{id:'best-segment',priority:'OPPORTUNITY',label:'Opportunity',category:'Positive signal',title:'Validate the strongest country-channel segment',detail:best.country+' · '+best.channel,evidence:multiple(best.roas)+' observed ROAS with '+fmt(best.won)+' reported won orders.',next:'Verify order quality and repeatability before testing a controlled budget increase.'}]:[])
  ].sort((a,b)=>({P1:0,P2:1,OPPORTUNITY:2}[a.priority]-({P1:0,P2:1,OPPORTUNITY:2}[b.priority])));
- const visibleActions=actionFilter==='All'?actions:actions.filter(a=>actionFilter==='Action required'?a.priority!=='OPPORTUNITY':a.priority==='OPPORTUNITY');
+ const selectedActions=selectedActionGroup==='urgent'?actions.filter(a=>a.priority==='P1'):selectedActionGroup==='review'?actions.filter(a=>a.priority==='P2'):selectedActionGroup==='opportunity'?actions.filter(a=>a.priority==='OPPORTUNITY'):[];
+ const selectedGroupTitle={urgent:'Urgent items',review:'Items needing review',opportunity:'Opportunities',zeroWins:'Spend with zero won orders'}[selectedActionGroup]||'';
  const urgentCount=actions.filter(a=>a.priority==='P1').length,reviewCount=actions.filter(a=>a.priority==='P2').length,opportunityCount=actions.filter(a=>a.priority==='OPPORTUNITY').length;
  const tooltipStyle={border:'1px solid #dce5f0',borderRadius:10,fontSize:12};
  return <section className="module-page marketing-roi-page">
@@ -553,18 +554,24 @@ function MarketingROIIntelligence({marketingRows=[]}){
   <div className="marketing-section-head"><div><span className="panel-kicker">06 · ACTION CENTRE</span><h2>Marketing action & risk priorities</h2><p>Turn observed patterns into a ranked review plan. Every alert includes the evidence and the next step.</p></div></div>
   <div className="marketing-action-centre">
    <div className="marketing-action-summary">
-    <div><span>Urgent</span><strong>{urgentCount}</strong><small>P1 · resolve first</small></div>
-    <div><span>Needs review</span><strong>{reviewCount}</strong><small>P2 · investigate</small></div>
-    <div><span>Opportunity</span><strong>{opportunityCount}</strong><small>Validate before scaling</small></div>
-    <div><span>Spend with zero wins</span><strong>{cash(zeroWinSpend)}</strong><small>{zeroWinSegments.length} segment(s) · selected scope</small></div>
+    <button type="button" className={selectedActionGroup==='urgent'?'selected':''} aria-expanded={selectedActionGroup==='urgent'} onClick={()=>setSelectedActionGroup(v=>v==='urgent'?null:'urgent')}><span>Urgent</span><strong>{urgentCount}</strong><small>P1 · resolve first</small></button>
+    <button type="button" className={selectedActionGroup==='review'?'selected':''} aria-expanded={selectedActionGroup==='review'} onClick={()=>setSelectedActionGroup(v=>v==='review'?null:'review')}><span>Needs review</span><strong>{reviewCount}</strong><small>P2 · investigate</small></button>
+    <button type="button" className={selectedActionGroup==='opportunity'?'selected':''} aria-expanded={selectedActionGroup==='opportunity'} onClick={()=>setSelectedActionGroup(v=>v==='opportunity'?null:'opportunity')}><span>Opportunity</span><strong>{opportunityCount}</strong><small>Validate before scaling</small></button>
+    <button type="button" className={selectedActionGroup==='zeroWins'?'selected':''} aria-expanded={selectedActionGroup==='zeroWins'} onClick={()=>setSelectedActionGroup(v=>v==='zeroWins'?null:'zeroWins')}><span>Spend with zero wins</span><strong>{cash(zeroWinSpend)}</strong><small>{zeroWinSegments.length} segment(s) · selected scope</small></button>
    </div>
-   <div className="marketing-action-toolbar"><div><b>{actions.length} evidence-based signal(s)</b><span>Ranked by urgency · based on current filters</span></div><div className="marketing-action-filters"><button type="button" className={actionFilter==='All'?'active':''} onClick={()=>setActionFilter('All')}>All</button><button type="button" className={actionFilter==='Action required'?'active':''} onClick={()=>setActionFilter('Action required')}>Action required</button><button type="button" className={actionFilter==='Opportunity'?'active':''} onClick={()=>setActionFilter('Opportunity')}>Opportunities</button></div></div>
-   <div className="marketing-action-grid">{visibleActions.length?visibleActions.map((a,i)=><article className={'marketing-action-card '+(a.priority==='P1'?'is-p1':a.priority==='P2'?'is-p2':'is-opportunity')} key={a.id}>
-    <div className="marketing-action-card-top"><span className="marketing-action-category">{a.category}</span><span className={'marketing-priority '+(a.priority==='P1'?'p1':a.priority==='P2'?'p2':'opportunity')}>{a.priority==='OPPORTUNITY'?'OPPORTUNITY':a.priority+' · '+a.label.toUpperCase()}</span></div>
-    <h3>{a.title}</h3><strong className="marketing-action-evidence-value">{a.detail}</strong>
-    <div className="marketing-action-evidence"><b>Why it is flagged</b><p>{a.evidence}</p></div>
-    <div className="marketing-action-next"><b>Recommended next step</b><p>{a.next}</p></div>
-   </article>):<div className="marketing-action-empty">No signals match this filter for the selected data scope.</div>}</div>
+   {selectedActionGroup&&<div className="marketing-action-detail">
+    <div className="marketing-action-detail-head"><h3>{selectedGroupTitle}</h3><button type="button" onClick={()=>setSelectedActionGroup(null)} aria-label="Close details">×</button></div>
+    {selectedActionGroup==='zeroWins'?(
+     zeroWinSegments.length?<div className="marketing-table-wrap"><table className="marketing-table"><thead><tr><th>Country</th><th>Channel</th><th>Spend</th><th>Inquiries</th><th>Samples</th><th>Won orders</th><th>ROAS</th></tr></thead><tbody>{zeroWinSegments.map((r,i)=><tr key={r.country+'-'+r.channel+'-'+i}><td>{r.country}</td><td>{r.channel}</td><td>{cash(r.spend)}</td><td>{fmt(r.inquiries)}</td><td>{fmt(r.samples)}</td><td>{fmt(r.won)}</td><td>{multiple(r.roas)}</td></tr>)}</tbody></table></div>:<p className="marketing-action-detail-empty">No country-channel segments have marketing spend with zero won orders in the selected scope.</p>
+    ):(
+     selectedActions.length?<div className="marketing-action-grid">{selectedActions.map(a=><article className={'marketing-action-card '+(a.priority==='P1'?'is-p1':a.priority==='P2'?'is-p2':'is-opportunity')} key={a.id}>
+      <div className="marketing-action-card-top"><span className="marketing-action-category">{a.category}</span><span className={'marketing-priority '+(a.priority==='P1'?'p1':a.priority==='P2'?'p2':'opportunity')}>{a.priority==='OPPORTUNITY'?'OPPORTUNITY':a.priority+' · '+a.label.toUpperCase()}</span></div>
+      <h3>{a.title}</h3><strong className="marketing-action-evidence-value">{a.detail}</strong>
+      <div className="marketing-action-evidence"><b>Why it is flagged</b><p>{a.evidence}</p></div>
+      <div className="marketing-action-next"><b>Recommended next step</b><p>{a.next}</p></div>
+     </article>)}</div>:<p className="marketing-action-detail-empty">There are no items in this category for the selected filters.</p>
+    )}
+   </div>}
   </div>
   </>}
  </section>;
