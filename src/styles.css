@@ -1104,3 +1104,24 @@ html{background:#f7f8fa;scroll-behavior:smooth}body{min-width:320px;background:#
 .marketing-crm-panel{padding:0;overflow:hidden}.marketing-crm-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:19px 20px;border:0;background:#fff;text-align:left;cursor:pointer}.marketing-crm-toggle>span{display:grid;gap:6px}.marketing-crm-toggle .panel-kicker{color:#e07842}.marketing-crm-toggle b{font-size:15px;color:#243b53}.marketing-crm-toggle small{font-size:10px;color:#8290a3}.marketing-crm-toggle>svg{color:#3268a8;transition:transform .18s}.marketing-crm-toggle>svg.open{transform:rotate(180deg)}.marketing-crm-content{padding:0 20px 20px;border-top:1px solid #edf1f6}.marketing-crm-content>p{font-size:11px;line-height:1.7;color:#71819a}.marketing-crm-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.marketing-crm-grid>div{display:grid;gap:6px;padding:13px;border:1px solid #e4ebf4;border-radius:10px;background:#fbfcfe}.marketing-crm-grid b{font-size:11px;color:#243b53}.marketing-crm-grid code{font-size:10px;font-weight:800}.marketing-crm-grid small{font-size:10px;line-height:1.55;color:#8290a3;overflow-wrap:anywhere}.marketing-crm-metrics{margin-top:14px;padding:14px;border-radius:10px;background:#f4f8fc}.marketing-crm-metrics>b{font-size:11px;color:#243b53}.marketing-crm-metrics ul{margin:9px 0 0;padding-left:18px;color:#71819a;font-size:10px;line-height:1.8}.marketing-empty{padding:24px}.marketing-empty h3{margin:0 0 7px;color:#243b53}.marketing-empty p{margin:0;color:#8290a3;font-size:12px}
 @media(max-width:1100px){.marketing-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.marketing-chart-grid{grid-template-columns:1fr}.marketing-actions{grid-template-columns:1fr}}
 @media(max-width:680px){.marketing-summary-grid{grid-template-columns:1fr 1fr;gap:9px}.marketing-summary{padding:13px}.marketing-summary>strong{font-size:19px}.marketing-panel{padding:13px}.marketing-chart{height:235px}.marketing-crm-grid{grid-template-columns:1fr}.marketing-section-head h2{font-size:17px}}
+
+
+/* Marketing ROI: compact table viewport (header + first 10 rows), then vertical scroll */
+#root .marketing-table-wrap{
+  max-height: 430px;
+  overflow-y: auto !important;
+  overflow-x: auto !important;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  border: 1px solid #e3eaf3;
+  border-radius: 10px;
+}
+#root .marketing-table-wrap .marketing-table{width:100%;}
+#root .marketing-table-wrap .marketing-table thead th{
+  position: sticky;
+  top: 0;
+  z-index: 7;
+  background: #f4f7fb;
+}
+#root .marketing-table-wrap .marketing-table tbody tr{height:38px;}
+@media(max-width:680px){#root .marketing-table-wrap{max-height:420px;}}
