@@ -1584,3 +1584,58 @@ html{background:#f7f8fa;scroll-behavior:smooth}body{min-width:320px;background:#
   #root .sb-panel-fill{min-height:330px}
   #root .sb-panel-fill>.sb-fill-chart{flex-basis:280px;height:280px;min-height:280px}
 }
+
+
+/* Cohort panel: show the full available timeline and use the card height */
+#root .sb-cohort-panel{display:flex;flex-direction:column;gap:10px;align-self:stretch}
+#root .sb-cohort-summary{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+#root .sb-cohort-summary strong,
+#root .sb-cohort-summary span{display:inline-flex;align-items:center;min-height:30px;padding:6px 10px;border-radius:8px;background:#f1f6fb;color:#49617d;font-size:11px;font-weight:700}
+#root .sb-cohort-summary strong{background:#fff0e8;color:#b85c2c}
+#root .sb-cohort-explainer{margin:0;color:#718198;font-size:11px;line-height:1.5}
+#root .sb-cohort-wrap{width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;padding-bottom:5px}
+#root .sb-cohort{width:max-content;min-width:100%;border-collapse:separate;border-spacing:4px;white-space:nowrap;font-size:11px}
+#root .sb-cohort th{min-width:48px;padding:9px 8px;color:#536780;text-align:center;font-size:11px;font-weight:800}
+#root .sb-cohort thead th:first-child{position:sticky;left:0;z-index:2;min-width:108px;background:#fff;text-align:left}
+#root .sb-cohort tbody th{position:sticky;left:0;z-index:1;min-width:108px;background:#fff;text-align:left;color:#334962;font-size:11px}
+#root .sb-cohort tbody th small{display:block;margin-top:3px;color:#8997aa;font-size:10px;font-weight:600}
+#root .sb-cohort td{min-width:48px;padding:10px 8px;border-radius:6px;text-align:center;color:#174d45;font-size:11px;font-weight:800}
+#root .sb-cohort-trend-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px}
+#root .sb-cohort-trend-head b{color:#334963;font-size:13px}
+#root .sb-cohort-trend-head span{color:#8997aa;font-size:10px}
+#root .sb-cohort-chart{width:100%;height:175px;min-height:175px;min-width:0}
+#root .sb-panel-head h3{font-size:16px}
+#root .sb-panel-head p{font-size:11px;line-height:1.5}
+#root .sb-page-head p{font-size:14px}
+#root .sb-kpi small{font-size:12px}
+#root .sb-kpi em{font-size:11px}
+#root .sb-section-title h2{font-size:20px}
+#root .sb-section-title>small{font-size:11px}
+#root .sb-table{font-size:11px}
+#root .sb-table th{font-size:11px}
+#root .sb-table td{font-size:11px}
+#root .sb-table td b{font-size:11px}
+#root .sb-table td small{font-size:10px}
+#root .sb-category-row b{font-size:11px}
+#root .sb-category-row small{font-size:10px}
+#root .sb-category-row>strong{font-size:11px}
+#root .sb-risk-list b{font-size:11px}
+#root .sb-risk-list small{font-size:10px}
+#root .risk-high,#root .risk-medium,#root .risk-low{font-size:10px}
+#root .sb-disclaimer{font-size:10px;line-height:1.6}
+#root .sb-order-stats small{font-size:10px}
+#root .sb-order-stats b{font-size:13px}
+#root .sb-country-list span{font-size:11px}
+#root .sb-country-list b{font-size:11px}
+#root .sb-country-list em{font-size:10px}
+#root .sb-margin-band-top b{font-size:12px}
+#root .sb-margin-band-top strong{font-size:12px}
+#root .sb-margin-band small{font-size:10px}
+#root .sb-frequency-summary>b{font-size:12px}
+#root .sb-frequency-summary span{font-size:11px}
+#root .sb-frequency-summary strong{font-size:12px}
+@media(max-width:720px){
+ #root .sb-cohort-chart{height:190px;min-height:190px}
+ #root .sb-cohort-trend-head b{font-size:12px}
+ #root .sb-cohort-explainer{font-size:10px}
+}
