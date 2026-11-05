@@ -10,9 +10,9 @@ const fmt=v=>Number(v||0).toLocaleString('en-IN',{maximumFractionDigits:1});
 const pct=v=>Number.isFinite(v)?v.toFixed(1)+'%':'—';
 const money=v=>{const x=num(v),a=Math.abs(x),f=n=>Number(n.toFixed(1)).toLocaleString('en-IN');return '₹'+(a>=1e7?f(x/1e7)+' Cr':a>=1e5?f(x/1e5)+' Lakh':a>=1e3?f(x/1e3)+' K':fmt(x));};
 
-function Metric({label,value,tone=0,icon:Icon,compact=false}){
+function Metric({label,value,note,tone=0,icon:Icon,compact=false}){
  return <article className={'pi-metric'+(compact?' compact':'')} style={{'--tone':COLORS[tone%COLORS.length]}}>
-  <div><span>{label}</span>{Icon&&<Icon size={16}/>}</div><strong>{value}</strong>
+  <div><span>{label}</span>{Icon&&<Icon size={16}/>}</div><strong>{value}</strong>{note&&<small className="pi-metric-note">{note}</small>}
  </article>;
 }
 function Section({no,title,icon:Icon,children}){
@@ -97,10 +97,10 @@ export default function ProductionIntelligence({orders=[],live=false}){
    <Section no="05" title="Workforce & Overtime" icon={Users}>
     <div className="pi-panel-body pi-workforce">
      <div className="pi-metric-grid two">
-      <Metric compact label="Worker records summed" value={fmt(d.workers)} tone={1}/>
-      <Metric compact label="Overtime hours" value={fmt(d.overtime)} tone={3}/>
+      <Metric compact label="Worker entries (order-level)" value={fmt(d.workers)} note="Sum across orders; not unique employees" tone={1}/>
+      <Metric compact label="Total overtime hours" value={fmt(d.overtime)} note="Recorded hours summed across orders" tone={3}/>
      </div>
-     {d.rows.length?<Donut centerLabel="OVERTIME STATUS" data={[{name:'Overtime recorded',value:d.overtimeRows,color:COLORS[0],display:fmt(d.overtimeRows)},{name:'No overtime recorded',value:d.rows.length-d.overtimeRows,color:COLORS[1],display:fmt(d.rows.length-d.overtimeRows)}]}/>:<div className="pi-data-note">No workforce rows are available.</div>}
+     {d.rows.length?<Donut centerLabel="OVERTIME STATUS" data={[{name:'Orders with overtime entry',value:d.overtimeRows,color:COLORS[0],display:fmt(d.overtimeRows)},{name:'Orders without overtime entry',value:d.rows.length-d.overtimeRows,color:COLORS[1],display:fmt(d.rows.length-d.overtimeRows)}]}/>:<div className="pi-data-note">No workforce rows are available.</div>}
     </div>
    </Section>
    <Section no="06" title="Production Risk & Exceptions" icon={AlertTriangle}>
