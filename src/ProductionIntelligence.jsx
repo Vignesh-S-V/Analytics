@@ -61,7 +61,7 @@ export default function ProductionIntelligence({orders=[],live=false}){
     {d.trend.length?<Chart><BarChart data={d.trend}><CartesianGrid strokeDasharray="3 4" vertical={false}/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis/><Tooltip/><Bar dataKey="orders" name="Orders" fill={COLORS[1]}/></BarChart></Chart>:<Empty/>}
    </Section>
    <Section no="06" title="Style & Product Production" desc="Style/category comparison across ordered quantity, fulfilment, rejection proxy and margin.">
-    {topStyles.length?<Chart><BarChart data={topStyles} layout="vertical" margin={{left:8,right:18}}><CartesianGrid strokeDasharray="3 4" horizontal={false}/><XAxis type="number"/><YAxis type="category" dataKey="style" width={100} tick={{fontSize:9}}/><Tooltip/><Bar dataKey="ordered" name="Ordered quantity" fill={COLORS[1]}/></BarChart>:<Empty/>}
+    {topStyles.length?<Chart><BarChart data={topStyles} layout="vertical" margin={{left:8,right:18}}><CartesianGrid strokeDasharray="3 4" horizontal={false}/><XAxis type="number"/><YAxis type="category" dataKey="style" width={100} tick={{fontSize:9}}/><Tooltip/><Bar dataKey="ordered" name="Ordered quantity" fill={COLORS[1]}/></BarChart></Chart>:<Empty/>}
     <Table columns={[{k:'style',t:'Style / category'},{k:'ordered',t:'Ordered',f:fmt},{k:'fill',t:'Fill rate',f:pct},{k:'reject',t:'Reject proxy',f:pct},{k:'margin',t:'Margin',f:pct}]} rows={topStyles}/>
    </Section>
    <Section no="07" title="Production Profitability" desc="Recorded revenue, cost and profit; margin is weighted by revenue.">
