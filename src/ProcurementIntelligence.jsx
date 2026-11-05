@@ -33,7 +33,7 @@ export default function ProcurementIntelligence({orders=[],supplierRows=[],marke
   const avgMasterDelay=supplierDelay.length?supplierDelay.reduce((a,b)=>a+b,0)/supplierDelay.length:null;
   const avgQuality=quality.length?quality.reduce((a,b)=>a+b,0)/quality.length:null;
   const last=market.at(-1),prior=market.at(-2),yarnMom=last&&prior&&prior.yarn?((last.yarn-prior.yarn)/prior.yarn)*100:null;
-  return{suppliers,linkedRevenue,linkedCost,top5,hhi,types,monthly:[...monthly.values()].sort((a,b)=>a.key.localeCompare(b.key)).map(x=>({...x,avgDelay:x.delayCount?x.delay/x.delayCount:null,latePct:x.orders?x.late/x.orders*100:null})),market,supplierCount,linkedCount,avgMasterDelay,avgQuality,dates,onTime,overallOnTimePct:dates.length?onTime/dates.length*100:null,yarnMom,last,prior,orderCount:new Set(orders.map(r=>r.order_id).filter(Boolean)).size};
+  return{suppliers,linkedRevenue,linkedCost,top5,hhi,types,monthly:[...monthly.values()].sort((a,b)=>a.key.localeCompare(b.key)).map(x=>({...x,avgDelay:x.delayCount?x.delay/x.delayCount:null,latePct:x.orders?x.late/x.orders*100:null})),market,supplierCount,linkedCount,avgMasterDelay,avgQuality,dates,onTime,overallOnTimePct:dates.length?onTime/dates.length*100:null,yarnMom,last,prior,orderCount:new Set(orders.filter(r=>r.supplier_id).map(r=>r.order_id).filter(Boolean)).size};
  },[orders,supplierRows,marketRows]);
  const costRows=model.suppliers.slice().sort((a,b)=>Number(b.orderCost||0)-Number(a.orderCost||0)).slice(0,10);
  const delayRows=model.suppliers.filter(s=>s.avg_delay_days!=null).slice().sort((a,b)=>Number(b.avg_delay_days)-Number(a.avg_delay_days));
