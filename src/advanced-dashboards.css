@@ -438,3 +438,23 @@
  .exec-two-col>.adv-panel>.exec-forecast-chart{min-height:300px}
  .exec-two-col>.adv-panel>.exec-balanced-chart,.exec-two-col>.adv-panel>.exec-category-chart{min-height:270px}
 }
+
+
+/* Larger category revenue mix pie: give the visual real space, not empty padding. */
+.exec-two-col>.adv-panel>.exec-category-chart{
+  flex:0 0 440px;
+  height:440px;
+  min-height:440px;
+  width:100%;
+}
+.exec-category-chart .recharts-responsive-container{height:100%!important;min-height:440px}
+.exec-category-chart .recharts-legend-wrapper{font-size:12px}
+.exec-category-chart .recharts-default-legend{gap:8px 18px}
+@media(max-width:850px){
+ .exec-two-col>.adv-panel>.exec-category-chart{flex-basis:400px;height:400px;min-height:400px}
+ .exec-category-chart .recharts-responsive-container{min-height:400px}
+}
+@media(max-width:560px){
+ .exec-two-col>.adv-panel>.exec-category-chart{flex-basis:350px;height:350px;min-height:350px}
+ .exec-category-chart .recharts-responsive-container{min-height:350px}
+}
