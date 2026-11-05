@@ -4,9 +4,9 @@
 .pi-metric:before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--tone)}
 .pi-metric>div{display:flex;align-items:center;justify-content:space-between;gap:6px;color:#78879a;font-size:10px;font-weight:700;line-height:1.3}
 .pi-metric svg{color:var(--tone);flex:none}.pi-metric strong{font-size:clamp(16px,1.45vw,21px);line-height:1.2;color:#263b53;overflow-wrap:anywhere}
-.pi-grid{display:block;columns:2;column-gap:11px;column-fill:balance}
-.pi-section{display:inline-block;width:100%;min-width:0;overflow:hidden;padding:13px;border:1px solid #e5eaf0;border-radius:12px;background:#fff;box-shadow:0 2px 8px rgba(30,45,65,.035);break-inside:avoid;margin:0 0 11px}
-.pi-section.wide,.pi-section:last-child{column-span:all}.pi-section header{margin:0 0 7px}
+.pi-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;align-items:start}.pi-column{display:flex;flex-direction:column;gap:11px;min-width:0}
+.pi-section{width:100%;min-width:0;overflow:hidden;padding:13px;border:1px solid #e5eaf0;border-radius:12px;background:#fff;box-shadow:0 2px 8px rgba(30,45,65,.035);break-inside:avoid;margin:0 0 11px}
+.pi-section.wide{grid-column:1/-1}.pi-section header{margin:0 0 7px}
 .pi-section header span{font-size:9px;letter-spacing:.08em;font-weight:800;color:#e07842}
 .pi-section header h2{font-size:15px;line-height:1.25;margin:3px 0 0;color:#203650}
 .pi-chart{height:190px;width:100%;min-width:0;margin-top:5px}
@@ -18,5 +18,5 @@
 .pi-table-wrap td{padding:6px;color:#42536a;border-bottom:1px solid #eef1f4;white-space:nowrap}.pi-table-wrap td:first-child{font-weight:650;color:#2d435c}
 .pi-table-wrap tr>td[colspan]{text-align:center;color:#8994a2;padding:12px}
 @media(max-width:1250px){.pi-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media(max-width:900px){.pi-grid{columns:1}.pi-section.wide,.pi-section:last-child{column-span:unset}}
+@media(max-width:900px){.pi-grid{grid-template-columns:1fr}.pi-section.wide{grid-column:auto}}
 @media(max-width:560px){.pi-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.pi-metric{padding:10px}.pi-section{padding:10px}.pi-chart{height:180px}.pi-inline{gap:6px}}
