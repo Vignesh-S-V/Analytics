@@ -21,13 +21,13 @@ function Section({no,title,icon:Icon,children}){
   {children}
  </section>;
 }
-function Donut({data,centerValue,centerLabel,legend=true}){
+function Donut({data,legend=true}){
  const valid=data.filter(x=>x.value>0);
  if(!valid.length)return <div className="pi-donut-empty">No data</div>;
  return <div className="pi-donut-layout">
   <div className="pi-donut-chart"><ResponsiveContainer width="100%" height="100%">
    <PieChart><Pie data={valid} dataKey="value" nameKey="name" innerRadius="68%" outerRadius="92%" paddingAngle={2} stroke="none">{valid.map((x,i)=><Cell key={x.name} fill={x.color||COLORS[i%COLORS.length]}/>)}</Pie><Tooltip formatter={(v,n)=>[fmt(v),n]}/></PieChart>
-  </ResponsiveContainer><div className="pi-donut-center"><strong>{centerValue}</strong></div></div>
+  </ResponsiveContainer></div>
   {legend&&<div className="pi-legend">{valid.map((x,i)=><div key={x.name}><i style={{background:x.color||COLORS[i%COLORS.length]}}/><span>{x.name}</span><b>{x.display??fmt(x.value)}</b></div>)}</div>}
  </div>;
 }
@@ -76,7 +76,7 @@ export default function ProductionIntelligence({orders=[],live=false}){
       <Metric compact label="Target average" value={d.target==null?'—':pct(d.target)} tone={2}/>
       <Metric compact label="Efficiency gap" value={d.target==null||d.actual==null?'—':(d.actual-d.target).toFixed(1)+' pp'} tone={3}/>
      </div>
-     {d.actual!=null&&d.target>0?<Donut centerValue={pct(efficiencyAttainment)} centerLabel="Target attained" data={[{name:'Attained',value:efficiencyAttainment,color:COLORS[2],display:pct(efficiencyAttainment)},{name:'Remaining',value:100-efficiencyAttainment,color:'#E8EDF2',display:pct(100-efficiencyAttainment)}]}/>:<div className="pi-data-note">Efficiency target comparison is unavailable.</div>}
+     {d.actual!=null&&d.target>0?<Donut data={[{name:'Attained',value:efficiencyAttainment,color:COLORS[2],display:pct(efficiencyAttainment)},{name:'Remaining',value:100-efficiencyAttainment,color:'#E8EDF2',display:pct(100-efficiencyAttainment)}]}/>:<div className="pi-data-note">Efficiency target comparison is unavailable.</div>}
     </div>
    </Section>
    <Section no="02" title="Manufacturing Cost" icon={Layers}>
@@ -88,7 +88,7 @@ export default function ProductionIntelligence({orders=[],live=false}){
       <Metric compact label="On-time shipments" value={d.dated.length?pct(onTimePct):'—'} tone={2}/>
       <Metric compact label="Average delay days" value={d.delayRows.length?(sum(d.delayRows,'delay_days')/d.delayRows.length).toFixed(1)+' d':'—'} tone={3}/>
      </div>
-     {d.dated.length?<Donut centerValue={pct(onTimePct)} centerLabel="On-time" data={[{name:'On-time',value:d.onTime.length,color:COLORS[1],display:fmt(d.onTime.length)},{name:'Delayed',value:d.dated.length-d.onTime.length,color:COLORS[0],display:fmt(d.dated.length-d.onTime.length)}]}/>:<div className="pi-data-note">Shipment date pairs are not available.</div>}
+     {d.dated.length?<Donut data={[{name:'On-time',value:d.onTime.length,color:COLORS[1],display:fmt(d.onTime.length)},{name:'Delayed',value:d.dated.length-d.onTime.length,color:COLORS[0],display:fmt(d.dated.length-d.onTime.length)}]}/>:<div className="pi-data-note">Shipment date pairs are not available.</div>}
     </div>
    </Section>
    <Section no="04" title="Style & Product Production" icon={Activity}>
@@ -100,7 +100,7 @@ export default function ProductionIntelligence({orders=[],live=false}){
       <Metric compact label="Worker records summed" value={fmt(d.workers)} tone={1}/>
       <Metric compact label="Overtime hours" value={fmt(d.overtime)} tone={3}/>
      </div>
-     {d.rows.length?<Donut centerValue={pct(overtimePct)} centerLabel="Rows with overtime" data={[{name:'Overtime recorded',value:d.overtimeRows,color:COLORS[0],display:fmt(d.overtimeRows)},{name:'No overtime recorded',value:d.rows.length-d.overtimeRows,color:COLORS[1],display:fmt(d.rows.length-d.overtimeRows)}]}/>:<div className="pi-data-note">No workforce rows are available.</div>}
+     {d.rows.length?<Donut data={[{name:'Overtime recorded',value:d.overtimeRows,color:COLORS[0],display:fmt(d.overtimeRows)},{name:'No overtime recorded',value:d.rows.length-d.overtimeRows,color:COLORS[1],display:fmt(d.rows.length-d.overtimeRows)}]}/>:<div className="pi-data-note">No workforce rows are available.</div>}
     </div>
    </Section>
    <Section no="06" title="Production Risk & Exceptions" icon={AlertTriangle}>
@@ -109,7 +109,7 @@ export default function ProductionIntelligence({orders=[],live=false}){
       <Metric compact label="Flagged orders" value={fmt(d.risk.length)} tone={3}/>
       <Metric compact label="Late penalty exposure" value={money(d.latePenalty)} tone={4}/>
      </div>
-     <Donut centerValue={fmt(d.risk.length)} centerLabel="Flagged rows" data={[{name:'Flagged',value:d.risk.length,color:COLORS[0],display:pct(flaggedPct)},{name:'No flags',value:Math.max(0,d.rows.length-d.risk.length),color:COLORS[1],display:pct(100-flaggedPct)}]}/>
+     <Donut data={[{name:'Flagged',value:d.risk.length,color:COLORS[0],display:pct(flaggedPct)},{name:'No flags',value:Math.max(0,d.rows.length-d.risk.length),color:COLORS[1],display:pct(100-flaggedPct)}]}/>
     </div>
    </Section>
   </div>
