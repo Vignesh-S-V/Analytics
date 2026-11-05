@@ -418,3 +418,23 @@
 @media(max-width:1050px){.exec-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:850px){.exec-two-col{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:560px){.exec-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.exec-analytics .adv-panel{padding:14px}.exec-analytics .adv-chart{min-height:230px}}
+
+
+/* Executive analytics chart sizing: align paired panels and use the full panel height. */
+.exec-two-col{align-items:stretch}
+.exec-two-col>.adv-panel{height:100%;display:flex;flex-direction:column;min-height:0}
+.exec-two-col>.adv-panel>.exec-chart{flex:1 1 auto;width:100%;min-height:320px;height:auto}
+.exec-two-col>.adv-panel>.exec-forecast-chart{min-height:390px}
+.exec-two-col>.adv-panel>.exec-balanced-chart{min-height:320px}
+.exec-two-col>.adv-panel>.exec-category-chart{min-height:340px}
+.exec-two-col>.adv-panel>.exec-chart .recharts-responsive-container{min-height:inherit}
+.exec-two-col>.adv-panel>.exec-chart .recharts-wrapper{max-width:100%}
+@media(max-width:850px){
+ .exec-two-col>.adv-panel{height:auto}
+ .exec-two-col>.adv-panel>.exec-forecast-chart{min-height:340px}
+ .exec-two-col>.adv-panel>.exec-balanced-chart,.exec-two-col>.adv-panel>.exec-category-chart{min-height:300px}
+}
+@media(max-width:560px){
+ .exec-two-col>.adv-panel>.exec-forecast-chart{min-height:300px}
+ .exec-two-col>.adv-panel>.exec-balanced-chart,.exec-two-col>.adv-panel>.exec-category-chart{min-height:270px}
+}
