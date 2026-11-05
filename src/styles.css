@@ -1355,3 +1355,59 @@ html{background:#f7f8fa;scroll-behavior:smooth}body{min-width:320px;background:#
     padding:12px;
   }
 }
+
+
+/* Action centre summary cards are expandable controls */
+#root .marketing-action-summary>button{
+  display:grid;
+  gap:6px;
+  min-width:0;
+  width:100%;
+  padding:15px 16px;
+  border:1px solid #e1e9f3;
+  border-radius:12px;
+  background:#f8fafd;
+  text-align:left;
+  cursor:pointer;
+  transition:border-color .16s ease,background .16s ease,box-shadow .16s ease;
+}
+#root .marketing-action-summary>button:hover,
+#root .marketing-action-summary>button.selected{
+  border-color:#e89a6c;
+  background:#fffaf6;
+  box-shadow:0 2px 10px rgba(31,53,79,.06);
+}
+#root .marketing-action-summary>button:focus-visible{
+  outline:3px solid rgba(224,120,66,.28);
+  outline-offset:2px;
+}
+#root .marketing-action-summary>button span{font-size:13px;font-weight:750;color:#52647e}
+#root .marketing-action-summary>button strong{font-size:25px;line-height:1.2;color:#1d3150;overflow-wrap:anywhere}
+#root .marketing-action-summary>button small{font-size:12px;line-height:1.5;color:#7a899e}
+#root .marketing-action-detail{
+  margin-top:14px;
+  padding:16px;
+  border:1px solid #e1e9f3;
+  border-radius:12px;
+  background:#fff;
+  animation:marketingDetailIn .18s ease-out;
+}
+#root .marketing-action-detail-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:12px;
+}
+#root .marketing-action-detail-head h3{margin:0;color:#243b53;font-size:16px}
+#root .marketing-action-detail-head button{
+  width:30px;height:30px;border:1px solid #dfe7f1;border-radius:8px;
+  background:#fff;color:#52647e;font-size:22px;line-height:1;cursor:pointer;
+}
+#root .marketing-action-detail-empty{margin:0;padding:18px;border-radius:9px;background:#f7f9fc;color:#71819a;font-size:13px}
+@keyframes marketingDetailIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:600px){
+  #root .marketing-action-summary>button{padding:12px}
+  #root .marketing-action-summary>button strong{font-size:21px}
+  #root .marketing-action-detail{padding:12px}
+}
