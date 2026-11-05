@@ -27,7 +27,7 @@ function Donut({data,centerValue,centerLabel,legend=true}){
  return <div className="pi-donut-layout">
   <div className="pi-donut-chart"><ResponsiveContainer width="100%" height="100%">
    <PieChart><Pie data={valid} dataKey="value" nameKey="name" innerRadius="68%" outerRadius="92%" paddingAngle={2} stroke="none">{valid.map((x,i)=><Cell key={x.name} fill={x.color||COLORS[i%COLORS.length]}/>)}</Pie><Tooltip formatter={(v,n)=>[fmt(v),n]}/></PieChart>
-  </ResponsiveContainer><div className="pi-donut-center"><strong>{centerValue}</strong><span>{centerLabel}</span></div></div>
+  </ResponsiveContainer><div className="pi-donut-center"><strong>{centerValue}</strong></div></div>
   {legend&&<div className="pi-legend">{valid.map((x,i)=><div key={x.name}><i style={{background:x.color||COLORS[i%COLORS.length]}}/><span>{x.name}</span><b>{x.display??fmt(x.value)}</b></div>)}</div>}
  </div>;
 }
