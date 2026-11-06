@@ -145,6 +145,9 @@ function AuthScreen({db}){
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState('');
  const [notice,setNotice]=useState('');
+ const [pendingConfirmation,setPendingConfirmation]=useState(false);
+ const [resendBusy,setResendBusy]=useState(false);
+ const [resendFeedback,setResendFeedback]=useState('');
  const isSignup=mode==='signup';
  useEffect(()=>{
   const hashParams=new URLSearchParams(window.location.hash.replace(/^#/,''));
@@ -156,17 +159,43 @@ function AuthScreen({db}){
    window.history.replaceState({},document.title,window.location.pathname);
   }
  },[]);
- const clearFeedback=()=>{setError('');setNotice('')};
+ const clearFeedback=()=>{setError('');setNotice('');setPendingConfirmation(false);setResendFeedback('')};
  const switchMode=next=>{setMode(next);clearFeedback();setPassword('');setConfirmPassword('')};
  const friendlyAuthError=message=>{
   const text=String(message||'').toLowerCase();
   if(text.includes('signup')&&(/disabled|not allowed|not permitted/.test(text)))return 'New account registration is disabled in Supabase Auth. The workspace owner must enable “Allow new users to sign up” in Authentication settings.';
   if(/already registered|already exists|user exists/.test(text))return 'An account already exists with this email. Please sign in instead.';
-  if(/email address not authorized|email_address_not_authorized/.test(text))return 'Supabase default email service cannot send to this address. The workspace owner must configure custom SMTP to deliver verification emails to external users.';
-  if(text.includes('password')&&text.includes('least'))return 'Choose a stronger password with at least 8 characters.';
-  if(text.includes('rate limit')||text.includes('too many'))return 'Too many attempts. Wait a few minutes and try again.';
+  if(/email address not authorized|email_address_not_authorized/.test(text))return 'The free Supabase email service cannot send to this address. Configure a free custom SMTP provider to send verification emails to external users.';
+  if(text.includes('over_email_send_rate_limit')||text.includes('email rate limit'))return 'The email provider rate limit has been reached. Wait until its limit resets, then try again.';
+  if(text.includes('rate limit')||text.includes('too many'))return 'Too many requests. Wait for the authentication rate limit to reset, then try again.';
   if(text.includes('redirect')&&text.includes('allow'))return 'The current website URL is not in Supabase Auth’s allowed redirect URLs. Add this site under Authentication → URL Configuration.';
   return message||(isSignup?'Account creation failed. Please try again.':'Sign-in failed. Please try again.');
+ };
+ const resendConfirmation=async()=>{
+  if(!db||!pendingConfirmation||!email.trim()||resendBusy)return;
+  setResendBusy(true);
+  setResendFeedback('');
+  setError('');
+  try{
+   const {error}=await db.auth.resend({
+    type:'signup',
+    email:email.trim().toLowerCase(),
+    options:{emailRedirectTo:AUTH_REDIRECT_URL}
+   });
+   if(error)throw error;
+   setResendFeedback('A new confirmation email request was accepted. Check your inbox and spam folder.');
+  }catch(e){
+   const message=String(e?.message||'');
+   if(/already confirmed|email not confirmed/i.test(message)){
+    setPendingConfirmation(false);
+    setNotice('This email is already confirmed. Please sign in instead.');
+    setResendFeedback('');
+   }else{
+    setResendFeedback(friendlyAuthError(message));
+   }
+  }finally{
+   setResendBusy(false);
+  }
  };
  const submit=async(e)=>{
   e.preventDefault();
@@ -190,17 +219,18 @@ function AuthScreen({db}){
      }
     });
     if(error)throw error;
-    // Supabase masks confirmed existing accounts with an empty identities array.
-    // Do not show a false "verification email sent" message for that response.
+    // Supabase masks a previously confirmed account with an empty identities array.
     if(Array.isArray(data.user?.identities)&&data.user.identities.length===0){
      setPassword('');
      setConfirmPassword('');
+     setPendingConfirmation(false);
      setNotice('An account already exists with this email. Please sign in instead.');
      return;
     }
     setPassword('');
     setConfirmPassword('');
-    setNotice('Verification email requested. Check your inbox and spam folder. After confirming your email, the workspace owner must approve your account before any business data is available.');
+    setPendingConfirmation(true);
+    setNotice('Your account is waiting for email confirmation. Check your inbox and spam folder. You can request another confirmation email below until the address is confirmed. Workspace approval is still required before business data becomes available.');
    }else{
     const {error}=await db.auth.signInWithPassword({email:cleanEmail,password});
     if(error)throw error;
@@ -227,7 +257,11 @@ function AuthScreen({db}){
    <button className="auth-submit" type="submit" disabled={busy||!email.trim()||password.length<8||(isSignup&&(fullName.trim().length<2||password!==confirmPassword))}>{busy?(isSignup?'Creating account…':'Signing in…'):(isSignup?'Create account':'Sign in securely')}</button>
   </form>}
   {error&&<p className="auth-error" role="alert">{error}</p>}
-  {notice&&<div className="auth-notice" role="status">{notice}<button type="button" className="auth-notice-action" onClick={()=>switchMode('signin')}>Back to sign in</button></div>}
+  {notice&&<div className="auth-notice" role="status">
+   {notice}
+   {pendingConfirmation&&<><button type="button" className="auth-notice-action" onClick={resendConfirmation} disabled={resendBusy}>{resendBusy?'Sending…':'Send confirmation email again'}</button>{resendFeedback&&<small className="auth-resend-message" role="status">{resendFeedback}</small>}</>}
+   <button type="button" className="auth-notice-action" onClick={()=>switchMode('signin')}>Back to sign in</button>
+  </div>}
  </section></main>
 }
 
