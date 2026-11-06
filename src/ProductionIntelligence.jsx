@@ -67,7 +67,7 @@ export default function ProductionIntelligence({orders=[],live=false}){
    <Metric label="Actual efficiency" value={d.actual==null?'—':pct(d.actual)} icon={Gauge} tone={2}/>
    <Metric label="On-time shipments" value={d.dated.length?pct(onTimePct):'—'} icon={Activity} tone={3}/>
    <Metric label="Rejection proxy" value={d.ordered?pct(d.rejected/d.ordered*100):'—'} icon={ShieldCheck} tone={4}/>
-   <Metric label="Total rework cost" value={d.rework?money(d.rework):'—'} note="Total rework expenditure · INR" icon={Wallet} tone={5}/>
+   <Metric label="Total rework cost" value={d.rework?money(d.rework):'—'} note={d.shipped?money(d.rework/d.shipped)+' per shipped pc':'Total rework expenditure · INR'} icon={Wallet} tone={5}/>
   </div>
   <div className="pi-grid">
    <Section no="01" title="Production Efficiency" icon={Factory}>
