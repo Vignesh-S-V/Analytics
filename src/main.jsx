@@ -145,6 +145,16 @@ function AuthScreen({db}){
  const [error,setError]=useState('');
  const [notice,setNotice]=useState('');
  const isSignup=mode==='signup';
+ useEffect(()=>{
+  const hashParams=new URLSearchParams(window.location.hash.replace(/^#/,''));
+  const queryParams=new URLSearchParams(window.location.search);
+  const code=hashParams.get('error_code')||queryParams.get('error_code');
+  const description=hashParams.get('error_description')||queryParams.get('error_description');
+  if(code||description){
+   setError(description?description.replace(/\\+/g,' '):'Email verification could not be completed. Please request a fresh confirmation email.');
+   window.history.replaceState({},document.title,window.location.pathname);
+  }
+ },[]);
  const clearFeedback=()=>{setError('');setNotice('')};
  const switchMode=next=>{setMode(next);clearFeedback();setPassword('');setConfirmPassword('')};
  const friendlyAuthError=message=>{
@@ -172,7 +182,7 @@ function AuthScreen({db}){
      email:cleanEmail,
      password,
      options:{
-      emailRedirectTo:window.location.origin,
+      emailRedirectTo:AUTH_REDIRECT_URL,
       data:{full_name:fullName.trim()}
      }
     });
