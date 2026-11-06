@@ -177,7 +177,7 @@ function AuthScreen({db}){
     options:{emailRedirectTo:AUTH_REDIRECT_URL}
    });
    if(error)throw error;
-   setResendMessage('A fresh confirmation email was sent. Open the newest email and use that link.');
+   setResendMessage('If this email is still unverified, a fresh confirmation link will be sent. If it is already confirmed, Supabase will not send another email. Always use the newest link.');
   }catch(e){
    const message=String(e?.message||'');
    setResendMessage(/already confirmed/i.test(message)?'This email is already confirmed. Return to Sign in.':message||'Could not resend the confirmation email. Try again shortly.');
