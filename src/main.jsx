@@ -145,8 +145,6 @@ function AuthScreen({db}){
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState('');
  const [notice,setNotice]=useState('');
- const [resendBusy,setResendBusy]=useState(false);
- const [resendMessage,setResendMessage]=useState('');
  const isSignup=mode==='signup';
  useEffect(()=>{
   const hashParams=new URLSearchParams(window.location.hash.replace(/^#/,''));
@@ -163,26 +161,12 @@ function AuthScreen({db}){
  const friendlyAuthError=message=>{
   const text=String(message||'').toLowerCase();
   if(text.includes('signup')&&(/disabled|not allowed|not permitted/.test(text)))return 'New account registration is disabled in Supabase Auth. The workspace owner must enable “Allow new users to sign up” in Authentication settings.';
+  if(/already registered|already exists|user exists/.test(text))return 'An account already exists with this email. Please sign in instead.';
+  if(/email address not authorized|email_address_not_authorized/.test(text))return 'Supabase default email service cannot send to this address. The workspace owner must configure custom SMTP to deliver verification emails to external users.';
   if(text.includes('password')&&text.includes('least'))return 'Choose a stronger password with at least 8 characters.';
   if(text.includes('rate limit')||text.includes('too many'))return 'Too many attempts. Wait a few minutes and try again.';
   if(text.includes('redirect')&&text.includes('allow'))return 'The current website URL is not in Supabase Auth’s allowed redirect URLs. Add this site under Authentication → URL Configuration.';
-  return message|| (isSignup?'Account creation failed. Please try again.':'Sign-in failed. Please try again.');
- };
- const resendConfirmation=async()=>{
-  if(!db||!email.trim()||resendBusy)return;
-  setResendBusy(true);setResendMessage('');
-  try{
-   const {error}=await db.auth.resend({
-    type:'signup',
-    email:email.trim().toLowerCase(),
-    options:{emailRedirectTo:AUTH_REDIRECT_URL}
-   });
-   if(error)throw error;
-   setResendMessage('If this email is still unverified, a fresh confirmation link will be sent. If it is already confirmed, Supabase will not send another email. Always use the newest link.');
-  }catch(e){
-   const message=String(e?.message||'');
-   setResendMessage(/already confirmed/i.test(message)?'This email is already confirmed. Return to Sign in.':message||'Could not resend the confirmation email. Try again shortly.');
-  }finally{setResendBusy(false)}
+  return message||(isSignup?'Account creation failed. Please try again.':'Sign-in failed. Please try again.');
  };
  const submit=async(e)=>{
   e.preventDefault();
@@ -206,11 +190,17 @@ function AuthScreen({db}){
      }
     });
     if(error)throw error;
-    // Keep any session returned by Supabase. With email confirmation enabled this is normally null;
-    // after confirmation, the callback session is handled by the auth listener below.
+    // Supabase masks confirmed existing accounts with an empty identities array.
+    // Do not show a false "verification email sent" message for that response.
+    if(Array.isArray(data.user?.identities)&&data.user.identities.length===0){
+     setPassword('');
+     setConfirmPassword('');
+     setNotice('An account already exists with this email. Please sign in instead.');
+     return;
+    }
     setPassword('');
     setConfirmPassword('');
-    setNotice('Account request submitted. Check your email for a verification link. After verification, the workspace owner must approve your account before any business data is available.');
+    setNotice('Verification email requested. Check your inbox and spam folder. After confirming your email, the workspace owner must approve your account before any business data is available.');
    }else{
     const {error}=await db.auth.signInWithPassword({email:cleanEmail,password});
     if(error)throw error;
@@ -229,18 +219,15 @@ function AuthScreen({db}){
    <button type="button" role="tab" aria-selected={!isSignup} className={!isSignup?'active':''} onClick={()=>switchMode('signin')}>Sign in</button>
    <button type="button" role="tab" aria-selected={isSignup} className={isSignup?'active':''} onClick={()=>switchMode('signup')}>Create account</button>
   </div>
-  <form onSubmit={submit} className="auth-form">
+  {!notice&&<form onSubmit={submit} className="auth-form">
    {isSignup&&<label>Full name<input type="text" value={fullName} onChange={e=>setFullName(e.target.value)} autoComplete="name" required minLength={2} maxLength={100} placeholder="Your full name"/></label>}
    <label>Email address<input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" required maxLength={254} placeholder="you@company.com"/></label>
    <label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete={isSignup?'new-password':'current-password'} required minLength={8} maxLength={128} placeholder={isSignup?'At least 8 characters':'Your password'}/></label>
    {isSignup&&<label>Confirm password<input type="password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} autoComplete="new-password" required minLength={8} maxLength={128} placeholder="Re-enter your password"/></label>}
    <button className="auth-submit" type="submit" disabled={busy||!email.trim()||password.length<8||(isSignup&&(fullName.trim().length<2||password!==confirmPassword))}>{busy?(isSignup?'Creating account…':'Signing in…'):(isSignup?'Create account':'Sign in securely')}</button>
-  </form>
-  {!isSignup&&<button type="button" className="auth-notice-action auth-resend-inline" disabled={!email.trim()||resendBusy} onClick={resendConfirmation}>{resendBusy?'Sending verification…':'Resend verification email'}</button>}
-  {resendMessage&&!notice&&<p className="auth-resend-message" role="status">{resendMessage}</p>}
+  </form>}
   {error&&<p className="auth-error" role="alert">{error}</p>}
-  {notice&&<div className="auth-notice" role="status"><b>Next step</b><br/>{notice}<button type="button" className="auth-notice-action" onClick={resendConfirmation} disabled={resendBusy}>{resendBusy?'Sending…':'Resend confirmation email'}</button>{resendMessage&&<small className="auth-resend-message">{resendMessage}</small>}<button type="button" className="auth-notice-action" onClick={()=>switchMode('signin')}>Back to sign in</button></div>}
-  <p className="auth-footnote">{isSignup?'All new accounts require email verification and manual workspace approval. Only active members can read company data.':'Need a login? Select Create account. New accounts remain pending until the workspace owner approves them.'}</p>
+  {notice&&<div className="auth-notice" role="status">{notice}<button type="button" className="auth-notice-action" onClick={()=>switchMode('signin')}>Back to sign in</button></div>}
  </section></main>
 }
 
