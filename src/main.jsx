@@ -131,9 +131,80 @@ const configuredPublicKey=String(import.meta.env.VITE_SUPABASE_ANON_KEY||import.
 const SUPABASE_PUBLIC_KEY=configuredPublicKey&&!/^(your_|replace|placeholder)/i.test(configuredPublicKey)?configuredPublicKey:'sb_publishable_kV77uVff2Gv6PiW1b1xBrw_4XsqB_00';
 const fiscalYearStart=date=>{if(!date)return null;const [y,m]=String(date).slice(0,10).split('-').map(Number);return Number.isFinite(y)&&Number.isFinite(m)?(m>=4?y:y-1):null;};
 function AuthScreen({db}){
- const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
- const submit=async(e)=>{e.preventDefault();if(busy||!db)return;setBusy(true);setError('');try{const {error}=await db.auth.signInWithPassword({email:email.trim(),password});if(error)throw error;}catch(e){setError(e?.message||'Sign-in failed. Please try again.')}finally{setBusy(false)}};
- return <main className="auth-shell"><section className="auth-card"><div className="auth-brand"><span className="auth-brand-icon"><ShieldAlert size={23}/></span><div><b>ThreadIQ</b><small>PRIVATE BUSINESS WORKSPACE</small></div></div><h1>Sign in to ThreadIQ</h1><p className="auth-copy">This workspace is private. Only workspace-approved accounts can view sales, buyer and supplier data. New account registration is disabled.</p><form onSubmit={submit} className="auth-form"><label>Email address<input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="username" required maxLength={254} placeholder="you@company.com"/></label><label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" required minLength={8} maxLength={128} placeholder="Your password"/></label><button className="auth-submit" type="submit" disabled={busy||!email.trim()||password.length<8}>{busy?'Signing in…':'Sign in securely'}</button></form>{error&&<p className="auth-error" role="alert">{error}</p>}<p className="auth-footnote">Account creation is closed. If you need access, contact the workspace owner; only manually approved accounts can read business data.</p></section></main>
+ const [mode,setMode]=useState('signin');
+ const [fullName,setFullName]=useState('');
+ const [email,setEmail]=useState('');
+ const [password,setPassword]=useState('');
+ const [confirmPassword,setConfirmPassword]=useState('');
+ const [busy,setBusy]=useState(false);
+ const [error,setError]=useState('');
+ const [notice,setNotice]=useState('');
+ const isSignup=mode==='signup';
+ const clearFeedback=()=>{setError('');setNotice('')};
+ const switchMode=next=>{setMode(next);clearFeedback();setPassword('');setConfirmPassword('')};
+ const friendlyAuthError=message=>{
+  const text=String(message||'').toLowerCase();
+  if(text.includes('signup')&&(/disabled|not allowed|not permitted/.test(text)))return 'New account registration is disabled in Supabase Auth. The workspace owner must enable “Allow new users to sign up” in Authentication settings.';
+  if(text.includes('password')&&text.includes('least'))return 'Choose a stronger password with at least 8 characters.';
+  if(text.includes('rate limit')||text.includes('too many'))return 'Too many attempts. Wait a few minutes and try again.';
+  if(text.includes('redirect')&&text.includes('allow'))return 'The current website URL is not in Supabase Auth’s allowed redirect URLs. Add this site under Authentication → URL Configuration.';
+  return message|| (isSignup?'Account creation failed. Please try again.':'Sign-in failed. Please try again.');
+ };
+ const submit=async(e)=>{
+  e.preventDefault();
+  if(busy||!db)return;
+  clearFeedback();
+  const cleanEmail=email.trim().toLowerCase();
+  if(isSignup){
+   if(fullName.trim().length<2){setError('Enter your full name.');return;}
+   if(password.length<8){setError('Password must contain at least 8 characters.');return;}
+   if(password!==confirmPassword){setError('Passwords do not match.');return;}
+  }
+  setBusy(true);
+  try{
+   if(isSignup){
+    const {data,error}=await db.auth.signUp({
+     email:cleanEmail,
+     password,
+     options:{
+      emailRedirectTo:window.location.origin,
+      data:{full_name:fullName.trim()}
+     }
+    });
+    if(error)throw error;
+    if(data?.session)await db.auth.signOut();
+    setPassword('');
+    setConfirmPassword('');
+    setNotice('Account request submitted. Check your email for a verification link. After verification, the workspace owner must approve your account before any business data is available.');
+   }else{
+    const {error}=await db.auth.signInWithPassword({email:cleanEmail,password});
+    if(error)throw error;
+   }
+  }catch(e){
+   setError(friendlyAuthError(e?.message));
+  }finally{
+   setBusy(false);
+  }
+ };
+ return <main className="auth-shell"><section className="auth-card">
+  <div className="auth-brand"><span className="auth-brand-icon"><ShieldAlert size={23}/></span><div><b>ThreadIQ</b><small>PRIVATE BUSINESS WORKSPACE</small></div></div>
+  <h1>{isSignup?'Create your account':'Sign in to ThreadIQ'}</h1>
+  <p className="auth-copy">{isSignup?'Create your login, verify your email and request workspace approval. Registration does not automatically grant access to business data.':'Sign in with a workspace-approved account to access sales, buyer and supplier data.'}</p>
+  <div className="auth-mode-switch" role="tablist" aria-label="Account access">
+   <button type="button" role="tab" aria-selected={!isSignup} className={!isSignup?'active':''} onClick={()=>switchMode('signin')}>Sign in</button>
+   <button type="button" role="tab" aria-selected={isSignup} className={isSignup?'active':''} onClick={()=>switchMode('signup')}>Create account</button>
+  </div>
+  <form onSubmit={submit} className="auth-form">
+   {isSignup&&<label>Full name<input type="text" value={fullName} onChange={e=>setFullName(e.target.value)} autoComplete="name" required minLength={2} maxLength={100} placeholder="Your full name"/></label>}
+   <label>Email address<input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" required maxLength={254} placeholder="you@company.com"/></label>
+   <label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete={isSignup?'new-password':'current-password'} required minLength={8} maxLength={128} placeholder={isSignup?'At least 8 characters':'Your password'}/></label>
+   {isSignup&&<label>Confirm password<input type="password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} autoComplete="new-password" required minLength={8} maxLength={128} placeholder="Re-enter your password"/></label>}
+   <button className="auth-submit" type="submit" disabled={busy||!email.trim()||password.length<8||(isSignup&&(fullName.trim().length<2||password!==confirmPassword))}>{busy?(isSignup?'Creating account…':'Signing in…'):(isSignup?'Create account':'Sign in securely')}</button>
+  </form>
+  {error&&<p className="auth-error" role="alert">{error}</p>}
+  {notice&&<div className="auth-notice" role="status"><b>Next step</b><br/>{notice}<button type="button" className="auth-notice-action" onClick={()=>switchMode('signin')}>Back to sign in</button></div>}
+  <p className="auth-footnote">{isSignup?'All new accounts require email verification and manual workspace approval. Only active members can read company data.':'Need a login? Select Create account. New accounts remain pending until the workspace owner approves them.'}</p>
+ </section></main>
 }
 
 function AccessScreen({mode,db,email='',onRetry=()=>{}}){
