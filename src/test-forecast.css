@@ -1,0 +1,95 @@
+#root .tf-section{display:flex;flex-direction:column;gap:14px;margin-top:22px;padding-top:22px;border-top:1px solid #dce6f0;min-width:0;color:#253b59}
+#root .tf-section-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+#root .tf-section-heading h2{display:flex;align-items:center;gap:9px;margin:7px 0 5px;color:#172e4d;font:800 22px/1.2 Manrope,sans-serif;letter-spacing:-.45px}
+#root .tf-section-heading h2 svg{color:#2476bd}
+#root .tf-section-heading p{max-width:760px;margin:0;color:#71839c;font-size:11px;line-height:1.6}
+#root .tf-engine-pill{display:flex;align-items:center;gap:7px;white-space:nowrap;padding:8px 11px;border:1px solid #cce5dc;border-radius:20px;background:#f0faf6;color:#16815f;font-size:9px;font-weight:800}
+#root .tf-filter-card{display:grid;grid-template-columns:minmax(150px,1fr) minmax(140px,.8fr) minmax(150px,1fr) minmax(220px,1.5fr);align-items:end;gap:11px;padding:14px;border:1px solid #e0e8f2;border-radius:12px;background:#fff;box-shadow:0 6px 18px rgba(33,68,111,.04)}
+#root .tf-filter-card label,#root .tf-override-panel label{display:grid;gap:7px;min-width:0}
+#root .tf-filter-card label>span,#root .tf-override-panel label>span{color:#637790;font-size:9px;font-weight:800}
+#root .tf-filter-card select,#root .tf-override-panel select,#root .tf-override-panel input{width:100%;min-width:0;height:39px;padding:8px 10px;border:1px solid #dce5f0;border-radius:8px;background:#fbfdff;color:#263e5b;font-size:10px;outline:none}
+#root .tf-filter-card select:focus,#root .tf-override-panel select:focus,#root .tf-override-panel input:focus{border-color:#368bd6;box-shadow:0 0 0 3px #368bd61a}
+#root .tf-filter-help{display:flex;align-items:center;gap:7px;min-height:38px;color:#71839c;font-size:9px;line-height:1.45}
+#root .tf-data-warning{display:flex;align-items:flex-start;gap:10px;padding:11px 13px;border:1px solid #cfe6db;border-radius:10px;background:#f3fbf7;color:#33735d}
+#root .tf-data-warning>svg{flex:0 0 auto;margin-top:1px}
+#root .tf-data-warning strong{display:block;color:#245c49;font-size:10px}
+#root .tf-data-warning p{margin:4px 0 0;color:#5d806f;font-size:10px;line-height:1.6}
+#root .tf-data-warning-stale{border-color:#f0d8a9;background:#fff9ed;color:#9a6c17}
+#root .tf-data-warning-stale strong{color:#875b13}
+#root .tf-data-warning-stale p{color:#896e43}
+#root .tf-row-config{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 13px;border:1px solid #e1e9f2;border-radius:10px;background:#fbfdff}
+#root .tf-row-config-main{display:flex;align-items:center;gap:9px;min-width:0;color:#2875b8}
+#root .tf-row-config-main>div{display:grid;gap:3px;min-width:0}
+#root .tf-row-config-main b{color:#304d6d;font-size:10px}
+#root .tf-row-config-main span{color:#8291a5;font-size:9px;overflow-wrap:anywhere}
+#root .tf-row-config-note{max-width:420px;color:#8291a5;font-size:9px;line-height:1.5;text-align:right}
+#root .tf-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+#root .tf-stat{display:flex;flex-direction:column;gap:7px;min-width:0;padding:12px;border:1px solid #e3eaf3;border-radius:10px;background:#fff}
+#root .tf-stat-top{display:flex;justify-content:space-between;align-items:center;gap:6px;color:#71839b;font-size:9px;font-weight:700}
+#root .tf-stat-top svg{color:#7d9dbd}
+#root .tf-stat strong{color:#213a5b;font:800 16px/1.25 Manrope,sans-serif;overflow-wrap:anywhere}
+#root .tf-stat small{color:#91a0b1;font-size:8px;line-height:1.4}
+#root .tf-stat-violet{background:#fbfaff;border-color:#e8e2f5}
+#root .tf-stat-violet .tf-stat-top svg{color:#9a83c6}
+#root .tf-stat-green{background:#f6fcf9;border-color:#d9eee4}
+#root .tf-stat-green strong{color:#14815e}
+#root .tf-stat-amber{background:#fffbf4;border-color:#f2e7cf}
+#root .tf-stat-amber strong{color:#986b1e}
+#root .tf-override-panel{display:grid;grid-template-columns:minmax(240px,1.4fr) minmax(200px,1fr) minmax(140px,.6fr) auto;align-items:end;gap:12px;padding:13px;border:1px solid #dbe7f2;border-radius:11px;background:#f9fcff}
+#root .tf-override-title{display:flex;align-items:flex-start;gap:9px;min-width:0}
+#root .tf-override-title>svg{flex:0 0 auto;margin-top:2px;color:#2478bd}
+#root .tf-override-title>div{display:grid;gap:4px}
+#root .tf-override-title b{color:#284967;font-size:10px}
+#root .tf-override-title span{color:#8090a5;font-size:9px;line-height:1.5}
+#root .tf-clear-override{height:38px;padding:0 12px;border:1px solid #dce5ef;border-radius:8px;background:#fff;color:#526b88;font-size:9px;font-weight:700;white-space:nowrap}
+#root .tf-validation{grid-column:1/-1;color:#b65a42;font-size:9px}
+#root .tf-override-impact{grid-column:1/-1;padding:8px 10px;border:1px solid #cde9dc;border-radius:8px;background:#f0faf5;color:#187a59;font-size:9px;font-weight:700}
+#root .tf-analysis-grid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(300px,.9fr);gap:12px;align-items:stretch}
+#root .tf-chart-card,#root .tf-model-card,#root .tf-table-card{min-width:0;border:1px solid #e1e9f2;border-radius:12px;background:#fff;box-shadow:0 6px 18px rgba(33,68,111,.035)}
+#root .tf-chart-card,#root .tf-model-card{padding:14px}
+#root .tf-card-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+#root .tf-card-heading h3{margin:5px 0 4px;color:#203957;font:800 13px/1.35 Manrope,sans-serif;overflow-wrap:anywhere}
+#root .tf-card-heading p{margin:0;color:#8191a6;font-size:9px;line-height:1.5}
+#root .tf-card-heading>svg{color:#5788b4;flex:0 0 auto}
+#root .tf-confidence{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;padding:4px 7px;border:1px solid #e5eaf1;border-radius:20px;background:#f6f8fb;color:#6d7d91;font-size:8px;font-weight:800}
+#root .tf-confidence-high{border-color:#c9e8da;background:#effaf5;color:#16815e}
+#root .tf-confidence-medium{border-color:#d4e5f5;background:#f1f7fd;color:#3676ad}
+#root .tf-confidence-low{border-color:#f0dfbd;background:#fff9ef;color:#9a7027}
+#root .tf-chart-wrap{height:240px;margin-top:9px;min-width:0}
+#root .tf-chart-foot{display:flex;justify-content:space-between;gap:8px;padding-top:8px;border-top:1px solid #edf1f6;color:#8b9aae;font-size:8px}
+#root .tf-model-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:12px}
+#root .tf-model-metrics>div{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:8px;border:1px solid #edf1f6;border-radius:7px;background:#fbfdff}
+#root .tf-model-metrics span{color:#8291a5;font-size:8px}
+#root .tf-model-metrics b{color:#294665;font-size:9px;text-align:right}
+#root .tf-model-note{margin:10px 0;padding:8px 9px;border-radius:7px;background:#fff9ef;color:#876a3e;font-size:8px;line-height:1.55}
+#root .tf-candidate-list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+#root .tf-candidate-list>b{color:#637891;font-size:9px}
+#root .tf-candidate-row{display:grid;grid-template-columns:minmax(0,1fr) auto 55px;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0f3f7;color:#697d95;font-size:8px}
+#root .tf-candidate-row strong{color:#2b4c6e;font-size:9px}
+#root .tf-candidate-row small{color:#96a3b4;text-align:right;font-size:8px}
+#root .tf-table-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:14px}
+#root .tf-table-heading h3{margin:5px 0 4px;color:#203957;font:800 13px Manrope,sans-serif}
+#root .tf-table-heading p{margin:0;color:#8291a5;font-size:9px}
+#root .tf-table-heading input{width:min(260px,40%);height:34px;padding:7px 10px;border:1px solid #dce5f0;border-radius:8px;background:#fbfdff;color:#2b4562;font-size:9px}
+#root .tf-table-scroll{max-height:440px;overflow:auto;border-top:1px solid #e8edf4}
+#root .tf-table{width:100%;border-collapse:separate;border-spacing:0;white-space:nowrap;font-variant-numeric:tabular-nums}
+#root .tf-table th{position:sticky;top:0;z-index:2;padding:10px 11px;border-bottom:1px solid #e1e8f1;background:#f7faff;color:#6b7e96;font-size:8px;font-weight:800;letter-spacing:.3px;text-align:right}
+#root .tf-table th:first-child{text-align:left;left:0;min-width:230px}
+#root .tf-table td{padding:9px 11px;border-bottom:1px solid #edf1f6;color:#526a86;font-size:9px;text-align:right}
+#root .tf-table td:first-child{text-align:left;left:0}
+#root .tf-table tbody tr{cursor:pointer}
+#root .tf-table tbody tr:hover td{background:#f7fbff}
+#root .tf-table tbody tr.tf-selected-row td{background:#eef6ff}
+#root .tf-group-link{max-width:360px;padding:0;border:0;background:transparent;color:#265984;font-size:9px;font-weight:800;text-align:left;white-space:normal}
+#root .tf-override-tag{display:block;margin-top:4px;color:#11845e;font-size:8px;font-weight:700}
+#root .tf-model-name{color:#627a96;font-size:8px}
+#root .tf-money{color:#1c4e79!important;font-weight:800}
+#root .tf-table-foot{display:flex;justify-content:space-between;gap:10px;padding:9px 13px;color:#8b99aa;font-size:8px;line-height:1.5}
+#root .tf-empty{display:flex;align-items:flex-start;gap:10px;padding:16px;border:1px solid #f0dfbd;border-radius:10px;background:#fffaf0;color:#956b25}
+#root .tf-empty svg{flex:0 0 auto}
+#root .tf-empty b{display:block;color:#79581e;font-size:10px}
+#root .tf-empty span{color:#89734e;font-size:9px;line-height:1.55}
+#root .tf-method-note{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:1px solid #e5ebf2;border-radius:9px;background:#fbfdff;color:#7b8da3;font-size:9px;line-height:1.55}
+#root .tf-method-note svg{flex:0 0 auto;margin-top:1px;color:#5686b2}
+@media(max-width:1100px){#root .tf-filter-card{grid-template-columns:repeat(2,minmax(0,1fr))}#root .tf-stats{grid-template-columns:repeat(2,minmax(0,1fr))}#root .tf-override-panel{grid-template-columns:1fr 1fr}#root .tf-override-title{grid-column:1/-1}#root .tf-analysis-grid{grid-template-columns:1fr}}
+@media(max-width:760px){#root .tf-section-heading{flex-direction:column}#root .tf-row-config{align-items:flex-start;flex-direction:column}#root .tf-row-config-note{text-align:left}#root .tf-filter-card{grid-template-columns:1fr 1fr}#root .tf-override-panel{grid-template-columns:1fr}#root .tf-override-title{grid-column:auto}#root .tf-validation,#root .tf-override-impact{grid-column:auto}#root .tf-stats{grid-template-columns:1fr 1fr}#root .tf-chart-wrap{height:210px}#root .tf-table-heading{flex-direction:column}#root .tf-table-heading input{width:100%}#root .tf-table-foot{flex-direction:column}#root .tf-chart-foot{flex-direction:column}}
