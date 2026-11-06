@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, BarChart3,
+  Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, BarChart3, ChevronDown,
   Boxes, Calculator, CircleDollarSign, Factory, Gauge, Globe2,
   Layers, Lightbulb, Package, RefreshCw, ShieldAlert, Target,
   TrendingUp, Truck, Wallet
@@ -91,6 +91,7 @@ export default function ProductEconomics({
   const [indirectAlert, setIndirectAlert] = useState(30);
   const [portfolioSearch, setPortfolioSearch] = useState('');
   const [supplierSearch, setSupplierSearch] = useState('');
+  const [expandedAlertId, setExpandedAlertId] = useState(null);
 
   const options = useMemo(() => [...new Set(orders.map(keyOf))].sort(), [orders]);
   const data = useMemo(() => {
@@ -129,7 +130,7 @@ export default function ProductEconomics({
       else if (groupBy === 'season') label = row.season || 'Unspecified season';
       else label = [row.product_category || 'Unclassified', row.fabric || 'Unknown fabric', row.style_id || 'No style'].join(' · ');
       const group = groupsMap.get(label) || {
-        label, revenue: 0, profit: 0, totalCost: 0, directCost: 0, units: 0,
+        label, revenue: 0, profit: 0, totalCost: 0, directCost: 0, units: 0, orderedUnits: 0,
         orders: new Set(), rejection: 0, rework: 0, rows: 0
       };
       group.revenue += num(row.revenue_inr);
@@ -137,6 +138,7 @@ export default function ProductEconomics({
       group.totalCost += num(row.total_cost_inr);
       group.directCost += directCostOf(row);
       group.units += quantityOf(row);
+      group.orderedUnits += num(row.order_qty);
       group.rejection += num(row.rejection_qty);
       group.rework += num(row.rework_cost_inr);
       group.rows += 1;
@@ -149,7 +151,7 @@ export default function ProductEconomics({
       gpPct: group.revenue ? (group.revenue - group.directCost) / group.revenue * 100 : null,
       npPct: group.revenue ? group.profit / group.revenue * 100 : null,
       revenueCr: group.revenue / 1e7,
-      rejectionPct: group.units ? group.rejection / group.units * 100 : 0,
+      rejectionPct: group.orderedUnits ? group.rejection / group.orderedUnits * 100 : 0,
       reworkShare: group.revenue ? group.rework / group.revenue * 100 : 0
     })).sort((a, b) => b.revenue - a.revenue);
     const medianRevenue = median(portfolio.map(group => group.revenue));
@@ -303,15 +305,93 @@ export default function ProductEconomics({
   const supplierRowsForView = d.linkedSuppliers.filter(row => (row.name + ' ' + row.id + ' ' + row.supplyType).toLowerCase().includes(supplierSearch.toLowerCase())).slice(0, 12);
 
   const alerts = [];
-  const lowMarginProducts = d.portfolio.filter(row => row.gpPct != null && row.gpPct < num(marginAlert));
-  const lossProducts = d.portfolio.filter(row => row.profit < 0);
-  if (lossProducts.length) alerts.push({ level: 'critical', title: 'Negative-profit product groups', detail: lossProducts.length + ' product groups have negative net profit.', action: 'Review selling price, total cost and order mix.', count: lossProducts.length });
-  if (lowMarginProducts.length) alerts.push({ level: 'warning', title: 'Gross margin below target', detail: lowMarginProducts.length + ' groups are below the ' + num(marginAlert) + '% GP threshold.', action: 'Review direct material cost and selling price.', count: lowMarginProducts.length });
-  if (d.rejectionPct > num(rejectionAlert)) alerts.push({ level: 'warning', title: 'Rejection rate above threshold', detail: pct(d.rejectionPct) + ' of ordered quantity is classified as rejection.', action: 'Review style complexity, line efficiency and quality controls.', count: fmt(d.rejectionQty) + ' units' });
-  if (d.reworkShare > num(reworkAlert)) alerts.push({ level: 'warning', title: 'Rework cost share is elevated', detail: pct(d.reworkShare) + ' of revenue is represented by rework cost.', action: 'Investigate repeat defects and rework drivers.', count: money(d.reworkCost) });
-  if (d.indirectShare > num(indirectAlert)) alerts.push({ level: 'warning', title: 'Indirect expense concentration', detail: pct(d.indirectShare) + ' of total expenses sits outside fabric, trims and CMT direct cost.', action: 'Review overhead, freight, penalties and other cost allocations.', count: money(d.otherCost) });
-  if (topFiveShare > 60) alerts.push({ level: 'info', title: 'Product revenue concentration', detail: 'Top five selected product groups contribute ' + pct(topFiveShare) + ' of revenue.', action: 'Monitor dependency and diversify profitable product mix.', count: money(d.topFiveRevenue) });
-  if (!alerts.length && sourceAvailable) alerts.push({ level: 'good', title: 'No threshold breaches detected', detail: 'Current data is within the configured review thresholds.', action: 'Continue monitoring as new orders are loaded.', count: 'Clear' });
+  const lowMarginProducts = d.portfolio.filter(row => row.gpPct != null && row.gpPct < num(marginAlert)).sort((a,b)=>a.gpPct-b.gpPct);
+  const lossProducts = d.portfolio.filter(row => row.profit < 0).sort((a,b)=>a.profit-b.profit);
+  const rejectionProducts = d.portfolio.filter(row => row.rejection > 0).sort((a,b)=>b.rejectionPct-a.rejectionPct);
+  const reworkProducts = d.portfolio.filter(row => row.rework > 0).sort((a,b)=>b.reworkShare-a.reworkShare);
+  const indirectProducts = d.portfolio.map(row=>({...row,otherCost:row.totalCost-row.directCost,indirectShare:row.totalCost?(row.totalCost-row.directCost)/row.totalCost*100:0})).filter(row=>row.otherCost>0).sort((a,b)=>b.indirectShare-a.indirectShare);
+  const moneyCols = [
+    {label:'Product group', render:r=><><b>{r.label}</b><small>{fmt(r.orders)} orders · {compact(r.units)} units</small></>},
+    {label:'Revenue', render:r=>money(r.revenue)},
+    {label:'Total cost', render:r=>money(r.totalCost)},
+    {label:'GP%', render:r=>pct(r.gpPct)},
+    {label:'Net profit', render:r=>money(r.profit)},
+    {label:'NP%', render:r=>pct(r.npPct)}
+  ];
+  const pushAlert = alert => alerts.push(alert);
+  if (lossProducts.length) pushAlert({
+    id:'negative-profit',level:'critical',title:'Negative-profit product groups',
+    detail:lossProducts.length+' product groups have negative net profit.',
+    action:'Review selling price, total cost and order mix.',count:lossProducts.length+' groups',
+    details:lossProducts,columns:moneyCols,summary:'Most negative group: '+lossProducts[0].label,
+  });
+  if (lowMarginProducts.length) pushAlert({
+    id:'low-margin',level:'warning',title:'Gross margin below target',
+    detail:lowMarginProducts.length+' groups are below the '+num(marginAlert)+'% GP threshold.',
+    action:'Review direct material cost and selling price.',count:lowMarginProducts.length+' groups',
+    details:lowMarginProducts,columns:moneyCols,summary:'Lowest GP margin: '+pct(lowMarginProducts[0].gpPct),
+  });
+  if (d.rejectionPct > num(rejectionAlert)) pushAlert({
+    id:'rejection',level:'warning',title:'Rejection rate above threshold',
+    detail:pct(d.rejectionPct)+' of ordered quantity is classified as rejection.',
+    action:'Review style complexity, line efficiency and quality controls.',count:fmt(d.rejectionQty)+' units',
+    details:rejectionProducts,summary:'Highest product-group rejection rates',
+    columns:[
+      {label:'Product group',render:r=><><b>{r.label}</b><small>{fmt(r.orders)} orders</small></>},
+      {label:'Rejected qty',render:r=>fmt(r.rejection)},
+      {label:'Rejection %',render:r=>pct(r.rejectionPct)},
+      {label:'Ordered qty',render:r=>fmt(r.orderedUnits)},
+      {label:'Revenue',render:r=>money(r.revenue)}
+    ]
+  });
+  if (d.reworkShare > num(reworkAlert)) pushAlert({
+    id:'rework',level:'warning',title:'Rework cost share is elevated',
+    detail:pct(d.reworkShare)+' of revenue is represented by rework cost.',
+    action:'Investigate repeat defects and rework drivers.',count:money(d.reworkCost),
+    details:reworkProducts,summary:'Product groups ranked by rework / revenue',
+    columns:[
+      {label:'Product group',render:r=><><b>{r.label}</b><small>{fmt(r.orders)} orders</small></>},
+      {label:'Rework cost',render:r=>money(r.rework)},
+      {label:'Rework / revenue',render:r=>pct(r.reworkShare)},
+      {label:'Revenue',render:r=>money(r.revenue)},
+      {label:'Orders',render:r=>fmt(r.orders)}
+    ]
+  });
+  if (d.indirectShare > num(indirectAlert)) pushAlert({
+    id:'indirect-cost',level:'warning',title:'Indirect expense concentration',
+    detail:pct(d.indirectShare)+' of total expenses sits outside fabric, trims and CMT direct cost.',
+    action:'Review overhead, freight, penalties and other cost allocations.',count:money(d.otherCost),
+    details:indirectProducts,summary:'Product groups ranked by indirect cost share',
+    columns:[
+      {label:'Product group',render:r=><><b>{r.label}</b><small>{fmt(r.orders)} orders</small></>},
+      {label:'Other / indirect',render:r=>money(r.otherCost)},
+      {label:'Indirect / total cost',render:r=>pct(r.indirectShare)},
+      {label:'Total cost',render:r=>money(r.totalCost)},
+      {label:'Net profit',render:r=>money(r.profit)}
+    ]
+  });
+  if (topFiveShare > 60) {
+    const topProducts=d.portfolio.slice(0,5);
+    pushAlert({
+      id:'revenue-concentration',level:'info',title:'Product revenue concentration',
+      detail:'Top five selected product groups contribute '+pct(topFiveShare)+' of revenue.',
+      action:'Monitor dependency and diversify profitable product mix.',count:money(d.topFiveRevenue),
+      details:topProducts,summary:'Top five groups by revenue contribution',
+      columns:[
+        {label:'Product group',render:r=><b>{r.label}</b>},
+        {label:'Revenue',render:r=>money(r.revenue)},
+        {label:'Revenue share',render:r=>pct(d.revenue?r.revenue/d.revenue*100:0)},
+        {label:'GP%',render:r=>pct(r.gpPct)},
+        {label:'NP%',render:r=>pct(r.npPct)}
+      ]
+    });
+  }
+  if (!alerts.length && sourceAvailable) pushAlert({
+    id:'all-clear',level:'good',title:'No threshold breaches detected',
+    detail:'Current data is within the configured review thresholds.',
+    action:'Continue monitoring as new orders are loaded.',count:'Clear',
+    details:[],summary:'All configured rules are within their thresholds.',columns:[]
+  });
 
   const tipStyle = { background: '#fff', border: '1px solid #dfe7f1', borderRadius: 10, color: '#334963', fontSize: 12, boxShadow: '0 8px 24px rgba(30,55,85,.10)' };
   const moneyTip = value => money(value);
@@ -502,11 +582,24 @@ export default function ProductEconomics({
           </div>
         </Panel>
         <div className="pe-alert-list">
-          {alerts.map((alert, index) => <article className={'pe-alert ' + alert.level} key={alert.title}>
-            <span className="pe-alert-icon">{alert.level === 'critical' ? <AlertTriangle size={17}/> : alert.level === 'good' ? <ShieldAlert size={17}/> : alert.level === 'info' ? <Lightbulb size={17}/> : <AlertTriangle size={17}/>}</span>
-            <div><div className="pe-alert-title"><b>{alert.title}</b><span>{alert.level.toUpperCase()}</span></div><p>{alert.detail}</p><small>Next step: {alert.action}</small></div>
-            <strong>{alert.count}</strong>
-          </article>)}
+          {alerts.map(alert => {
+            const isOpen=expandedAlertId===alert.id;
+            return <article className={'pe-alert '+alert.level+(isOpen?' is-expanded':'')} key={alert.id}>
+              <button type="button" className="pe-alert-trigger" aria-expanded={isOpen} aria-controls={'pe-alert-detail-'+alert.id} onClick={()=>setExpandedAlertId(current=>current===alert.id?null:alert.id)}>
+                <span className="pe-alert-icon">{alert.level==='critical'?<AlertTriangle size={17}/>:alert.level==='good'?<ShieldAlert size={17}/>:alert.level==='info'?<Lightbulb size={17}/>:<AlertTriangle size={17}/>}</span>
+                <span className="pe-alert-copy">
+                  <span className="pe-alert-title"><b>{alert.title}</b><em>{alert.level.toUpperCase()}</em></span>
+                  <span className="pe-alert-description">{alert.detail}</span>
+                  <span className="pe-alert-next">Recommended action: {alert.action}</span>
+                </span>
+                <span className="pe-alert-right"><strong>{alert.count}</strong><span className="pe-alert-view">{isOpen?'Hide details':'View details'}<ChevronDown size={15}/></span></span>
+              </button>
+              {isOpen&&<div className="pe-alert-detail" id={'pe-alert-detail-'+alert.id}>
+                <div className="pe-alert-detail-head"><div><b>{alert.summary||'Affected product groups'}</b><small>{alert.details.length} matching product groups · current filters</small></div></div>
+                {alert.details.length&&alert.columns.length?<div className="pe-alert-detail-table-wrap"><table className="pe-table pe-alert-detail-table"><thead><tr>{alert.columns.map(col=><th key={col.label}>{col.label}</th>)}</tr></thead><tbody>{alert.details.map((row,index)=><tr key={row.label||row.id||index}>{alert.columns.map(col=><td key={col.label}>{col.render(row)}</td>)}</tr>)}</tbody></table></div>:<p className="pe-alert-no-details">No affected product groups for this alert in the selected filters.</p>}
+              </div>}
+            </article>;
+          })}
         </div>
       </Section>
 
