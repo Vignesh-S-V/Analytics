@@ -184,3 +184,40 @@
  #root .pe-alert{grid-template-columns:30px minmax(0,1fr)}
  #root .pe-alert>strong{grid-column:2;text-align:left}
 }
+
+
+/* Final page cleanup: one title, tighter rhythm and balanced matrix cards */
+#root .pe-page{gap:14px}
+#root .pe-controls{padding:13px 15px;gap:10px}
+#root .pe-controls>p{font-size:9px}
+#root .pe-kpi-grid{gap:10px}
+#root .pe-metric{min-height:108px;padding:13px 15px}
+#root .pe-unit-strip>div{padding:10px 12px}
+#root .pe-section{gap:9px}
+#root .pe-section-head{gap:9px}
+#root .pe-section-head h2{font-size:18px}
+#root .pe-section-head p{font-size:10px}
+#root .pe-panel{gap:9px}
+#root .pe-panel-head h3{font-size:14px}
+#root .pe-panel-head p{font-size:9px}
+#root .pe-matrix-panel{height:535px;min-height:535px}
+#root .pe-matrix-panel>.pe-tall-chart{height:auto;min-height:405px;flex:1 1 auto}
+#root .pe-matrix-table-wrap{max-height:350px;overflow-y:auto;scrollbar-gutter:stable}
+#root .pe-matrix-table-wrap thead{position:sticky;top:0;z-index:2}
+#root .pe-matrix-panel .pe-quadrant-legend{padding-top:0}
+#root .pe-note{font-size:9px;line-height:1.45}
+#root .pe-governance-grid{display:none}
+#root .pe-portfolio-summary{gap:5px}
+#root .pe-portfolio-summary>div{padding:6px 7px;font-size:9px}
+@media(max-width:780px){
+ #root .pe-matrix-panel{height:auto;min-height:0}
+ #root .pe-matrix-panel>.pe-tall-chart{height:360px;min-height:360px;flex:0 0 360px}
+ #root .pe-matrix-table-wrap{max-height:390px}
+}
+@media(max-width:520px){
+ #root .pe-page{gap:12px}
+ #root .pe-matrix-panel>.pe-tall-chart{height:300px;min-height:300px;flex-basis:300px}
+ #root .pe-matrix-panel{height:auto;min-height:0}
+ #root .pe-metric{min-height:98px}
+ #root .pe-section-head h2{font-size:16px}
+}
