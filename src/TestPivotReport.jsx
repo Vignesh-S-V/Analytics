@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, GripVertical, Layers3, Plus, RotateCcw, Table2, X } from 'lucide-react';
 import './test-pivot.css';
+import TestForecasting from './TestForecasting.jsx';
 
 const DIMENSIONS = [
   { key: 'product_category', label: 'Product Category' },
@@ -372,6 +373,8 @@ export default function TestPivotReport({ orders = [], live = false, loading = f
           <div className="tp-report-foot"><span>+ Expand a category to drill into the next row field.</span><span>YoY % = (Current year − Previous year) ÷ Previous year × 100.</span></div>
         </div>
       </div>
+
+      <TestForecasting orders={orders} rowFields={rowFields} dimensions={DIMENSIONS} />
     </section>
   );
 }
