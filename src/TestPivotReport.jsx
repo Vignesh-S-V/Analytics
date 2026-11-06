@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, GripVertical, Layers3, Plus, RotateCcw, Table2, X } from 'lucide-react';
+import { ChevronDown, GripVertical, Layers3, Plus, RotateCcw, Table2, X } from 'lucide-react';
 import './test-pivot.css';
 
 const DIMENSIONS = [
@@ -23,6 +23,7 @@ const MONTHS = [
 
 const textValue = value => String(value ?? '').trim() || 'Unspecified';
 const money = value => '₹' + Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+const percent = value => Number.isFinite(value) ? (value > 0 ? '+' : '') + value.toFixed(2) + '%' : '—';
 const dateParts = value => {
   const match = String(value || '').match(/^(\d{4})-(\d{2})/);
   return match ? { year: match[1], month: match[2], key: match[1] + '-' + match[2] } : null;
@@ -65,7 +66,25 @@ function buildNodes(rows, fields, level, monthKeys, prefix = '') {
     });
 }
 
-function PivotRows({ nodes, columns, fields, expanded, toggle, depth = 0 }) {
+const growthBetween = (current, previous) => {
+  if (!Number.isFinite(previous) || previous === 0) return null;
+  return ((current - previous) / Math.abs(previous)) * 100;
+};
+
+function displayColumnValue(node, column, growthNumber) {
+  const current = Number(node.totals[column.currentKey] || 0);
+  const previous = Number(node.totals[column.previousKey] || 0);
+  if (column.kind === 'current') return money(current);
+  if (column.kind === 'previous') return money(previous);
+  if (column.kind === 'yoy') {
+    const rate = growthBetween(current, previous);
+    return rate === null ? (current > 0 ? 'New' : '—') : percent(rate);
+  }
+  if (column.kind === 'projected') return money(current * (1 + growthNumber / 100));
+  return '—';
+}
+
+function PivotRows({ nodes, columns, expanded, toggle, growthNumber, depth = 0 }) {
   return nodes.map(node => {
     const hasChildren = Boolean(node.children?.length);
     const isOpen = expanded.has(node.id);
@@ -79,64 +98,110 @@ function PivotRows({ nodes, columns, fields, expanded, toggle, depth = 0 }) {
                   {isOpen ? <ChevronDown size={15} /> : <Plus size={15} />}
                 </button>
               ) : <span className="tp-expand-spacer" />}
-              <span className="tp-node-field">{fields[depth]?.label || node.field}</span>
               <strong>{node.label}</strong>
             </span>
           </td>
-          {columns.map(column => {
-            const actual = node.totals[column.key] || 0;
-            const value = column.kind === 'projected' ? actual * (1 + column.growth / 100) : actual;
-            return <td key={column.id} className={column.kind === 'projected' ? 'tp-projected-cell' : ''}>{money(value)}</td>;
-          })}
+          {columns.map(column => (
+            <td
+              key={column.id}
+              className={
+                column.kind === 'projected' ? 'tp-projected-cell' :
+                column.kind === 'yoy' ? 'tp-yoy-cell' : ''
+              }
+            >{displayColumnValue(node, column, growthNumber)}</td>
+          ))}
         </tr>
-        {hasChildren && isOpen && <PivotRows nodes={node.children} columns={columns} fields={fields} expanded={expanded} toggle={toggle} depth={depth + 1} />}
+        {hasChildren && isOpen && (
+          <PivotRows
+            nodes={node.children}
+            columns={columns}
+            expanded={expanded}
+            toggle={toggle}
+            growthNumber={growthNumber}
+            depth={depth + 1}
+          />
+        )}
       </React.Fragment>
     );
   });
 }
 
 export default function TestPivotReport({ orders = [], live = false, loading = false }) {
-  const availableYears = useMemo(() => [...new Set(orders.map(row => dateParts(row.order_date)?.year).filter(Boolean))].sort((a, b) => b.localeCompare(a)), [orders]);
+  const availableYears = useMemo(
+    () => [...new Set(orders.map(row => dateParts(row.order_date)?.year).filter(Boolean))].sort((a, b) => b.localeCompare(a)),
+    [orders]
+  );
   const [year, setYear] = useState('latest');
   const [month, setMonth] = useState('all');
   const [growth, setGrowth] = useState('20');
-  const [rowFields, setRowFields] = useState(['product_category', 'fabric']);
+  const [rowFields, setRowFields] = useState(['product_category', 'country']);
   const [expanded, setExpanded] = useState(() => new Set());
   const [dragField, setDragField] = useState('');
 
   useEffect(() => {
-    if (year === 'latest' && !availableYears.length) return;
-    if (year !== 'latest' && year !== 'all' && !availableYears.includes(year)) setYear('latest');
+    if (year === 'latest' || availableYears.includes(year)) return;
+    setYear('latest');
   }, [availableYears, year]);
 
-  const selectedYear = year === 'latest' ? (availableYears[0] || 'all') : year;
+  const selectedYear = year === 'latest' ? (availableYears[0] || '') : year;
+  const comparisonYear = selectedYear ? String(Number(selectedYear) - 1) : '';
   const filteredRows = useMemo(() => orders.filter(row => {
     const date = dateParts(row.order_date);
     if (!date) return false;
-    if (selectedYear !== 'all' && date.year !== selectedYear) return false;
+    if (date.year !== selectedYear && date.year !== comparisonYear) return false;
     if (month !== 'all' && date.month !== month) return false;
     return true;
-  }), [orders, selectedYear, month]);
+  }), [orders, selectedYear, comparisonYear, month]);
 
-  const monthKeys = useMemo(() => [...new Set(filteredRows.map(row => dateParts(row.order_date)?.key).filter(Boolean))].sort(), [filteredRows]);
+  const monthNumbers = useMemo(
+    () => [...new Set(filteredRows.map(row => dateParts(row.order_date)?.month).filter(Boolean))].sort(),
+    [filteredRows]
+  );
+  const monthKeys = useMemo(
+    () => [...new Set(filteredRows.map(row => dateParts(row.order_date)?.key).filter(Boolean))],
+    [filteredRows]
+  );
+
   const growthNumber = growth.trim() === '' ? 0 : Number(growth);
   const validGrowth = Number.isFinite(growthNumber) && growthNumber >= -100 && growthNumber <= 1000;
-  const projectionEnabled = month !== 'all' && validGrowth;
-  const columns = useMemo(() => monthKeys.flatMap(key => {
-    const monthNumber = key.slice(5, 7);
-    const result = [{ id: key + '-actual', key, kind: 'actual' }];
-    if (projectionEnabled && monthNumber === month) result.push({ id: key + '-projected', key, kind: 'projected', growth: growthNumber });
+  const projectionEnabled = month !== 'all' && validGrowth && Boolean(selectedYear);
+  const columns = useMemo(() => monthNumbers.flatMap(monthNumber => {
+    const currentKey = selectedYear + '-' + monthNumber;
+    const previousKey = comparisonYear + '-' + monthNumber;
+    const monthLabelName = monthName(monthNumber);
+    const result = [
+      { id: currentKey + '-current', kind: 'current', currentKey, previousKey, label: monthLabelName + ' ' + selectedYear + ' · Actual' },
+      { id: previousKey + '-previous', kind: 'previous', currentKey, previousKey, label: monthLabelName + ' ' + comparisonYear + ' · Actual' },
+      { id: currentKey + '-yoy', kind: 'yoy', currentKey, previousKey, label: monthLabelName + ' · YoY %' }
+    ];
+    if (projectionEnabled && monthNumber === month) {
+      result.push({
+        id: currentKey + '-projected',
+        kind: 'projected',
+        currentKey,
+        previousKey,
+        label: monthLabelName + ' ' + selectedYear + ' · +' + growthNumber + '% Scenario'
+      });
+    }
     return result;
-  }), [monthKeys, projectionEnabled, month, growthNumber]);
+  }), [monthNumbers, selectedYear, comparisonYear, projectionEnabled, month, growthNumber]);
 
-  const nodes = useMemo(() => buildNodes(filteredRows, rowFields, 0, monthKeys), [filteredRows, rowFields, monthKeys]);
+  const nodes = useMemo(
+    () => buildNodes(filteredRows, rowFields, 0, monthKeys),
+    [filteredRows, rowFields, monthKeys]
+  );
   const fieldOptions = DIMENSIONS.filter(field => !rowFields.includes(field.key));
-  const actualRevenue = filteredRows.reduce((sum, row) => sum + Number(row.revenue_inr || 0), 0);
-  const projectedBase = month === 'all' ? 0 : filteredRows.reduce((sum, row) => {
-    return dateParts(row.order_date)?.month === month ? sum + Number(row.revenue_inr || 0) : sum;
+  const actualRevenue = filteredRows.reduce((sum, row) => {
+    return dateParts(row.order_date)?.year === selectedYear ? sum + Number(row.revenue_inr || 0) : sum;
   }, 0);
+  const previousRevenue = filteredRows.reduce((sum, row) => {
+    return dateParts(row.order_date)?.year === comparisonYear ? sum + Number(row.revenue_inr || 0) : sum;
+  }, 0);
+  const yoyGrowth = growthBetween(actualRevenue, previousRevenue);
+  const projectedBase = month === 'all' ? 0 : actualRevenue;
   const projectedRevenue = projectionEnabled ? projectedBase * (1 + growthNumber / 100) : null;
   const incrementalRevenue = projectedRevenue === null ? null : projectedRevenue - projectedBase;
+  const latestYear = availableYears[0] || '';
 
   const addField = fieldKey => {
     if (!DIMENSIONS.some(field => field.key === fieldKey) || rowFields.includes(fieldKey)) return;
@@ -157,7 +222,7 @@ export default function TestPivotReport({ orders = [], live = false, loading = f
     setYear('latest');
     setMonth('all');
     setGrowth('20');
-    setRowFields(['product_category', 'fabric']);
+    setRowFields(['product_category', 'country']);
     setExpanded(new Set());
   };
   const handleDrop = event => {
@@ -167,13 +232,27 @@ export default function TestPivotReport({ orders = [], live = false, loading = f
     setDragField('');
   };
 
+  const totalsByKey = useMemo(() => {
+    const totals = {};
+    monthKeys.forEach(key => { totals[key] = 0; });
+    filteredRows.forEach(row => {
+      const date = dateParts(row.order_date);
+      if (date && Object.prototype.hasOwnProperty.call(totals, date.key)) {
+        totals[date.key] += Number(row.revenue_inr || 0);
+      }
+    });
+    return totals;
+  }, [filteredRows, monthKeys]);
+
+  const totalNode = { totals: totalsByKey };
+
   return (
     <section className="tp-page">
       <div className="tp-intro">
         <div>
           <span className="tp-kicker">PIVOT BUILDER · TEST WORKSPACE</span>
           <h2>Category × Monthly Revenue</h2>
-          <p>Drag text fields into the row hierarchy. Expand a category to see its underlying detail and the revenue impact of your growth assumption.</p>
+          <p>Compare each month with the same month in the previous year. Expand a category to see the country-level revenue split and the year-on-year change.</p>
         </div>
         <button type="button" className="tp-reset" onClick={reset}><RotateCcw size={14} /> Reset layout</button>
       </div>
@@ -181,9 +260,8 @@ export default function TestPivotReport({ orders = [], live = false, loading = f
       <div className="tp-filter-card">
         <label><span>Year</span>
           <select value={year} onChange={event => setYear(event.target.value)}>
-            <option value="latest">{availableYears[0] ? 'Latest year · ' + availableYears[0] : 'Latest available year'}</option>
-            <option value="all">All years</option>
-            {availableYears.filter(value => value !== availableYears[0]).map(value => <option key={value} value={value}>{value}</option>)}
+            <option value="latest">{latestYear ? 'Latest year · ' + latestYear : 'Latest available year'}</option>
+            {availableYears.filter(value => value !== latestYear).map(value => <option key={value} value={value}>{value}</option>)}
           </select>
         </label>
         <label><span>Month</span>
@@ -192,10 +270,10 @@ export default function TestPivotReport({ orders = [], live = false, loading = f
             {MONTHS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
           </select>
         </label>
-        <label><span>Growth (%)</span>
+        <label><span>Growth assumption (%)</span>
           <input type="number" min="-100" max="1000" step="0.1" value={growth} onChange={event => setGrowth(event.target.value)} placeholder="e.g. 20" />
         </label>
-        <div className="tp-filter-hint">Growth is applied only to the selected month. Example: ₹15,000 + 20% = ₹18,000. Select a specific month to show its projected column next to actual revenue.</div>
+        <div className="tp-filter-hint">YoY % is calculated from actual selected-year revenue versus the same month in the previous year. Growth assumption is a separate what-if calculation; it does not alter actuals.</div>
       </div>
 
       <div className="tp-builder-grid">
@@ -231,8 +309,8 @@ export default function TestPivotReport({ orders = [], live = false, loading = f
             </div>
             <div className="tp-drop-zone tp-column-zone">
               <span className="tp-zone-label">COLUMNS</span>
-              <span className="tp-row-field tp-fixed-field">Month <span>↔</span></span>
-              <span className="tp-zone-note">Monthly revenue</span>
+              <span className="tp-row-field tp-fixed-field">Month × Year comparison</span>
+              <span className="tp-zone-note">Current year · Previous year · YoY %</span>
             </div>
             <div className="tp-drop-zone tp-value-zone">
               <span className="tp-zone-label">VALUES</span>
@@ -243,13 +321,21 @@ export default function TestPivotReport({ orders = [], live = false, loading = f
 
           <div className="tp-report-heading">
             <div><span className="tp-kicker">LIVE PIVOT REPORT</span><h3>Revenue by {rowFields.map(key => DIMENSIONS.find(field => field.key === key)?.label || key).join(' → ')}</h3></div>
-            <span className="tp-row-count">{filteredRows.length.toLocaleString('en-IN')} rows · {monthKeys.length} month columns</span>
+            <span className="tp-row-count">{filteredRows.length.toLocaleString('en-IN')} rows · {monthNumbers.length} month groups · {selectedYear || '—'} vs {comparisonYear || '—'}</span>
           </div>
 
+          {latestYear && (
+            <div className="tp-data-note">
+              Source data currently runs through {latestYear}. The next year ({Number(latestYear) + 1}) is not present in the source yet, so that year's actual revenue cannot be shown until those rows are loaded.
+            </div>
+          )}
+
           <div className="tp-summary-strip">
-            <div><span>Actual revenue</span><strong>{money(actualRevenue)}</strong></div>
-            <div><span>{month === 'all' ? 'Projected revenue' : monthName(month) + ' projected'}</span><strong>{projectedRevenue === null ? 'Select month' : money(projectedRevenue)}</strong></div>
-            <div><span>Growth impact</span><strong className={incrementalRevenue > 0 ? 'tp-positive' : ''}>{incrementalRevenue === null ? '—' : money(incrementalRevenue)}</strong></div>
+            <div><span>{selectedYear || 'Selected year'} actual revenue</span><strong>{money(actualRevenue)}</strong></div>
+            <div><span>{comparisonYear || 'Previous year'} actual revenue</span><strong>{money(previousRevenue)}</strong></div>
+            <div><span>Actual YoY growth</span><strong className={yoyGrowth > 0 ? 'tp-positive' : ''}>{yoyGrowth === null ? '—' : percent(yoyGrowth)}</strong></div>
+            <div><span>{month === 'all' ? 'Scenario revenue' : monthName(month) + ' scenario'}</span><strong>{projectedRevenue === null ? 'Select a month' : money(projectedRevenue)}</strong></div>
+            <div><span>Scenario uplift · {validGrowth ? growthNumber : '—'}%</span><strong className={incrementalRevenue > 0 ? 'tp-positive' : ''}>{incrementalRevenue === null ? 'Select a month' : money(incrementalRevenue)}</strong></div>
           </div>
 
           {!live && (loading || !orders.length) ? (
@@ -259,20 +345,31 @@ export default function TestPivotReport({ orders = [], live = false, loading = f
           ) : (
             <div className="tp-table-scroll">
               <table className="tp-table">
-                <thead><tr><th className="tp-sticky-label">{rowFields.map(key => DIMENSIONS.find(field => field.key === key)?.label || key).join(' / ')}</th>{columns.map(column => <th key={column.id} className={column.kind === 'projected' ? 'tp-projected-head' : ''}>{monthLabel(column.key)}{column.kind === 'projected' ? ' · +' + growthNumber + '%' : ' · Actual'}</th>)}</tr></thead>
+                <thead>
+                  <tr>
+                    <th className="tp-sticky-label">{rowFields.map(key => DIMENSIONS.find(field => field.key === key)?.label || key).join(' / ')}</th>
+                    {columns.map(column => (
+                      <th
+                        key={column.id}
+                        className={
+                          column.kind === 'projected' ? 'tp-projected-head' :
+                          column.kind === 'yoy' ? 'tp-yoy-head' : ''
+                        }
+                      >{column.label}</th>
+                    ))}
+                  </tr>
+                </thead>
                 <tbody>
-                  <PivotRows nodes={nodes} columns={columns} fields={rowFields.map(key => DIMENSIONS.find(field => field.key === key) || { key, label: key })} expanded={expanded} toggle={toggle} />
-                  <tr className="tp-grand-total"><td>Grand total</td>{columns.map(column => {
-                    const actual = filteredRows.reduce((sum, row) => {
-                      return dateParts(row.order_date)?.key === column.key ? sum + Number(row.revenue_inr || 0) : sum;
-                    }, 0);
-                    return <td key={column.id}>{money(column.kind === 'projected' ? actual * (1 + growthNumber / 100) : actual)}</td>;
-                  })}</tr>
+                  <PivotRows nodes={nodes} columns={columns} expanded={expanded} toggle={toggle} growthNumber={growthNumber} />
+                  <tr className="tp-grand-total">
+                    <td>Grand total</td>
+                    {columns.map(column => <td key={column.id}>{displayColumnValue(totalNode, column, growthNumber)}</td>)}
+                  </tr>
                 </tbody>
               </table>
             </div>
           )}
-          <div className="tp-report-foot"><span>+ Expand a category to drill into the next row field.</span><span>Projection = actual revenue × (1 + growth %).</span></div>
+          <div className="tp-report-foot"><span>+ Expand a category to drill into the next row field.</span><span>YoY % = (Current year − Previous year) ÷ Previous year × 100.</span></div>
         </div>
       </div>
     </section>
