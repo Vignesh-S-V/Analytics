@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Activity, BrainCircuit, CalendarRange, Gauge, Info, Layers3,
+  Activity, BrainCircuit, Gauge, Info, Layers3,
   ShieldCheck, Sparkles, TrendingUp
 } from "lucide-react";
 import {
@@ -178,7 +178,6 @@ export default function TestForecasting({ orders = [], rowFields = [], dimension
         <div>
           <span className="tp-kicker">FORECASTING ENGINE · TEST WORKSPACE</span>
           <h2><BrainCircuit size={21} /> Demand & Revenue Forecast</h2>
-          <p>Forecast each selected row group independently. The engine tests candidate methods using chronological rolling-origin backtests before choosing a model.</p>
         </div>
         <div className="tf-engine-pill"><Sparkles size={14} /> Auto model selection</div>
       </div>
@@ -200,7 +199,6 @@ export default function TestForecasting({ orders = [], rowFields = [], dimension
             {MEASURES.map(item => <option value={item.key} key={item.key}>{item.label}</option>)}
           </select>
         </label>
-        <div className="tf-filter-help"><CalendarRange size={15} /> Monthly frequency · History: {firstMonth ? monthName(firstMonth) + " – " + monthName(latestMonth) : "—"}</div>
       </div>
 
       {latestMonth && (
@@ -225,7 +223,7 @@ export default function TestForecasting({ orders = [], rowFields = [], dimension
         </div>
         <div className="tf-row-config-note">
           {activeDimensionCount > 1
-            ? "Multiple fields: parent-level forecast is allocated to each child using its trailing 12-month share."
+            ? "Child forecasts are allocated from the parent trend using each child’s trailing 12-month share."
             : "One field: each group is fitted and backtested as its own monthly series."}
         </div>
       </div>
@@ -317,7 +315,7 @@ export default function TestForecasting({ orders = [], rowFields = [], dimension
 
           <div className="tf-table-card">
             <div className="tf-table-heading">
-              <div><span className="tp-kicker">GROUP-LEVEL FORECAST OUTPUT</span><h3>Forecast by {dimensionLabels.join(" → ") || "selected dimension"}</h3><p>Click any row to inspect its trend, validation result and manual override target.</p></div>
+              <div><span className="tp-kicker">GROUP-LEVEL FORECAST OUTPUT</span><h3>Forecast by {dimensionLabels.join(" → ") || "selected dimension"}</h3></div>
               <input value={groupSearch} onChange={event => setGroupSearch(event.target.value)} placeholder="Search forecast groups..." />
             </div>
             <div className="tf-table-scroll">
@@ -339,8 +337,7 @@ export default function TestForecasting({ orders = [], rowFields = [], dimension
               </table>
             </div>
             <div className="tf-table-foot">
-              <span>WAPE = total absolute forecast error ÷ total actual value. Lower is better.</span>
-              <span>Rows with limited history are marked Low confidence rather than hiding the uncertainty.</span>
+              <span>Lower WAPE means lower historical forecast error. Low confidence indicates limited reliability.</span>
             </div>
           </div>
         </>
