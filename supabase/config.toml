@@ -1,4 +1,8 @@
 project_id = "rzsgdfpwnxhseyxtrrlx"
 
+[auth]
+site_url = "https://analytics-mis.onrender.com"
+additional_redirect_urls = ["https://analytics-mis.onrender.com/**"]
+
 [functions.ask-garment-data]
 verify_jwt = true
