@@ -25,6 +25,7 @@ const compact = value => {
 };
 const money = value => '₹' + compact(value);
 const pct = value => Number.isFinite(value) ? value.toFixed(2) + '%' : '—';
+const efficiencyPct = value => Number.isFinite(value) ? pct(Math.abs(value) <= 1 ? value * 100 : value) : '—';
 const quantityOf = row => num(row.shipped_qty) > 0 ? num(row.shipped_qty) : num(row.order_qty);
 const keyOf = row => [row.product_category || 'Unclassified', row.fabric || 'Unknown fabric', row.style_id || 'No style'].join(' | ');
 const dateMonth = value => value ? new Date(String(value).slice(0, 7) + '-01T00:00:00Z').toLocaleDateString('en-IN', { month: 'short', year: 'numeric', timeZone: 'UTC' }) : '—';
@@ -319,17 +320,12 @@ export default function ProductEconomics({
   };
 
   return <section className="module-page pe-page">
-    <header className="pe-heading">
-      <div><span className="pe-kicker">PRODUCT-LEVEL UNIT ECONOMICS</span><h1>Product Profitability & Pricing Intelligence</h1><p>Understand product margins, cost drivers, price opportunities and export exposure using selected order data.</p></div>
-      <div className="pe-heading-tags"><span>{sourceAvailable ? fmt(d.orderCount) + ' orders loaded' : 'Data unavailable'}</span><span>{productKey === 'All products' ? 'All products' : 'Filtered product group'}</span></div>
-    </header>
-
     {!sourceAvailable ? <div className="panel pe-empty-large"><Package size={24}/><div><h3>Product economics data unavailable</h3><p>Open this page after order details load, or broaden the period and country filters.</p></div></div> : <>
       <div className="panel pe-controls">
         <label><span>Product / category / fabric / style filter</span><select value={productKey} onChange={event => setProductKey(event.target.value)}><option value="All products">All products</option>{options.map(option => <option key={option} value={option}>{option}</option>)}</select></label>
         <label><span>Portfolio grouping</span><select value={groupBy} onChange={event => setGroupBy(event.target.value)}><option value="product">Product combination</option><option value="category">Product category</option><option value="fabric">Fabric</option><option value="style">Style</option><option value="season">Season</option></select></label>
         <label><span>Tax / GST assumption (%)</span><input type="number" min="0" max="100" step="0.1" value={taxRate} onChange={event => setTaxRate(event.target.value === '' ? '' : Math.max(0, Math.min(100, Number(event.target.value))))}/></label>
-        <p>Tax-inclusive price is an assumption only. It is not an income-tax calculation or a verified GST amount.</p>
+        <p>Tax is an assumption only; it is not a verified GST calculation.</p>
       </div>
 
       <div className="pe-kpi-grid">
@@ -346,7 +342,7 @@ export default function ProductEconomics({
         <div><span>Selected quantity basis</span><strong>{compact(unitCount)}</strong><small>{d.shippedQty > 0 ? 'Shipped quantity' : 'Ordered quantity fallback'}</small></div>
       </div>
 
-      <Section number="01 · PRODUCT PROFITABILITY" title="Profitability matrix & product ranking" subtitle="Revenue, GP%, NP% and product-group contribution. Median lines define the portfolio quadrants." icon={Target}>
+      <Section number="01 · PRODUCT PROFITABILITY" title="Profitability matrix & product ranking" subtitle="Compare product revenue and gross margin; median lines mark the four portfolio groups." icon={Target}>
         <div className="pe-two-col">
           <Panel title="Revenue vs gross margin matrix" subtitle="Bubble size = distinct orders · X = revenue · Y = GP margin" className="pe-chart-panel">
             {d.portfolio.length ? <div className="pe-chart pe-tall-chart"><ResponsiveContainer width="100%" height="100%"><ScatterChart margin={{top:16,right:18,bottom:18,left:6}}>
@@ -361,10 +357,10 @@ export default function ProductEconomics({
             </ScatterChart></ResponsiveContainer></div> : <EmptyState>No product groups are available for this selection.</EmptyState>}
             <div className="pe-quadrant-legend"><span><i className="star"/> Star product</span><span><i className="growth"/> Growth opportunity</span><span><i className="review"/> Pricing review</span><span><i className="turnaround"/> Turnaround review</span></div>
           </Panel>
-          <Panel title="Portfolio ranking" subtitle="Top product groups by revenue · select a grouping above">
+          <Panel title="Portfolio ranking" subtitle={"Top 12 of " + fmt(d.portfolio.length) + " groups by revenue"}>
             <div className="pe-table-tools"><input value={portfolioSearch} onChange={event => setPortfolioSearch(event.target.value)} placeholder="Search product / category / quadrant..."/></div>
-            <div className="pe-table-wrap"><table className="pe-table"><thead><tr><th>Product group</th><th>Revenue</th><th>GP%</th><th>NP%</th><th>Portfolio</th></tr></thead><tbody>
-              {marginMatrixRows.slice(0, 14).map(row => <tr key={row.label}><td><b>{row.label}</b><small>{fmt(row.orders)} orders · {compact(row.units)} units</small></td><td>{money(row.revenue)}</td><td>{pct(row.gpPct)}</td><td>{pct(row.npPct)}</td><td><span className={'pe-pill ' + (row.quadrant === 'Star product' ? 'good' : row.quadrant === 'Pricing review' ? 'warn' : row.quadrant === 'Turnaround review' ? 'bad' : 'info')}>{row.quadrant}</span></td></tr>)}
+            <div className="pe-table-wrap pe-matrix-table-wrap"><table className="pe-table"><thead><tr><th>Product group</th><th>Revenue</th><th>GP%</th><th>NP%</th><th>Portfolio</th></tr></thead><tbody>
+              {marginMatrixRows.slice(0, 12).map(row => <tr key={row.label}><td><b>{row.label}</b><small>{fmt(row.orders)} orders · {compact(row.units)} units</small></td><td>{money(row.revenue)}</td><td>{pct(row.gpPct)}</td><td>{pct(row.npPct)}</td><td><span className={'pe-pill ' + (row.quadrant === 'Star product' ? 'good' : row.quadrant === 'Pricing review' ? 'warn' : row.quadrant === 'Turnaround review' ? 'bad' : 'info')}>{row.quadrant}</span></td></tr>)}
               {!marginMatrixRows.length && <tr><td colSpan="5">No products match this search.</td></tr>}
             </tbody></table></div>
             <div className="pe-portfolio-summary">
@@ -374,7 +370,7 @@ export default function ProductEconomics({
         </div>
       </Section>
 
-      <Section number="02 · COST STRUCTURE" title="Cost waterfall & margin bridge" subtitle="Revenue is reduced by direct manufacturing costs to gross profit, then by other / indirect expenses to reported net profit." icon={Layers}>
+      <Section number="02 · COST STRUCTURE" title="Cost waterfall & margin bridge" subtitle="Revenue less direct costs, then indirect expenses to reported net profit." icon={Layers}>
         <div className="pe-two-col">
           <Panel title="Revenue to profit waterfall" subtitle="INR · actual selected-order totals" className="pe-chart-panel">
             <div className="pe-chart pe-waterfall-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={waterfallData} margin={{top:16,right:16,left:12,bottom:18}}>
@@ -397,12 +393,12 @@ export default function ProductEconomics({
               <div className="pe-reconcile"><span>Total expenses</span><b>{money(d.totalCost)}</b></div>
               <div className="pe-reconcile emphasis"><span>Actual net profit field</span><b>{money(d.netProfit)}</b></div>
             </div>
-            <p className="pe-note">Other / indirect is calculated as total_cost_inr less fabric, trims and CMT extended costs. The final profit uses profit_inr.</p>
+            <p className="pe-note">Other / indirect = total cost less fabric, trims and CMT. Net profit uses profit_inr.</p>
           </Panel>
         </div>
       </Section>
 
-      <Section number="03 · WHAT-IF PRICING" title="Pricing & cost scenario simulator" subtitle="Adjust selling price and cost assumptions to model gross and net profit. These are simulations; actual Supabase rows are never changed." icon={Calculator}>
+      <Section number="03 · WHAT-IF PRICING" title="Pricing & cost scenario simulator" subtitle="Model price and cost changes without changing actual records." icon={Calculator}>
         <div className="pe-simulator">
           <div className="pe-simulator-controls">
             <div className="pe-sim-head"><b>Scenario assumptions</b><button type="button" onClick={resetScenario}>Reset scenario</button></div>
@@ -420,14 +416,14 @@ export default function ProductEconomics({
               <div><span>Scenario gross profit</span><b>{money(simulatedGp)}</b></div>
               <div><span>Scenario GP margin</span><b>{pct(simulatedGpPct)}</b></div>
               <div><span>Net profit change</span><b className={simulatedNp - d.netProfit >= 0 ? 'positive' : 'negative'}>{money(simulatedNp - d.netProfit)}</b></div>
-              <div><span>Compared with actual</span><b>{simulatedNp >= d.netProfit ? 'Improved' : 'Lower'}</b></div>
+              <div><span>Compared with actual</span><b>{simulatedNp > d.netProfit ? 'Improved' : simulatedNp < d.netProfit ? 'Lower' : 'Unchanged'}</b></div>
             </div>
             <p className="pe-note">Baseline is anchored to actual profit_inr. Cost changes are applied to each expense component independently. No budget, price or source data is saved.</p>
           </div>
         </div>
       </Section>
 
-      <Section number="04 · BREAK-EVEN & TARGET PRICE" title="Cost recovery & target pricing" subtitle="Calculate a full-cost recovery unit price and the selling price needed for selected GP and NP targets." icon={Target}>
+      <Section number="04 · BREAK-EVEN & TARGET PRICE" title="Cost recovery & target pricing" subtitle="Calculate cost recovery and target-margin selling prices." icon={Target}>
         <div className="pe-target-grid">
           <Panel title="Target margins" subtitle="Change margin goals to see required selling prices">
             <div className="pe-target-inputs">
@@ -444,12 +440,12 @@ export default function ProductEconomics({
           </Panel>
           <Panel title="Break-even calculation limits" subtitle="What the current order dataset can and cannot support">
             <div className="pe-breakeven-status"><div><b>Available</b><span>Full-cost recovery selling price per unit</span><strong>{costRecoveryPrice == null ? '—' : money(costRecoveryPrice)}</strong></div><div className="blocked"><b>Not available</b><span>Break-even quantity and margin of safety quantity</span><strong>Fixed cost split required</strong></div></div>
-            <p className="pe-note">The source has total order expenses but does not separate fixed factory overhead from variable unit costs. A break-even quantity would therefore be misleading. The recovery price uses total_cost_inr divided by shipped quantity (or ordered quantity where nothing shipped).</p>
+            <p className="pe-note">Break-even quantity needs a fixed / variable cost split, which is not available. Recovery price = total expenses ÷ quantity.</p>
           </Panel>
         </div>
       </Section>
 
-      <Section number="05 · EXPORT & FOREX" title="Foreign exchange sensitivity" subtitle="FOB USD × quantity × order exchange rate provides an estimate of FX-linked order value; this is not a hedge or bank settlement position." icon={Globe2}>
+      <Section number="05 · EXPORT & FOREX" title="Foreign exchange sensitivity" subtitle="FOB-linked INR exposure estimate; not a bank settlement position." icon={Globe2}>
         <div className="pe-forex-grid">
           <Panel title="FX exposure summary" subtitle="Derived from order-level FOB USD and exchange-rate fields">
             <div className="pe-forex-kpis">
@@ -469,23 +465,23 @@ export default function ProductEconomics({
         {!d.usdExposure && <EmptyState>FOB USD, quantity and order exchange-rate fields are not available for the selected rows, so FX scenarios are disabled by the absence of exposure.</EmptyState>}
       </Section>
 
-      <Section number="06 · PRODUCTION ECONOMICS" title="Production-linked product profitability" subtitle="Connect style margin with SMV minutes, efficiency, rejection and line performance." icon={Factory}>
+      <Section number="06 · PRODUCTION ECONOMICS" title="Production-linked product profitability" subtitle="Compare line efficiency, rejection and profit per SMV minute." icon={Factory}>
         <div className="pe-production-kpis">
-          <Metric label="Actual efficiency" value={d.actualEfficiency == null ? '—' : pct(d.actualEfficiency)} note={d.targetEfficiency == null ? 'No target efficiency rows' : 'Target ' + pct(d.targetEfficiency)} tone="blue" icon={Gauge}/>
+          <Metric label="Actual efficiency" value={d.actualEfficiency == null ? '—' : efficiencyPct(d.actualEfficiency)} note={d.targetEfficiency == null ? 'No target efficiency rows' : 'Target ' + efficiencyPct(d.targetEfficiency)} tone="blue" icon={Gauge}/>
           <Metric label="GP per standard minute" value={d.smvMinutes ? money(d.grossProfit / d.smvMinutes) : '—'} note="Gross profit ÷ SMV × ordered quantity" tone="green" icon={Activity}/>
           <Metric label="Rejection cost proxy" value={money(d.rejectionCostProxy)} note="Rejected units × average total cost per ordered unit" tone="orange" icon={ShieldAlert}/>
           <Metric label="Rework expenditure" value={money(d.reworkCost)} note={'Rework share ' + pct(d.reworkShare) + ' of revenue'} tone="violet" icon={RefreshCw}/>
         </div>
         <Panel title="Line-level productivity & profitability" subtitle="Order-linked line metrics; GP uses direct fabric + trims + CMT cost">
           <div className="pe-table-wrap"><table className="pe-table"><thead><tr><th>Production line</th><th>Orders</th><th>Revenue</th><th>GP</th><th>Actual efficiency</th><th>GP / SMV min</th><th>Rejection %</th></tr></thead><tbody>
-            {productionRows.map(row => <tr key={row.id}><td><b>{row.id}</b></td><td>{fmt(row.orders)}</td><td>{money(row.revenue)}</td><td>{money(row.gp)}</td><td>{row.actualEfficiency == null ? '—' : pct(row.actualEfficiency)}</td><td>{row.gpPerSmv == null ? '—' : money(row.gpPerSmv)}</td><td>{pct(row.rejectionPct)}</td></tr>)}
+            {productionRows.map(row => <tr key={row.id}><td><b>{row.id}</b></td><td>{fmt(row.orders)}</td><td>{money(row.revenue)}</td><td>{money(row.gp)}</td><td>{row.actualEfficiency == null ? '—' : efficiencyPct(row.actualEfficiency)}</td><td>{row.gpPerSmv == null ? '—' : money(row.gpPerSmv)}</td><td>{pct(row.rejectionPct)}</td></tr>)}
             {!productionRows.length && <tr><td colSpan="7">No line-level production data is available.</td></tr>}
           </tbody></table></div>
           <p className="pe-note">GP per SMV minute uses standard minutes × ordered quantity. Rejection cost is an average-cost proxy, not a separately posted scrap valuation.</p>
         </Panel>
       </Section>
 
-      <Section number="07 · SUPPLIER-LINKED COST" title="Supplier cost & quality intelligence" subtitle="Supplier-linked order costs, net profit, shipment delays, rework and supplier master ratings." icon={Truck}>
+      <Section number="07 · SUPPLIER-LINKED COST" title="Supplier cost & quality intelligence" subtitle="Order cost, profit, delivery and quality for linked suppliers." icon={Truck}>
         <Panel title="Supplier performance ranking" subtitle="Only suppliers linked through supplier_id in selected orders are shown">
           <div className="pe-table-tools"><input value={supplierSearch} onChange={event => setSupplierSearch(event.target.value)} placeholder="Search supplier / type / ID..."/></div>
           <div className="pe-table-wrap"><table className="pe-table"><thead><tr><th>Supplier</th><th>Linked orders</th><th>Order cost</th><th>Net profit</th><th>Rework</th><th>Late rate</th><th>Quality</th><th>Master delay</th></tr></thead><tbody>
@@ -493,10 +489,10 @@ export default function ProductEconomics({
             {!supplierRowsForView.length && <tr><td colSpan="8">No linked suppliers match this filter, or supplier master data is unavailable.</td></tr>}
           </tbody></table></div>
         </Panel>
-        <p className="pe-note">Supplier quality and average delay come from dim_suppliers. The associated order revenue, cost, rework and delivery rows show correlation with linked orders; they do not prove supplier causation.</p>
+        <p className="pe-note">Quality and average delay come from supplier master data. Linked order results show association, not proof of supplier causation.</p>
       </Section>
 
-      <Section number="08 · RULE-BASED ALERTS" title="Smart product alerts & review priorities" subtitle="Transparent threshold rules. No AI inference and no automatic pricing or budget changes." icon={ShieldAlert}>
+      <Section number="08 · RULE-BASED ALERTS" title="Smart product alerts & review priorities" subtitle="Rule-based alerts using editable thresholds." icon={ShieldAlert}>
         <Panel title="Alert thresholds" subtitle="Adjust the rules used to identify products and cost structures for review">
           <div className="pe-threshold-grid">
             <label><span>Minimum GP margin (%)</span><input type="number" min="0" max="100" step="0.5" value={marginAlert} onChange={event => setMarginAlert(event.target.value === '' ? 0 : Number(event.target.value))}/></label>
@@ -514,16 +510,6 @@ export default function ProductEconomics({
         </div>
       </Section>
 
-      <Section number="09 · CALCULATION GOVERNANCE" title="Definitions, assumptions & data limitations" subtitle="Keep the meaning of the metrics explicit so this page is safe to use for pricing decisions." icon={Lightbulb}>
-        <div className="pe-governance-grid">
-          <div><b>Gross profit (GP)</b><p>Revenue less extended fabric, trims and CMT per-unit costs multiplied by quantity basis.</p></div>
-          <div><b>Net profit (NP)</b><p>Sum of the source profit_inr field. Net margin is NP divided by revenue.</p></div>
-          <div><b>Other / indirect expenses</b><p>Total cost less the three direct manufacturing cost components. This is a derived reconciliation amount.</p></div>
-          <div><b>Break-even limitation</b><p>Fixed and variable expenses are not separately tagged. Cost-recovery price is available; break-even volume is not.</p></div>
-          <div><b>FX sensitivity</b><p>FOB USD × quantity × exchange_rate estimates exposure. It does not model payment timing, hedges or bank settlement.</p></div>
-          <div><b>Supplier intelligence</b><p>Dimensional supplier ratings and delay averages are master-data attributes; linked order metrics are not supplier-attribution proof.</p></div>
-        </div>
-      </Section>
     </>}
   </section>;
 }
