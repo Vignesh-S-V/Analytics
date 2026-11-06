@@ -1853,3 +1853,18 @@ html,body,#root,.app-shell,.main-area,.content{
  opacity:.6;
  cursor:wait;
 }
+
+
+.auth-resend-inline{
+ width:100%;
+ margin-top:12px;
+ padding:8px 10px;
+ border:1px solid #e1e8f1;
+ border-radius:8px;
+ background:#f7f9fc;
+ text-align:center;
+}
+.auth-resend-inline:disabled{
+ opacity:.55;
+ cursor:not-allowed;
+}
