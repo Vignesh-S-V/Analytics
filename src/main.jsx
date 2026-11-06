@@ -126,6 +126,11 @@ async function fetchAllRowsInPages(buildQuery,pageSize=1000,parallelPages=5){
  }
 }
 const SUPABASE_URL=String(import.meta.env.VITE_SUPABASE_URL||'https://rzsgdfpwnxhseyxtrrlx.supabase.co').trim();
+const supabaseProjectRef=SUPABASE_URL.match(/^https?:\\/\\/([^.]+)/i)?.[1];
+if(typeof window!=='undefined'&&supabaseProjectRef){
+ try{window.localStorage.removeItem('sb-'+supabaseProjectRef+'-auth-token')}catch{}
+}
+
 const AUTH_REDIRECT_URL='https://analytics.vigneshw-5416.workers.dev/';
 const configuredPublicKey=String(import.meta.env.VITE_SUPABASE_ANON_KEY||import.meta.env.VITE_SUPABASE_LEGACY_ANON_KEY||'').trim();
 const SUPABASE_PUBLIC_KEY=configuredPublicKey&&!/^(your_|replace|placeholder)/i.test(configuredPublicKey)?configuredPublicKey:'sb_publishable_kV77uVff2Gv6PiW1b1xBrw_4XsqB_00';
