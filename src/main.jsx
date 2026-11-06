@@ -144,6 +144,8 @@ function AuthScreen({db}){
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState('');
  const [notice,setNotice]=useState('');
+ const [resendBusy,setResendBusy]=useState(false);
+ const [resendMessage,setResendMessage]=useState('');
  const isSignup=mode==='signup';
  useEffect(()=>{
   const hashParams=new URLSearchParams(window.location.hash.replace(/^#/,''));
@@ -164,6 +166,22 @@ function AuthScreen({db}){
   if(text.includes('rate limit')||text.includes('too many'))return 'Too many attempts. Wait a few minutes and try again.';
   if(text.includes('redirect')&&text.includes('allow'))return 'The current website URL is not in Supabase Auth’s allowed redirect URLs. Add this site under Authentication → URL Configuration.';
   return message|| (isSignup?'Account creation failed. Please try again.':'Sign-in failed. Please try again.');
+ };
+ const resendConfirmation=async()=>{
+  if(!db||!email.trim()||resendBusy)return;
+  setResendBusy(true);setResendMessage('');
+  try{
+   const {error}=await db.auth.resend({
+    type:'signup',
+    email:email.trim().toLowerCase(),
+    options:{emailRedirectTo:AUTH_REDIRECT_URL}
+   });
+   if(error)throw error;
+   setResendMessage('A fresh confirmation email was sent. Open the newest email and use that link.');
+  }catch(e){
+   const message=String(e?.message||'');
+   setResendMessage(/already confirmed/i.test(message)?'This email is already confirmed. Return to Sign in.':message||'Could not resend the confirmation email. Try again shortly.');
+  }finally{setResendBusy(false)}
  };
  const submit=async(e)=>{
   e.preventDefault();
@@ -217,7 +235,7 @@ function AuthScreen({db}){
    <button className="auth-submit" type="submit" disabled={busy||!email.trim()||password.length<8||(isSignup&&(fullName.trim().length<2||password!==confirmPassword))}>{busy?(isSignup?'Creating account…':'Signing in…'):(isSignup?'Create account':'Sign in securely')}</button>
   </form>
   {error&&<p className="auth-error" role="alert">{error}</p>}
-  {notice&&<div className="auth-notice" role="status"><b>Next step</b><br/>{notice}<button type="button" className="auth-notice-action" onClick={()=>switchMode('signin')}>Back to sign in</button></div>}
+  {notice&&<div className="auth-notice" role="status"><b>Next step</b><br/>{notice}<button type="button" className="auth-notice-action" onClick={resendConfirmation} disabled={resendBusy}>{resendBusy?'Sending…':'Resend confirmation email'}</button>{resendMessage&&<small className="auth-resend-message">{resendMessage}</small>}<button type="button" className="auth-notice-action" onClick={()=>switchMode('signin')}>Back to sign in</button></div>}
   <p className="auth-footnote">{isSignup?'All new accounts require email verification and manual workspace approval. Only active members can read company data.':'Need a login? Select Create account. New accounts remain pending until the workspace owner approves them.'}</p>
  </section></main>
 }
