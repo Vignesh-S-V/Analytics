@@ -18,7 +18,7 @@ test("buildMonthKeys returns inclusive chronological monthly periods", () => {
 test("series diagnostics identify smooth and intermittent demand", () => {
   assert.equal(describeSeries(Array(24).fill(100)).demandType, "Smooth");
   const intermittent = Array.from({ length: 24 }, (_, i) => i % 4 === 0 ? 200 : 0);
-  assert.equal(describeSeries(intermittent).demandType, "Lumpy");
+  assert.equal(describeSeries(intermittent).demandType, "Intermittent");
 });
 
 test("model selector returns finite non-negative forecasts and rolling-origin metrics", () => {
@@ -37,7 +37,7 @@ test("model selector returns finite non-negative forecasts and rolling-origin me
 test("Croston-compatible forecast handles intermittent positive demand", () => {
   const history = Array.from({ length: 24 }, (_, i) => i % 4 === 0 ? 500 : 0);
   const result = selectForecastModel(history, 6);
-  assert.equal(result.profile.demandType, "Lumpy");
+  assert.equal(result.profile.demandType, "Intermittent");
   assert.ok(result.forecast.every(value => Number.isFinite(value) && value >= 0));
 });
 
