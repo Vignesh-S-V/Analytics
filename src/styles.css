@@ -1840,3 +1840,16 @@ html,body,#root,.app-shell,.main-area,.content{
  .auth-mode-switch{margin-bottom:15px}
  .auth-mode-switch button{min-height:40px;font-size:12px}
 }
+
+
+.auth-resend-message{
+ display:block;
+ margin-top:7px;
+ color:#526c89;
+ font-size:11px;
+ line-height:1.5;
+}
+.auth-notice-action:disabled{
+ opacity:.6;
+ cursor:wait;
+}
