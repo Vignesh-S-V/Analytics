@@ -72,7 +72,7 @@ jobs:
       - name: Install Python Worker tooling
         run: uv sync --group dev
 
-      - name: Deploy Worker and configure runtime secrets
+      - name: Upload and deploy Worker version
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -85,6 +85,7 @@ jobs:
           UPSTREAM_TIMEOUT_SECONDS: ${{ secrets.UPSTREAM_TIMEOUT_SECONDS }}
         run: |
           set -euo pipefail
+
           secret_file="$(mktemp)"
           trap 'rm -f "$secret_file"' EXIT
           python - <<'PY' > "$secret_file"
@@ -106,32 +107,92 @@ jobs:
               if os.environ.get(name)
           }))
           PY
-          # Cloudflare's Workers service metadata endpoint can briefly return
-          # 503 "no healthy upstream". Retry only that confirmed transient GET failure;
-          # do not retry auth, build, or configuration errors.
-          max_attempts=4
-          for attempt in $(seq 1 "$max_attempts"); do
-            output_file="$(mktemp)"
-            set +e
-            uv run pywrangler deploy --config wrangler.jsonc --secrets-file "$secret_file" 2>&1 | tee "$output_file"
-            deploy_status=${PIPESTATUS[0]}
-            set -e
 
-            if [ "$deploy_status" -eq 0 ]; then
+          # Retry transient Cloudflare API failures, but never hide auth,
+          # permission, validation, or build errors.
+          retry_cloudflare() {
+            local max_attempts=5
+            local attempt=1
+            local output_file
+            while [ "$attempt" -le "$max_attempts" ]; do
+              output_file="$(mktemp)"
+              set +e
+              "$@" 2>&1 | tee "$output_file"
+              local command_status=${PIPESTATUS[0]}
+              set -e
+
+              if [ "$command_status" -eq 0 ]; then
+                rm -f "$output_file"
+                return 0
+              fi
+
+              if grep -Eqi '(^|[^0-9])HTTP ([45][0-9][0-9])|[45][0-9][0-9] (Service Unavailable|Too Many Requests|Bad Gateway|Gateway Timeout)|no healthy upstream|ECONNRESET|ETIMEDOUT|socket hang up|fetch failed' "$output_file" \
+                && [ "$attempt" -lt "$max_attempts" ]; then
+                local delay=$((attempt * 20))
+                echo "::warning::Transient Cloudflare API failure. Retrying in ${delay}s (attempt $((attempt + 1))/$max_attempts)."
+                rm -f "$output_file"
+                sleep "$delay"
+                attempt=$((attempt + 1))
+                continue
+              fi
+
               rm -f "$output_file"
-              exit 0
-            fi
+              return "$command_status"
+            done
+            return 1
+          }
 
-            if grep -Eqi 'no healthy upstream|503 Service Unavailable' "$output_file" \
-              && grep -Eqi '/workers/services/analytics' "$output_file" \
-              && [ "$attempt" -lt "$max_attempts" ]; then
-              delay=$((attempt * 15))
-              echo "::warning::Cloudflare Workers API returned a transient 503. Retrying in ${delay}s (attempt $((attempt + 1))/$max_attempts)."
-              rm -f "$output_file"
-              sleep "$delay"
-              continue
-            fi
+          api_base="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/analytics"
+          api_get() {
+            curl --fail-with-body --silent --show-error \
+              --retry 5 --retry-all-errors --retry-delay 2 --retry-max-time 45 \
+              --connect-timeout 15 --max-time 60 \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Accept: application/json" "$1"
+          }
 
-            rm -f "$output_file"
-            exit "$deploy_status"
-          done
+          upload_started="$(date -u +%s)"
+          retry_cloudflare uv run pywrangler versions upload \
+            --config wrangler.jsonc --secrets-file "$secret_file"
+
+          versions_json="$(api_get "$api_base/versions?per_page=1")"
+          version_id="$(printf '%s' "$versions_json" | python -c '
+          import json, sys
+          data = json.load(sys.stdin)
+          if not data.get("success") or not data.get("result", {}).get("items"):
+              raise SystemExit("Cloudflare did not return an uploaded Worker version")
+          item = data["result"]["items"][0]
+          if item.get("metadata", {}).get("source") != "wrangler":
+              raise SystemExit("Latest Worker version was not uploaded by Wrangler")
+          print(item["id"])
+          ')"
+          version_created="$(printf '%s' "$versions_json" | python -c '
+          import json, sys
+          print(json.load(sys.stdin)["result"]["items"][0]["metadata"]["created_on"])
+          ')"
+          created_epoch="$(date -u -d "$version_created" +%s)"
+          if [ "$created_epoch" -lt "$((upload_started - 60))" ]; then
+            echo "::error::The latest Cloudflare Worker version is stale; refusing to deploy it."
+            exit 1
+          fi
+
+          echo "Uploaded Worker version: $version_id"
+          retry_cloudflare uv run pywrangler versions deploy \
+            "$version_id@100%" --yes --config wrangler.jsonc \
+            --message "GitHub Actions deployment $GITHUB_SHA"
+
+          deployments_json="$(api_get "$api_base/deployments?per_page=1")"
+          printf '%s' "$deployments_json" | python -c '
+          import json, sys
+          data = json.load(sys.stdin)
+          if not data.get("success"):
+              raise SystemExit("Cloudflare deployment verification API returned success=false")
+          deployments = data.get("result", {}).get("deployments", [])
+          if not deployments:
+              raise SystemExit("No Cloudflare Worker deployments were returned")
+          deployment = deployments[0]
+          versions = deployment.get("versions", [])
+          if not any(item.get("version_id") == sys.argv[1] and float(item.get("percentage", 0)) == 100 for item in versions):
+              raise SystemExit("The newly uploaded Worker version is not receiving 100% of traffic")
+          print("Verified: Cloudflare Worker version " + sys.argv[1] + " receives 100% of traffic.")
+          ' "$version_id"
