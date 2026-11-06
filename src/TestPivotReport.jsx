@@ -253,7 +253,6 @@ export default function TestPivotReport({ orders = [], live = false, loading = f
         <div>
           <span className="tp-kicker">PIVOT BUILDER · TEST WORKSPACE</span>
           <h2>Category × Monthly Revenue</h2>
-          <p>Compare each month with the same month in the previous year. Expand a category to see the country-level revenue split and the year-on-year change.</p>
         </div>
         <button type="button" className="tp-reset" onClick={reset}><RotateCcw size={14} /> Reset layout</button>
       </div>
@@ -274,7 +273,6 @@ export default function TestPivotReport({ orders = [], live = false, loading = f
         <label><span>Growth assumption (%)</span>
           <input type="number" min="-100" max="1000" step="0.1" value={growth} onChange={event => setGrowth(event.target.value)} placeholder="e.g. 20" />
         </label>
-        <div className="tp-filter-hint">YoY % is calculated from actual selected-year revenue versus the same month in the previous year. Growth assumption is a separate what-if calculation; it does not alter actuals.</div>
       </div>
 
       <div className="tp-builder-grid">
@@ -295,7 +293,6 @@ export default function TestPivotReport({ orders = [], live = false, loading = f
             ))}
             {!fieldOptions.length && <p className="tp-empty-fields">All available text fields are in the row hierarchy.</p>}
           </div>
-          <div className="tp-field-note">Click a field or drag it into the Rows area. Fields are nested in the order shown.</div>
         </aside>
 
         <div className="tp-report-panel">
@@ -306,7 +303,6 @@ export default function TestPivotReport({ orders = [], live = false, loading = f
                 const field = DIMENSIONS.find(item => item.key === key);
                 return <span className="tp-row-field" key={key}><b>{index + 1}</b>{field?.label || key}{rowFields.length > 1 && <button type="button" onClick={() => removeField(key)} aria-label={'Remove ' + field?.label}><X size={12} /></button>}</span>;
               })}
-              <span className="tp-drop-placeholder">Drop field here</span>
             </div>
             <div className="tp-drop-zone tp-column-zone">
               <span className="tp-zone-label">COLUMNS</span>
@@ -327,7 +323,7 @@ export default function TestPivotReport({ orders = [], live = false, loading = f
 
           {latestYear && (
             <div className="tp-data-note">
-              Source data currently runs through {latestYear}. The next year ({Number(latestYear) + 1}) is not present in the source yet, so that year's actual revenue cannot be shown until those rows are loaded.
+              Actual data is available through {latestYear}. {Number(latestYear) + 1} data has not been loaded yet.
             </div>
           )}
 
@@ -370,7 +366,6 @@ export default function TestPivotReport({ orders = [], live = false, loading = f
               </table>
             </div>
           )}
-          <div className="tp-report-foot"><span>+ Expand a category to drill into the next row field.</span><span>YoY % = (Current year − Previous year) ÷ Previous year × 100.</span></div>
         </div>
       </div>
 
