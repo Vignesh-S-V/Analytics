@@ -1842,29 +1842,7 @@ html,body,#root,.app-shell,.main-area,.content{
 }
 
 
-.auth-resend-message{
- display:block;
- margin-top:7px;
- color:#526c89;
- font-size:11px;
- line-height:1.5;
-}
 .auth-notice-action:disabled{
  opacity:.6;
  cursor:wait;
-}
-
-
-.auth-resend-inline{
- width:100%;
- margin-top:12px;
- padding:8px 10px;
- border:1px solid #e1e8f1;
- border-radius:8px;
- background:#f7f9fc;
- text-align:center;
-}
-.auth-resend-inline:disabled{
- opacity:.55;
- cursor:not-allowed;
 }
