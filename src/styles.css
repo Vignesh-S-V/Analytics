@@ -1639,3 +1639,36 @@ html{background:#f7f8fa;scroll-behavior:smooth}body{min-width:320px;background:#
  #root .sb-cohort-trend-head b{font-size:12px}
  #root .sb-cohort-explainer{font-size:10px}
 }
+
+
+/* Fix nested wheel-scroll trapping over charts and tables.
+   Keep table vertical scrolling where capped, but allow scroll chaining to the page. */
+html,body,#root,.app-shell,.main-area,.content{
+  overscroll-behavior-y:auto!important;
+}
+.panel,.pe-panel,.chart-panel,.table-panel,
+.recharts-responsive-container,.recharts-wrapper,.recharts-surface{
+  overscroll-behavior-y:auto!important;
+  touch-action:pan-y pinch-zoom;
+}
+.table-scroll,
+.ask-supplier-table-wrap,
+.adv-table-wrap,
+.ask-benchmark-table-wrap,
+.marketing-table-wrap,
+.pe-matrix-table-wrap{
+  overscroll-behavior-y:auto!important;
+  overscroll-behavior-x:contain;
+  -webkit-overflow-scrolling:touch;
+}
+.pe-table-wrap,
+.pe-alert-detail-table-wrap,
+.sb-table-wrap,
+.sb-cohort-wrap{
+  overflow-x:auto!important;
+  overflow-y:hidden!important;
+  overscroll-behavior-x:contain!important;
+  overscroll-behavior-y:auto!important;
+  -webkit-overflow-scrolling:touch;
+  max-height:none;
+}
