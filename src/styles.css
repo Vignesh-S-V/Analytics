@@ -1672,3 +1672,120 @@ html,body,#root,.app-shell,.main-area,.content{
   -webkit-overflow-scrolling:touch;
   max-height:none;
 }
+
+
+/* Order table pagination — readable, unclipped and responsive */
+#root .table-panel{min-width:0;overflow:hidden}
+#root .table-bottom{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  justify-content:initial;
+  gap:12px 16px;
+  width:100%;
+  min-width:0;
+  box-sizing:border-box;
+  padding:14px 2px 2px;
+  margin:0;
+  overflow:visible!important;
+  color:#40546e!important;
+  font-size:13px!important;
+  line-height:1.5!important;
+}
+#root .table-bottom>span{
+  display:block;
+  min-width:0;
+  max-width:100%;
+  color:#40546e!important;
+  font-size:13px!important;
+  font-weight:650;
+  line-height:1.5;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+#root .table-bottom .table-page-controls{
+  display:flex!important;
+  align-items:center;
+  justify-content:flex-end;
+  flex-wrap:wrap;
+  gap:8px;
+  min-width:0;
+  max-width:100%;
+}
+#root .table-bottom .table-page-controls>span{
+  display:inline-flex;
+  align-items:center;
+  min-height:36px;
+  padding:0 9px;
+  border:1px solid #e0e7f0;
+  border-radius:8px;
+  background:#f7f9fc;
+  color:#344b68!important;
+  font-size:12px!important;
+  font-weight:750;
+  white-space:nowrap;
+}
+#root .table-bottom .table-page-controls button{
+  display:inline-flex!important;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  min-width:72px;
+  min-height:36px;
+  padding:8px 12px!important;
+  border:1px solid #233a59!important;
+  border-radius:8px!important;
+  background:#1c3454!important;
+  color:#fff!important;
+  font-size:12px!important;
+  font-weight:750!important;
+  line-height:1.2;
+  white-space:nowrap;
+  opacity:1;
+  cursor:pointer;
+}
+#root .table-bottom .table-page-controls button:hover:not(:disabled){
+  background:#284b75!important;
+  border-color:#315d8e!important;
+  transform:translateY(-1px);
+}
+#root .table-bottom .table-page-controls button:focus-visible{
+  outline:3px solid rgba(49,116,190,.28);
+  outline-offset:2px;
+}
+#root .table-bottom .table-page-controls button:disabled{
+  background:#edf1f6!important;
+  color:#708198!important;
+  border-color:#dbe3ed!important;
+  opacity:1!important;
+  cursor:not-allowed;
+}
+#root .table-bottom .table-page-controls button:last-child{
+  min-width:160px;
+  background:#fff4ec!important;
+  color:#b85b2d!important;
+  border-color:#f0c8b2!important;
+}
+#root .table-bottom .table-page-controls button:last-child:hover{
+  background:#ffeadc!important;
+  border-color:#eab18f!important;
+}
+@media(max-width:900px){
+  #root .table-bottom{
+    grid-template-columns:minmax(0,1fr);
+    align-items:start;
+    gap:10px;
+    padding:13px 2px 2px;
+  }
+  #root .table-bottom .table-page-controls{
+    justify-content:flex-start;
+    width:100%;
+  }
+}
+@media(max-width:520px){
+  #root .table-bottom>span{font-size:12px!important}
+  #root .table-bottom .table-page-controls{gap:6px}
+  #root .table-bottom .table-page-controls button{min-width:64px;min-height:35px;padding:7px 9px!important;font-size:11px!important}
+  #root .table-bottom .table-page-controls button:last-child{min-width:0}
+  #root .table-bottom .table-page-controls>span{min-height:35px;font-size:11px!important}
+}
