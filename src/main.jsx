@@ -234,6 +234,8 @@ function AuthScreen({db}){
    {isSignup&&<label>Confirm password<input type="password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} autoComplete="new-password" required minLength={8} maxLength={128} placeholder="Re-enter your password"/></label>}
    <button className="auth-submit" type="submit" disabled={busy||!email.trim()||password.length<8||(isSignup&&(fullName.trim().length<2||password!==confirmPassword))}>{busy?(isSignup?'Creating account…':'Signing in…'):(isSignup?'Create account':'Sign in securely')}</button>
   </form>
+  {!isSignup&&<button type="button" className="auth-notice-action auth-resend-inline" disabled={!email.trim()||resendBusy} onClick={resendConfirmation}>{resendBusy?'Sending verification…':'Resend verification email'}</button>}
+  {resendMessage&&!notice&&<p className="auth-resend-message" role="status">{resendMessage}</p>}
   {error&&<p className="auth-error" role="alert">{error}</p>}
   {notice&&<div className="auth-notice" role="status"><b>Next step</b><br/>{notice}<button type="button" className="auth-notice-action" onClick={resendConfirmation} disabled={resendBusy}>{resendBusy?'Sending…':'Resend confirmation email'}</button>{resendMessage&&<small className="auth-resend-message">{resendMessage}</small>}<button type="button" className="auth-notice-action" onClick={()=>switchMode('signin')}>Back to sign in</button></div>}
   <p className="auth-footnote">{isSignup?'All new accounts require email verification and manual workspace approval. Only active members can read company data.':'Need a login? Select Create account. New accounts remain pending until the workspace owner approves them.'}</p>
