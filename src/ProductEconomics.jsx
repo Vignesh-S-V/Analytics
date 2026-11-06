@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, BarChart3,
   Boxes, Calculator, CircleDollarSign, Factory, Gauge, Globe2,
-  Layers, Lightbulb, Package, Percent, ShieldAlert, Target,
+  Layers, Lightbulb, Package, RefreshCw, ShieldAlert, Target,
   TrendingUp, Truck, Wallet
 } from 'lucide-react';
 import {
