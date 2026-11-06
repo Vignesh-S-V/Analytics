@@ -7,6 +7,7 @@ const COLORS=['#F47721','#203B5B','#16A085','#8B4A83','#F2BE45','#557895'];
 const num=v=>Number.isFinite(Number(v))?Number(v):0;
 const sum=(a,k)=>a.reduce((s,r)=>s+num(r[k]),0);
 const fmt=v=>Number(v||0).toLocaleString('en-IN',{maximumFractionDigits:1});
+const compactQty=v=>{const x=num(v),a=Math.abs(x),f=n=>Number(n.toFixed(2)).toLocaleString('en-IN',{maximumFractionDigits:2});return a>=1e7?f(x/1e7)+' Cr':a>=1e5?f(x/1e5)+' Lakh':a>=1e3?f(x/1e3)+' K':fmt(x)};
 const pct=v=>Number.isFinite(v)?v.toFixed(1)+'%':'—';
 const money=v=>{const x=num(v),a=Math.abs(x),f=n=>Number(n.toFixed(1)).toLocaleString('en-IN');return '₹'+(a>=1e7?f(x/1e7)+' Cr':a>=1e5?f(x/1e5)+' Lakh':a>=1e3?f(x/1e3)+' K':fmt(x));};
 
@@ -62,11 +63,11 @@ export default function ProductionIntelligence({orders=[],live=false}){
  return <div className="production-intel">
   <div className="pi-kpis">
    <Metric label="Distinct orders" value={fmt(d.orders)} icon={PackageCheck} tone={0}/>
-   <Metric label="Ordered / shipped qty" value={<>{fmt(d.ordered)} <span className="pi-kpi-divider">/</span> {fmt(d.shipped)}</>} icon={TrendingUp} tone={1}/>
+   <Metric label="Ordered / shipped qty" value={<>{compactQty(d.ordered)} <span className="pi-kpi-divider">/</span> {compactQty(d.shipped)}</>} note="Order quantity / shipped quantity" icon={TrendingUp} tone={1}/>
    <Metric label="Actual efficiency" value={d.actual==null?'—':pct(d.actual)} icon={Gauge} tone={2}/>
    <Metric label="On-time shipments" value={d.dated.length?pct(onTimePct):'—'} icon={Activity} tone={3}/>
    <Metric label="Rejection proxy" value={d.ordered?pct(d.rejected/d.ordered*100):'—'} icon={ShieldCheck} tone={4}/>
-   <Metric label="Rework cost / shipped pc" value={d.shipped?money(d.rework/d.shipped):'—'} icon={Wallet} tone={5}/>
+   <Metric label="Total rework cost" value={d.rework?money(d.rework):'—'} note="Total rework expenditure · INR" icon={Wallet} tone={5}/>
   </div>
   <div className="pi-grid">
    <Section no="01" title="Production Efficiency" icon={Factory}>
