@@ -344,7 +344,7 @@ export default function ProductEconomics({
 
       <Section number="01 · PRODUCT PROFITABILITY" title="Profitability matrix & product ranking" subtitle="Compare product revenue and gross margin; median lines mark the four portfolio groups." icon={Target}>
         <div className="pe-two-col">
-          <Panel title="Revenue vs gross margin matrix" subtitle="Bubble size = distinct orders · X = revenue · Y = GP margin" className="pe-chart-panel">
+          <Panel title="Revenue vs gross margin matrix" subtitle="Bubble size = distinct orders · X = revenue · Y = GP margin" className="pe-chart-panel pe-matrix-panel">
             {d.portfolio.length ? <div className="pe-chart pe-tall-chart"><ResponsiveContainer width="100%" height="100%"><ScatterChart margin={{top:16,right:18,bottom:18,left:6}}>
               <CartesianGrid stroke="#edf1f6" strokeDasharray="3 3"/>
               <XAxis type="number" dataKey="revenueCr" name="Revenue" unit=" Cr" tick={{fontSize:11,fill:'#718198'}}/>
