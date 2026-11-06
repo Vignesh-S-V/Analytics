@@ -1789,3 +1789,54 @@ html,body,#root,.app-shell,.main-area,.content{
   #root .table-bottom .table-page-controls button:last-child{min-width:0}
   #root .table-bottom .table-page-controls>span{min-height:35px;font-size:11px!important}
 }
+
+
+/* ThreadIQ auth — sign-in / create-account switch */
+.auth-mode-switch{
+ display:grid;
+ grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:5px;
+ padding:5px;
+ margin:0 0 18px;
+ border:1px solid #e1e8f1;
+ border-radius:11px;
+ background:#f5f8fc;
+}
+.auth-mode-switch button{
+ min-height:38px;
+ border:1px solid transparent;
+ border-radius:8px;
+ background:transparent;
+ color:#687b94;
+ font:700 12px 'DM Sans',sans-serif;
+ cursor:pointer;
+ transition:background .16s ease,color .16s ease,box-shadow .16s ease;
+}
+.auth-mode-switch button:hover{color:#1e5e9b;background:#edf4fc}
+.auth-mode-switch button.active{
+ border-color:#d9e6f5;
+ background:#fff;
+ color:#1c4f85;
+ box-shadow:0 2px 7px rgba(31,65,105,.07);
+}
+.auth-mode-switch button:focus-visible{
+ outline:3px solid rgba(63,139,211,.22);
+ outline-offset:2px;
+}
+.auth-notice{font-size:12px;line-height:1.65}
+.auth-notice-action{
+ display:block;
+ margin-top:10px;
+ padding:0;
+ border:0;
+ background:transparent;
+ color:#176bce;
+ font:800 12px 'DM Sans',sans-serif;
+ cursor:pointer;
+}
+.auth-notice-action:hover{text-decoration:underline}
+.auth-footnote{font-size:10px;line-height:1.65}
+@media(max-width:480px){
+ .auth-mode-switch{margin-bottom:15px}
+ .auth-mode-switch button{min-height:40px;font-size:12px}
+}
