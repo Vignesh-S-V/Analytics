@@ -70,3 +70,27 @@
 #root .tp-report-foot{display:flex;justify-content:space-between;gap:12px;padding:10px 15px;border-top:1px solid #edf1f6;color:#8a98aa;font-size:9px}
 @media(max-width:1100px){#root .tp-filter-card{grid-template-columns:repeat(3,minmax(0,1fr))}#root .tp-filter-hint{grid-column:1/-1}#root .tp-builder-grid{grid-template-columns:210px minmax(0,1fr)}#root .tp-drop-zones{grid-template-columns:1fr 1fr}#root .tp-value-zone{grid-column:1/-1}#root .tp-summary-strip{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:760px){#root .tp-intro{flex-direction:column;align-items:flex-start}#root .tp-filter-card{grid-template-columns:1fr 1fr}#root .tp-filter-hint{grid-column:1/-1}#root .tp-builder-grid{grid-template-columns:1fr}#root .tp-fields-panel{position:static}#root .tp-field-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}#root .tp-drop-zones{grid-template-columns:1fr}#root .tp-value-zone{grid-column:auto}#root .tp-report-heading{align-items:flex-start;flex-direction:column}#root .tp-summary-strip{grid-template-columns:1fr 1fr}#root .tp-report-foot{flex-direction:column}}
+
+/* Readability pass: Test pivot */
+#root .tp-kicker{font-size:10.5px;letter-spacing:1.2px}
+#root .tp-intro h2{font-size:26px}
+#root .tp-reset{font-size:12px}
+#root .tp-filter-card label>span{font-size:12px}
+#root .tp-filter-card select,#root .tp-filter-card input{font-size:13px}
+#root .tp-fields-heading h3,#root .tp-report-heading h3{font-size:16px}
+#root .tp-field-chip{font-size:13px;padding:10px}
+#root .tp-zone-label{font-size:10px}
+#root .tp-row-field{font-size:11.5px}
+#root .tp-row-field>b{font-size:9px}
+#root .tp-zone-note{font-size:10.5px}
+#root .tp-report-heading .tp-row-count{font-size:11px}
+#root .tp-summary-strip span{font-size:11px}
+#root .tp-summary-strip strong{font-size:19px}
+#root .tp-table th{font-size:11.5px;padding:12px 14px}
+#root .tp-table td{font-size:12px;padding:12px 14px}
+#root .tp-hierarchy-label strong{font-size:12px}
+#root .tp-expand{width:24px;height:24px;flex-basis:24px}
+#root .tp-expand-spacer{width:24px;flex-basis:24px}
+#root .tp-data-note{font-size:11.5px;line-height:1.55}
+#root .tp-empty-state strong{font-size:14px}
+#root .tp-empty-state p{font-size:12px}
