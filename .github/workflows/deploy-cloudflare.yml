@@ -1,20 +1,9 @@
 name: Deploy Analytics to Cloudflare Workers
 
+# Production auto-deploy is owned by the Cloudflare Workers Builds
+# connection for this Worker. Keep this workflow as a manual fallback only.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "src/**"
-      - "public/**"
-      - "python_backend/**"
-      - "wrangler.jsonc"
-      - "pyproject.toml"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/deploy-cloudflare.yml"
-      - "vite.config.js"
-      - ".env.production"
 
 permissions:
   contents: read
