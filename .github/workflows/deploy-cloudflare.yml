@@ -106,4 +106,32 @@ jobs:
               if os.environ.get(name)
           }))
           PY
-          uv run pywrangler deploy --config wrangler.jsonc --secrets-file "$secret_file"
+          # Cloudflare's Workers service metadata endpoint can briefly return
+          # 503 "no healthy upstream". Retry only that confirmed transient GET failure;
+          # do not retry auth, build, or configuration errors.
+          max_attempts=4
+          for attempt in $(seq 1 "$max_attempts"); do
+            output_file="$(mktemp)"
+            set +e
+            uv run pywrangler deploy --config wrangler.jsonc --secrets-file "$secret_file" 2>&1 | tee "$output_file"
+            deploy_status=${PIPESTATUS[0]}
+            set -e
+
+            if [ "$deploy_status" -eq 0 ]; then
+              rm -f "$output_file"
+              exit 0
+            fi
+
+            if grep -Eqi 'no healthy upstream|503 Service Unavailable' "$output_file" \
+              && grep -Eqi '/workers/services/analytics' "$output_file" \
+              && [ "$attempt" -lt "$max_attempts" ]; then
+              delay=$((attempt * 15))
+              echo "::warning::Cloudflare Workers API returned a transient 503. Retrying in ${delay}s (attempt $((attempt + 1))/$max_attempts)."
+              rm -f "$output_file"
+              sleep "$delay"
+              continue
+            fi
+
+            rm -f "$output_file"
+            exit "$deploy_status"
+          done
