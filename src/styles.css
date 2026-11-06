@@ -1835,6 +1835,7 @@ html,body,#root,.app-shell,.main-area,.content{
  cursor:pointer;
 }
 .auth-notice-action:hover{text-decoration:underline}
+.auth-resend-message{display:block;margin-top:8px;color:#526c89;font-size:11px;line-height:1.5;overflow-wrap:anywhere}
 .auth-footnote{font-size:10px;line-height:1.65}
 @media(max-width:480px){
  .auth-mode-switch{margin-bottom:15px}
