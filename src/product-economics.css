@@ -260,3 +260,37 @@
  #root .pe-alert-description{font-size:10px}
  #root .pe-alert-next{font-size:9px}
 }
+
+
+/* Smart Alerts — improve readability without changing other page typography */
+#root .pe-alert-title b{font-size:14px;line-height:1.4}
+#root .pe-alert-title em{font-size:10px;padding:4px 8px}
+#root .pe-alert-description{font-size:13px;line-height:1.55}
+#root .pe-alert-next{font-size:12px;line-height:1.55}
+#root .pe-alert-right>strong{font-size:13px}
+#root .pe-alert-view{font-size:11px}
+#root .pe-alert-icon{width:36px;height:36px}
+#root .pe-alert-trigger{grid-template-columns:38px minmax(0,1fr) auto;padding:15px 16px;gap:13px}
+#root .pe-alert-detail{padding:15px 16px 17px 67px}
+#root .pe-alert-detail-head b{font-size:13px}
+#root .pe-alert-detail-head small{font-size:11px}
+#root .pe-alert-detail-table{font-size:12px}
+#root .pe-alert-detail-table th{font-size:12px;padding:11px 12px}
+#root .pe-alert-detail-table td{font-size:12px;padding:12px}
+#root .pe-alert-detail-table td b{font-size:12px;max-width:340px}
+#root .pe-alert-detail-table td small{font-size:11px}
+#root .pe-alert-no-details{font-size:12px;padding:14px}
+#root .pe-threshold-grid label>span{font-size:13px}
+#root .pe-threshold-grid input{height:46px;font-size:14px}
+#root .pe-panel-head h3{font-size:16px}
+#root .pe-panel-head p{font-size:11px}
+@media(max-width:600px){
+ #root .pe-alert-trigger{grid-template-columns:34px minmax(0,1fr);padding:13px;gap:10px}
+ #root .pe-alert-icon{width:32px;height:32px}
+ #root .pe-alert-title b{font-size:13px}
+ #root .pe-alert-description{font-size:12px}
+ #root .pe-alert-next{font-size:11px}
+ #root .pe-alert-detail{padding:12px}
+ #root .pe-alert-detail-table th,#root .pe-alert-detail-table td{font-size:11px;padding:10px}
+ #root .pe-threshold-grid label>span{font-size:12px}
+}
