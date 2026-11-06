@@ -75,8 +75,10 @@ export default function TestForecasting({ orders = [], rowFields = [], dimension
   );
   const invalidDimension = rowFields.includes("order_id");
   const aggregation = useMemo(
-    () => aggregateMonthlySeries(orders, rowFields, measureKey, product),
-    [orders, rowFields, measureKey, product]
+    () => invalidDimension
+      ? { months: [], groups: [], parents: new Map(), filteredRows: [] }
+      : aggregateMonthlySeries(orders, rowFields, measureKey, product),
+    [orders, rowFields, measureKey, product, invalidDimension]
   );
   const tooManyGroups = aggregation.groups.length > 250;
   const modelRows = useMemo(() => {
@@ -302,7 +304,7 @@ export default function TestForecasting({ orders = [], rowFields = [], dimension
                     : "The selected model had the lowest horizon-specific WAPE among the tested candidates for this series."}
               </p>
               <div className="tf-candidate-list">
-                <b>Candidate comparison</b>
+                <b>{selected?.model?.includes("Top-down") ? "Parent model selection comparison" : "Candidate comparison"}</b>
                 {(modelScores.length ? modelScores : []).map(item => (
                   <div className="tf-candidate-row" key={item.model}>
                     <span>{item.model}</span><strong>{percentage(item.wape)}</strong><small>{item.folds} folds</small>
@@ -346,7 +348,7 @@ export default function TestForecasting({ orders = [], rowFields = [], dimension
 
       <div className="tf-method-note">
         <ShieldCheck size={16} />
-        <span>All forecasts use monthly history only. The current source has no price-promotion, inventory-stockout or holiday-event regressors, so the engine does not invent them. Forecasts are re-trained in the browser from the latest rows available in the workspace.</span>
+        <span>Candidate methods: Naive, Seasonal Naive, Damped Trend, Trend + Seasonality and Croston SBA for intermittent demand. ARIMA/SARIMA and high-capacity LightGBM/XGBoost/LSTM/TFT are not enabled for this 24-month source: per-series history is too short and price, promotion, stockout and holiday regressors are absent, so extra model complexity would invite overfit. Forecasts are re-trained in the browser from the latest rows available in the workspace.</span>
       </div>
     </section>
   );
