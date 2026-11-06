@@ -205,7 +205,8 @@ function AuthScreen({db}){
      }
     });
     if(error)throw error;
-    if(data?.session)await db.auth.signOut();
+    // Keep any session returned by Supabase. With email confirmation enabled this is normally null;
+    // after confirmation, the callback session is handled by the auth listener below.
     setPassword('');
     setConfirmPassword('');
     setNotice('Account request submitted. Check your email for a verification link. After verification, the workspace owner must approve your account before any business data is available.');
@@ -313,7 +314,82 @@ function App(){
  const [page,setPage]=useState('Overview'),[navRipple,setNavRipple]=useState(null),navRippleSequence=useRef(0),[range,setRange]=useState('All available periods'),[country,setCountry]=useState('All countries'),[status,setStatus]=useState('Loading performance metrics'),[aggregateRows,setAggregateRows]=useState([]),[orders,setOrders]=useState([]),[detailsLoaded,setDetailsLoaded]=useState(false),[detailStatus,setDetailStatus]=useState('idle'),[gpCostRows,setGpCostRows]=useState([]),[gpCostLoaded,setGpCostLoaded]=useState(false),[gpCostError,setGpCostError]=useState(''),[marketingRows,setMarketingRows]=useState([]),[supplierRows,setSupplierRows]=useState([]),[marketRows,setMarketRows]=useState([]),[search,setSearch]=useState(''),[orderPage,setOrderPage]=useState(0),[productKey,setProductKey]=useState('All products'),[taxRate,setTaxRate]=useState('5');
  const db=useMemo(()=>SUPABASE_URL&&SUPABASE_PUBLIC_KEY?createClient(SUPABASE_URL,SUPABASE_PUBLIC_KEY,{auth:{persistSession:false,autoRefreshToken:true,detectSessionInUrl:true}}):null,[]);
  const [authSession,setAuthSession]=useState(null),[authLoading,setAuthLoading]=useState(true),[accessStatus,setAccessStatus]=useState('checking'),[accessRetry,setAccessRetry]=useState(0);
- useEffect(()=>{if(!db){setAuthLoading(false);setAccessStatus('error');return}let active=true;db.auth.getSession().then(({data,error})=>{if(!active)return;if(error){setAuthSession(null);setAccessStatus('error')}else setAuthSession(data.session??null);setAuthLoading(false)});const {data:{subscription}}=db.auth.onAuthStateChange((_event,session)=>{if(!active)return;setAuthSession(session);setAuthLoading(false)});return()=>{active=false;subscription.unsubscribe()}},[db]);
+ useEffect(()=>{
+  if(!db){setAuthLoading(false);setAccessStatus('error');return}
+  let active=true;
+  let applyingPeerAuth=false;
+  const tabId=typeof crypto!=='undefined'&&crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+Math.random().toString(36).slice(2);
+  let authChannel=null;
+  const broadcastSession=session=>{
+   if(!authChannel||!session?.access_token||!session?.refresh_token)return;
+   authChannel.postMessage({type:'THREADIQ_AUTH_SESSION',source:tabId,access_token:session.access_token,refresh_token:session.refresh_token});
+  };
+  const handlePeerMessage=async event=>{
+   const message=event?.data;
+   if(!active||!message||message.source===tabId)return;
+   if(message.type==='THREADIQ_AUTH_SESSION'&&message.access_token&&message.refresh_token){
+    try{
+     applyingPeerAuth=true;
+     const {data,error}=await db.auth.setSession({access_token:message.access_token,refresh_token:message.refresh_token});
+     if(error)throw error;
+     if(active&&data?.session){setAuthSession(data.session);setAuthLoading(false)}
+    }catch(error){
+     console.warn('Could not hand off the verified session to this browser tab:',error?.message||error);
+    }finally{
+     applyingPeerAuth=false;
+    }
+   }else if(message.type==='THREADIQ_AUTH_SIGN_OUT'){
+    try{
+     applyingPeerAuth=true;
+     await db.auth.signOut({scope:'local'});
+    }finally{
+     applyingPeerAuth=false;
+    }
+   }
+  };
+  try{
+   if(typeof BroadcastChannel!=='undefined'){
+    authChannel=new BroadcastChannel('threadiq-auth-session-v1');
+    authChannel.addEventListener('message',handlePeerMessage);
+   }
+  }catch(error){
+   console.warn('Cross-tab sign-in handoff is unavailable in this browser:',error?.message||error);
+  }
+  const {data:{subscription}}=db.auth.onAuthStateChange((event,session)=>{
+   if(!active)return;
+   setAuthSession(session);
+   setAuthLoading(false);
+   if(applyingPeerAuth)return;
+   if(event==='SIGNED_IN'&&session)broadcastSession(session);
+   if(event==='SIGNED_OUT'&&authChannel)authChannel.postMessage({type:'THREADIQ_AUTH_SIGN_OUT',source:tabId});
+  });
+  // Supabase may process an email-verification URL before React attaches this listener.
+  // Read the resulting in-memory session and relay it to any already-open ThreadIQ tab.
+  db.auth.getSession().then(({data,error})=>{
+   if(!active)return;
+   if(error){setAuthSession(null);setAccessStatus('error')}
+   else{
+    const session=data.session??null;
+    setAuthSession(session);
+    if(session)broadcastSession(session);
+   }
+   setAuthLoading(false);
+  }).catch(error=>{
+   if(!active)return;
+   console.error('Could not read the Supabase session:',error?.message||error);
+   setAuthSession(null);
+   setAccessStatus('error');
+   setAuthLoading(false);
+  });
+  return()=>{
+   active=false;
+   subscription.unsubscribe();
+   if(authChannel){
+    authChannel.removeEventListener('message',handlePeerMessage);
+    authChannel.close();
+   }
+  };
+ },[db]);
  useEffect(()=>{
   if(!db)return;
   const handlePageShow=event=>{
