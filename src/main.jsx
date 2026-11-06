@@ -131,7 +131,7 @@ if(typeof window!=='undefined'&&supabaseProjectRef){
  try{window.localStorage.removeItem('sb-'+supabaseProjectRef+'-auth-token')}catch{}
 }
 
-const AUTH_REDIRECT_URL='https://analytics.vigneshw-5416.workers.dev/';
+const AUTH_REDIRECT_URL='https://analytics-mis.onrender.com/';
 const configuredPublicKey=String(import.meta.env.VITE_SUPABASE_ANON_KEY||import.meta.env.VITE_SUPABASE_LEGACY_ANON_KEY||'').trim();
 const SUPABASE_PUBLIC_KEY=configuredPublicKey&&!/^(your_|replace|placeholder)/i.test(configuredPublicKey)?configuredPublicKey:'sb_publishable_kV77uVff2Gv6PiW1b1xBrw_4XsqB_00';
 const fiscalYearStart=date=>{if(!date)return null;const [y,m]=String(date).slice(0,10).split('-').map(Number);return Number.isFinite(y)&&Number.isFinite(m)?(m>=4?y:y-1):null;};
