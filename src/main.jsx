@@ -126,7 +126,7 @@ async function fetchAllRowsInPages(buildQuery,pageSize=1000,parallelPages=5){
  }
 }
 const SUPABASE_URL=String(import.meta.env.VITE_SUPABASE_URL||'https://rzsgdfpwnxhseyxtrrlx.supabase.co').trim();
-const supabaseProjectRef=SUPABASE_URL.match(/^https?:\\/\\/([^.]+)/i)?.[1];
+const supabaseProjectRef=SUPABASE_URL.split('//')[1]?.split('.')[0];
 if(typeof window!=='undefined'&&supabaseProjectRef){
  try{window.localStorage.removeItem('sb-'+supabaseProjectRef+'-auth-token')}catch{}
 }
